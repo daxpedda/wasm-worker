@@ -1,0 +1,9 @@
+[build]
+target = "wasm32-unknown-unknown"
+rustflags = ["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals"]
+
+[unstable]
+build-std = ["panic_abort", "std"]
+
+[env]
+WASM_SERVER_RUNNER_NO_MODULE = "1"
