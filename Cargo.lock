@@ -86,7 +86,7 @@ checksum = "c4f5b37a154999a8f3f98cc23a628d850e154479cd94decf3414696e12e31aaf"
 [[package]]
 name = "wasm-bindgen"
 version = "0.2.82"
-source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#68c32c02419d8f84665d4d7e0a8cee76feb3e7a7"
+source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#18dcd7f2f0f053c406fe2f6ec943a52969e42a2d"
 dependencies = [
  "cfg-if",
  "wasm-bindgen-macro",
@@ -95,7 +95,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-backend"
 version = "0.2.82"
-source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#68c32c02419d8f84665d4d7e0a8cee76feb3e7a7"
+source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#18dcd7f2f0f053c406fe2f6ec943a52969e42a2d"
 dependencies = [
  "bumpalo",
  "log",
@@ -109,7 +109,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-macro"
 version = "0.2.82"
-source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#68c32c02419d8f84665d4d7e0a8cee76feb3e7a7"
+source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#18dcd7f2f0f053c406fe2f6ec943a52969e42a2d"
 dependencies = [
  "quote",
  "wasm-bindgen-macro-support",
@@ -118,7 +118,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-macro-support"
 version = "0.2.82"
-source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#68c32c02419d8f84665d4d7e0a8cee76feb3e7a7"
+source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#18dcd7f2f0f053c406fe2f6ec943a52969e42a2d"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -130,7 +130,7 @@ dependencies = [
 [[package]]
 name = "wasm-bindgen-shared"
 version = "0.2.82"
-source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#68c32c02419d8f84665d4d7e0a8cee76feb3e7a7"
+source = "git+https://github.com/daxpedda/wasm-bindgen?branch=despair#18dcd7f2f0f053c406fe2f6ec943a52969e42a2d"
 
 [[package]]
 name = "wasm-thread"
