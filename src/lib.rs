@@ -1,6 +1,7 @@
-use std::mem;
+use std::ops::Deref;
 
 use js_sys::Array;
+use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 use web_sys::Blob;
@@ -8,38 +9,65 @@ use web_sys::BlobPropertyBag;
 use web_sys::Url;
 use web_sys::Worker;
 
-type WebWorkerContext = Box<dyn 'static + FnOnce() + Send>;
+static URL: Lazy<WorkerUrl> = Lazy::new(worker_url);
+
+enum WebWorkerContext {
+    Closure(Box<dyn 'static + FnOnce() + Send>),
+    Fn(fn()),
+}
 
 pub fn spawn<F: 'static + FnOnce() + Send>(f: F) {
-    let script = include_str!("web_worker_closure.js");
-    let header = format!("importScripts('{}');\n", wasm_bindgen::script_url());
+    spawn_internal(WebWorkerContext::Closure(Box::new(f)));
+}
 
-    let sequence = Array::of2(&JsValue::from(header.as_str()), &JsValue::from(script));
-    let mut property = BlobPropertyBag::new();
-    property.type_("text/javascript");
-    let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap();
+pub fn spawn_fn(f: fn()) {
+    spawn_internal(WebWorkerContext::Fn(f));
+}
 
-    let url = Url::create_object_url_with_blob(&blob).unwrap();
+fn spawn_internal(context: WebWorkerContext) {
+    let worker = Worker::new(&URL).unwrap();
 
-    let worker = Worker::new(&url).unwrap();
-
-    let f: *mut WebWorkerContext = Box::into_raw(Box::new(Box::new(f)));
+    let context = Box::into_raw(Box::new(context));
 
     let init = Array::of3(
         &wasm_bindgen::module(),
         &wasm_bindgen::memory(),
-        &JsValue::from(f as usize),
+        &(context as usize).into(),
     );
 
     if let Err(err) = worker.post_message(&init) {
-        drop(unsafe { Box::from_raw(f) });
+        drop(unsafe { Box::from_raw(context) });
         Err(err).unwrap()
     }
 }
 
-pub fn spawn_fn(f: fn()) {
-    let script = include_str!("web_worker_fn.js");
+#[wasm_bindgen]
+pub fn __wasm_thread_entry(context: usize) {
+    match *unsafe { Box::from_raw(context as *mut WebWorkerContext) } {
+        WebWorkerContext::Closure(f) => f(),
+        WebWorkerContext::Fn(f) => f(),
+    }
+}
+
+struct WorkerUrl(String);
+
+impl Deref for WorkerUrl {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl Drop for WorkerUrl {
+    fn drop(&mut self) {
+        Url::revoke_object_url(&self.0).unwrap();
+    }
+}
+
+fn worker_url() -> WorkerUrl {
     let header = format!("importScripts('{}');\n", wasm_bindgen::script_url());
+    let script = include_str!("web_worker.js");
 
     let sequence = Array::of2(&JsValue::from(header.as_str()), &JsValue::from(script));
     let mut property = BlobPropertyBag::new();
@@ -48,24 +76,5 @@ pub fn spawn_fn(f: fn()) {
 
     let url = Url::create_object_url_with_blob(&blob).unwrap();
 
-    let worker = Worker::new(&url).unwrap();
-
-    let init = Array::new();
-    init.push(&wasm_bindgen::module());
-    init.push(&wasm_bindgen::memory());
-    init.push(&JsValue::from(f as usize));
-
-    worker.post_message(&init).unwrap()
-}
-
-#[wasm_bindgen]
-pub fn __wasm_thread_closure(ptr: usize) {
-    let f = unsafe { Box::from_raw(ptr as *mut WebWorkerContext) };
-    f();
-}
-
-#[wasm_bindgen]
-pub fn __wasm_thread_fn(ptr: usize) {
-    let f = unsafe { mem::transmute::<_, fn()>(ptr) };
-    f();
+    WorkerUrl(url)
 }
