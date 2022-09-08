@@ -1,6 +1,15 @@
+use std::error::Error;
+use std::fmt;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::future::Future;
 use std::ops::Deref;
+use std::pin::Pin;
+use std::task::Context;
+use std::task::Poll;
 
+use futures_channel::oneshot;
+use futures_channel::oneshot::Receiver;
 use js_sys::Array;
 use js_sys::Function;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -16,20 +25,55 @@ use web_sys::Worker;
 
 enum WorkerContext {
     Closure(Box<dyn 'static + FnOnce() + Send>),
-    Fn(fn()),
-    Future(Box<dyn 'static + Future<Output = ()> + Send + Unpin>),
+    Future(Box<dyn 'static + FnOnce() -> Pin<Box<dyn 'static + Future<Output = ()>>> + Send>),
 }
 
-pub fn spawn<F: 'static + FnOnce() + Send>(f: F) {
-    spawn_internal(WorkerContext::Closure(Box::new(f)));
+pub struct JoinHandle<R>(Receiver<R>);
+
+#[derive(Clone, Copy, Debug)]
+pub struct Canceled;
+
+impl Display for Canceled {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "worker cancelled before receiving a return value")
+    }
 }
 
-pub fn spawn_fn(f: fn()) {
-    spawn_internal(WorkerContext::Fn(f));
+impl Error for Canceled {}
+
+impl<R> Future for JoinHandle<R> {
+    type Output = Result<R, Canceled>;
+
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        Pin::new(&mut self.0).poll(cx).map_err(|_| Canceled)
+    }
 }
 
-pub fn spawn_async<F: 'static + Future<Output = ()> + Send + Unpin>(f: F) {
-    spawn_internal(WorkerContext::Future(Box::new(f)));
+pub fn spawn<F, R>(f: F) -> JoinHandle<R>
+where
+    F: 'static + FnOnce() -> R + Send,
+    R: 'static + Send,
+{
+    let (sender, receiver) = oneshot::channel();
+    spawn_internal(WorkerContext::Closure(Box::new(|| {
+        let _ = sender.send(f());
+    })));
+    JoinHandle(receiver)
+}
+
+pub fn spawn_async<F1, F2, R>(f: F1) -> JoinHandle<R>
+where
+    F1: 'static + FnOnce() -> F2 + Send,
+    F2: 'static + Future<Output = R>,
+    R: 'static + Send,
+{
+    let (sender, receiver) = oneshot::channel();
+    spawn_internal(WorkerContext::Future(Box::new(|| {
+        Box::pin(async {
+            let _ = sender.send(f().await);
+        })
+    })));
+    JoinHandle(receiver)
 }
 
 fn spawn_internal(context: WorkerContext) {
@@ -67,8 +111,7 @@ fn spawn_internal_ptr(context: *mut WorkerContext) {
 pub async fn __wasm_thread_entry(context: usize) {
     match *unsafe { Box::from_raw(context as *mut WorkerContext) } {
         WorkerContext::Closure(f) => f(),
-        WorkerContext::Fn(f) => f(),
-        WorkerContext::Future(f) => f.await,
+        WorkerContext::Future(f) => f().await,
     }
 }
 

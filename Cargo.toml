@@ -5,6 +5,9 @@ edition = "2021"
 publish = false
 
 [dependencies]
+futures-channel = { version = "0.3", default-features = false, features = [
+  "alloc",
+] }
 js-sys = "0.3"
 wasm-bindgen = { version = "0.2", default-features = false }
 wasm-bindgen-futures = "0.4"
