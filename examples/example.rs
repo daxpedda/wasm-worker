@@ -12,7 +12,8 @@ fn main() {
     wasm_thread::spawn_fn(blubb);
     wasm_thread::spawn_fn(blubb);
     wasm_thread::spawn_fn(blubb);
-    wasm_thread::spawn_fn(blubb);
+    wasm_thread::spawn_fn(|| console::log_1(&"fake fn".into()));
+    wasm_thread::spawn(|| wasm_thread::spawn(|| console::log_1(&"nested".into())));
 }
 
 fn blubb() {

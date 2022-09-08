@@ -11,6 +11,8 @@ wasm-bindgen = { version = "0.2", default-features = false }
 web-sys = { version = "0.3", features = [
   "Blob",
   "BlobPropertyBag",
+  "DedicatedWorkerGlobalScope",
+  "MessageEvent",
   "Url",
   "Worker",
 ] }
