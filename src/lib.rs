@@ -1,7 +1,7 @@
 use std::ops::Deref;
 
 use js_sys::Array;
-use once_cell::sync::Lazy;
+use js_sys::Function;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
@@ -31,39 +31,23 @@ fn spawn_internal(context: WorkerContext) {
 }
 
 fn spawn_internal_ptr(context: *mut WorkerContext) {
-    let result = GLOBAL.with(|global| {
-        match global {
-            WindowOrWorker::Window => {
-                static WORKER_URL: Lazy<WorkerUrl> = Lazy::new(worker_url);
+    let result = GLOBAL.with(|global| match global {
+        WindowOrWorker::Window => match WORKER_URL.with(|worker_url| Worker::new(worker_url)) {
+            Ok(worker) => {
+                NESTED_WORKER.with(|callback| worker.set_onmessage(Some(callback)));
 
-                match Worker::new(&WORKER_URL) {
-                    Ok(worker) => {
-                        thread_local! {
-                            static NESTED_WORKER: Closure<dyn FnMut(&MessageEvent)> =
-                                Closure::wrap(Box::new(|event: &MessageEvent| {
-                                    let context =
-                                        event.data().as_f64().unwrap().to_bits() as *mut WorkerContext;
-                                    spawn_internal_ptr(context);
-                                }));
-                        }
+                let init = Array::of3(
+                    &wasm_bindgen::module(),
+                    &wasm_bindgen::memory(),
+                    &(context as usize).into(),
+                );
 
-                        NESTED_WORKER
-                            .with(|callback| worker.set_onmessage(Some(callback.as_ref().unchecked_ref())));
-
-                        let init = Array::of3(
-                            &wasm_bindgen::module(),
-                            &wasm_bindgen::memory(),
-                            &(context as usize).into(),
-                        );
-
-                        worker.post_message(&init)
-                    }
-                    Err(error) => Err(error),
-                }
-            },
-            WindowOrWorker::Worker(worker) => {
-                worker.post_message(&f64::from_bits(context as u64).into())
-            },
+                worker.post_message(&init)
+            }
+            Err(error) => Err(error),
+        },
+        WindowOrWorker::Worker(worker) => {
+            worker.post_message(&f64::from_bits(context as u64).into())
         }
     });
 
@@ -79,6 +63,10 @@ pub fn __wasm_thread_entry(context: usize) {
         WorkerContext::Closure(f) => f(),
         WorkerContext::Fn(f) => f(),
     }
+}
+
+thread_local! {
+    static WORKER_URL: WorkerUrl = worker_url();
 }
 
 struct WorkerUrl(String);
@@ -109,6 +97,24 @@ fn worker_url() -> WorkerUrl {
     let url = Url::create_object_url_with_blob(&blob).unwrap();
 
     WorkerUrl(url)
+}
+
+thread_local! {
+    static NESTED_WORKER: NestedWorker =
+        NestedWorker(Closure::wrap(Box::new(|event: &MessageEvent| {
+            let context = event.data().as_f64().unwrap().to_bits() as *mut WorkerContext;
+            spawn_internal_ptr(context);
+        })));
+}
+
+struct NestedWorker(Closure<dyn FnMut(&MessageEvent)>);
+
+impl Deref for NestedWorker {
+    type Target = Function;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unchecked_ref()
+    }
 }
 
 thread_local! {
