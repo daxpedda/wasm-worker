@@ -1,29 +1,28 @@
 [package]
-name = "wasm-thread"
-version = "0.0.0"
 edition = "2021"
+name = "wasm-thread"
 publish = false
+version = "0.0.0"
 
 [dependencies]
-futures-channel = { version = "0.3", default-features = false, features = [
-  "alloc",
-] }
+futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
 js-sys = "0.3"
 wasm-bindgen = { version = "0.2", default-features = false }
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = [
-  "Blob",
-  "BlobPropertyBag",
-  "DedicatedWorkerGlobalScope",
-  "MessageEvent",
-  "Url",
-  "Worker",
+	"Blob",
+	"BlobPropertyBag",
+	"console",
+	"DedicatedWorkerGlobalScope",
+	"MessageEvent",
+	"Url",
+	"Worker",
 ] }
 
 [dev-dependencies]
 console_error_panic_hook = "0.1"
-web-sys = { version = "0.3", features = ["console"] }
 
 [patch.crates-io]
 # https://github.com/rustwasm/wasm-bindgen/pull/3032
+# https://github.com/rustwasm/wasm-bindgen/pull/3062
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
