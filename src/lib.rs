@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::ops::Deref;
 
 use js_sys::Array;
@@ -16,6 +17,7 @@ use web_sys::Worker;
 enum WorkerContext {
     Closure(Box<dyn 'static + FnOnce() + Send>),
     Fn(fn()),
+    Future(Box<dyn 'static + Future<Output = ()> + Send + Unpin>),
 }
 
 pub fn spawn<F: 'static + FnOnce() + Send>(f: F) {
@@ -24,6 +26,10 @@ pub fn spawn<F: 'static + FnOnce() + Send>(f: F) {
 
 pub fn spawn_fn(f: fn()) {
     spawn_internal(WorkerContext::Fn(f));
+}
+
+pub fn spawn_async<F: 'static + Future<Output = ()> + Send + Unpin>(f: F) {
+    spawn_internal(WorkerContext::Future(Box::new(f)));
 }
 
 fn spawn_internal(context: WorkerContext) {
@@ -58,10 +64,11 @@ fn spawn_internal_ptr(context: *mut WorkerContext) {
 }
 
 #[wasm_bindgen]
-pub fn __wasm_thread_entry(context: usize) {
+pub async fn __wasm_thread_entry(context: usize) {
     match *unsafe { Box::from_raw(context as *mut WorkerContext) } {
         WorkerContext::Closure(f) => f(),
         WorkerContext::Fn(f) => f(),
+        WorkerContext::Future(f) => f.await,
     }
 }
 
