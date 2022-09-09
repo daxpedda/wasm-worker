@@ -24,7 +24,6 @@ rustflags = [
 	# Clippy restriction lints.
 	"-Wclippy::as_conversions",
 	"-Wclippy::clone_on_ref_ptr",
-	"-Wclippy::default_numeric_fallback",
 	"-Wclippy::empty_structs_with_brackets",
 	"-Wclippy::if_then_some_else_none",
 	"-Wclippy::lossy_float_literal",
