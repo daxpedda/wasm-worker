@@ -35,6 +35,7 @@ rustflags = [
 	"-Wclippy::string_add",
 	"-Wclippy::string_slice",
 	"-Wclippy::string_to_string",
+	"-Wclippy::todo",
 	"-Wclippy::try_err",
 	"-Wclippy::undocumented_unsafe_blocks",
 	"-Wclippy::unnecessary_self_imports",

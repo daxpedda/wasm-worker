@@ -1,12 +1,18 @@
 [package]
 edition = "2021"
-name = "wasm-thread"
+name = "wasm-worker"
 publish = false
 version = "0.0.0"
 
+[features]
+message = ["dep:vec_map"]
+
 [dependencies]
 futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
+futures-util = { version = "0.3", default-features = false }
 js-sys = "0.3"
+pin-project-lite = "0.2"
+vec_map = { version = "0.8", optional = true }
 wasm-bindgen = { version = "0.2", default-features = false }
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = [
@@ -14,6 +20,7 @@ web-sys = { version = "0.3", features = [
 	"BlobPropertyBag",
 	"console",
 	"DedicatedWorkerGlobalScope",
+	"ErrorEvent",
 	"MessageEvent",
 	"Url",
 	"Worker",
@@ -21,6 +28,7 @@ web-sys = { version = "0.3", features = [
 
 [dev-dependencies]
 console_error_panic_hook = "0.1"
+futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 
 [patch.crates-io]
 # https://github.com/rustwasm/wasm-bindgen/pull/3032
