@@ -5,6 +5,9 @@ target = "wasm32-unknown-unknown"
 [unstable]
 build-std = ["panic_abort", "std"]
 
+[target.wasm32-unknown-unknown]
+runner = "wasm-bindgen-test-runner"
+
 [target.'cfg(all())']
 rustflags = [
 	# `rustflags` overwrite each other.
@@ -74,4 +77,5 @@ rustflags = [
 ]
 
 [env]
+WASM_BINDGEN_USE_NO_MODULE = "1"
 WASM_SERVER_RUNNER_NO_MODULE = "1"

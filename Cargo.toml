@@ -28,8 +28,10 @@ web-sys = { version = "0.3", features = [
 
 [dev-dependencies]
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
+wasm-bindgen-test = "0.3"
 
 [patch.crates-io]
 # https://github.com/rustwasm/wasm-bindgen/pull/3032
 # https://github.com/rustwasm/wasm-bindgen/pull/3062
+# https://github.com/rustwasm/wasm-bindgen/pull/3084
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
