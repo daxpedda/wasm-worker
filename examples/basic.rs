@@ -19,7 +19,10 @@ fn main() {}
 #[wasm_bindgen(start)]
 #[allow(clippy::future_not_send)]
 pub async fn main_js() -> Result<(), JsValue> {
-	panic::set_hook(Box::new(console_error_panic_hook::hook));
+	panic::set_hook(Box::new(|panic_info| {
+		console_error_panic_hook::hook(panic_info);
+		wasm_worker::hook(panic_info);
+	}));
 
 	// Spawning closures.
 	for index in 0..10 {

@@ -5,13 +5,15 @@
 #![allow(rustdoc::missing_doc_code_examples)]
 
 mod global;
+mod message_handler;
+mod try_catch;
 mod worker_url;
 #[cfg(feature = "message")]
 mod workers;
 
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
-use std::ops::Deref;
+use std::panic::PanicInfo;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 use std::{error, fmt};
@@ -19,11 +21,12 @@ use std::{error, fmt};
 use futures_channel::oneshot;
 use futures_channel::oneshot::Receiver;
 use global::{Global, GLOBAL};
-use js_sys::{Array, Function};
-use pin_project_lite::pin_project;
-use wasm_bindgen::prelude::{wasm_bindgen, Closure};
-use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{DedicatedWorkerGlobalScope, MessageEvent, Worker};
+use js_sys::Array;
+use message_handler::{Message, WorkerContext, MESSAGE_HANDLER};
+use try_catch::TryFuture;
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
+use web_sys::{DedicatedWorkerGlobalScope, Worker};
 use worker_url::WORKER_URL;
 #[cfg(feature = "message")]
 use workers::{Id, IDS, WORKERS};
@@ -61,12 +64,6 @@ impl<R> Debug for WorkerHandle<R> {
 	}
 }
 
-impl<R> Debug for Return<R> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_tuple("Running").field(&"Receiver<R>").finish()
-	}
-}
-
 impl<R> Future for WorkerHandle<R> {
 	type Output = Result<R, Error>;
 
@@ -77,6 +74,12 @@ impl<R> Future for WorkerHandle<R> {
 		self.return_.take();
 
 		Poll::Ready(result)
+	}
+}
+
+impl<R> Debug for Return<R> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.debug_tuple("Running").field(&"Receiver<R>").finish()
 	}
 }
 
@@ -123,7 +126,7 @@ impl<R> WorkerHandle<R> {
 				});
 			}
 			// Workers have to instruct the window to terminate the worker for them.
-			Global::Worker(worker) => worker.post_message_ext(Message::Terminate(self.id)),
+			Global::Worker(worker) => Message::Terminate(self.id).post_message(worker),
 		});
 
 		result
@@ -205,11 +208,11 @@ where
 	#[cfg(feature = "message")]
 	let id = IDS.next();
 	let context = WorkerContext::Closure(Box::new(move || {
-		let result = try_(f).map_err(Error::Error);
+		let result = try_catch::try_(f).map_err(Error::Error);
 		let _canceled = sender.send(result);
 
 		#[cfg(feature = "message")]
-		GLOBAL.with(|global| global.worker().post_message_ext(Message::Close(id)));
+		GLOBAL.with(|global| Message::Close(id).post_message(global.worker()));
 	}));
 
 	spawn_internal(
@@ -245,7 +248,7 @@ where
 			let _canceled = sender.send(result);
 
 			#[cfg(feature = "message")]
-			GLOBAL.with(|global| global.worker().post_message_ext(Message::Close(id)));
+			GLOBAL.with(|global| Message::Close(id).post_message(global.worker()));
 		})
 	}));
 
@@ -257,31 +260,11 @@ where
 	)
 }
 
-/// Holds the functions to execute on the worker.
-enum WorkerContext {
-	/// Closure.
-	Closure(Box<dyn 'static + FnOnce() + Send>),
-	/// [`Future`].
-	Future(Box<dyn 'static + FnOnce() -> Pin<Box<dyn 'static + Future<Output = ()>>> + Send>),
-}
-
-/// Message sent to the window.
-enum Message {
-	/// Instruct window to spawn a worker.
-	Spawn {
-		/// ID to use for the spawned worker.
-		#[cfg(feature = "message")]
-		id: Id,
-		/// Worker context to run.
-		context: WorkerContext,
-	},
-	/// Instruct window to terminate a worker.
-	#[cfg(feature = "message")]
-	Terminate(Id),
-	/// Instruct window to delete this [`Worker`] from the
-	/// [`Workers`](workers::Workers) list.
-	#[cfg(feature = "message")]
-	Close(Id),
+/// Hook for panic handler. Ensures that instead of just using a trap on panic
+/// we also throw the panic message, which will be caught and relayed to the
+/// [`WorkerHandle`].
+pub fn hook(panic_info: &PanicInfo<'_>) -> ! {
+	wasm_bindgen::throw_str(&panic_info.to_string());
 }
 
 /// Internal worker spawning function.
@@ -350,11 +333,12 @@ fn spawn_from_worker(
 	#[cfg(feature = "message")] id: Id,
 	context: WorkerContext,
 ) {
-	global.post_message_ext(Message::Spawn {
+	Message::Spawn {
 		#[cfg(feature = "message")]
 		id,
 		context,
-	});
+	}
+	.post_message(global);
 }
 
 /// This function is called to get back into the Rust module from inside the
@@ -369,137 +353,4 @@ pub async fn __wasm_worker_entry(context: usize) {
 		WorkerContext::Closure(fn_) => fn_(),
 		WorkerContext::Future(fn_) => fn_().await,
 	};
-}
-
-/// Wrap a function in a JS `try catch` block.
-fn try_<R>(fn_: impl FnOnce() -> R) -> Result<R, String> {
-	#[wasm_bindgen]
-	extern "C" {
-		/// JS `try catch` block.
-		fn __wasm_worker_try(fn_: &mut dyn FnMut()) -> JsValue;
-	}
-
-	// This workaround is required because of the limitations of having to pass an
-	// `FnMut`, `FnOnce` isn't supported by `wasm_bindgen`.
-	let mut fn_ = Some(fn_);
-	let mut return_ = None;
-	let error =
-		__wasm_worker_try(&mut || return_ = Some(fn_.take().expect("called more than once")()));
-	return_.ok_or(format!("{error:?}"))
-}
-
-pin_project! {
-	/// Wrapping a [`Future`] in a JS `try catch` block.
-	pub struct TryFuture<F: Future>{
-		#[pin]
-		fn_: F
-	}
-}
-
-impl<F> Future for TryFuture<F>
-where
-	F: Future,
-{
-	type Output = Result<F::Output, String>;
-
-	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		match try_(|| self.project().fn_.poll(cx)) {
-			Ok(Poll::Ready(return_)) => Poll::Ready(Ok(return_)),
-			Ok(Poll::Pending) => Poll::Pending,
-			Err(err) => Poll::Ready(Err(err)),
-		}
-	}
-}
-
-impl<F: Future> TryFuture<F> {
-	/// Creates a new [`TryFuture`].
-	const fn new(fn_: F) -> Self {
-		Self { fn_ }
-	}
-}
-
-/// Convenience methods for [`DedicatedWorkerGlobalScope`].
-trait WorkerExt {
-	/// Handle turning [`Message`] into a pointer and cleaning it up in case of
-	/// an error.
-	fn post_message_ext(&self, message: Message);
-}
-
-impl WorkerExt for DedicatedWorkerGlobalScope {
-	fn post_message_ext(&self, message: Message) {
-		let message = Box::into_raw(Box::new(message));
-
-		if let Err(error) = self.post_message(
-			#[allow(clippy::as_conversions)]
-			&f64::from_bits(message as u64).into(),
-		) {
-			// SAFETY: We created this pointer just above. This is necessary to clean up
-			// memory in the case of an error.
-			drop(unsafe { Box::from_raw(message) });
-			// `Worker.postMessage()` should only fail on unsupported messages, this is
-			// consistent and is caught during testing.
-			unreachable!("`Worker.postMessage()` failed: {error:?}");
-		}
-	}
-}
-
-thread_local! {
-	/// All workers are spawned from the window only, so having this thread-local is enough.
-	static MESSAGE_HANDLER: MessageHandler = MessageHandler::new();
-}
-
-/// Holds the callback to handle nested worker spawning.
-struct MessageHandler(Closure<dyn FnMut(&MessageEvent)>);
-
-impl Deref for MessageHandler {
-	type Target = Function;
-
-	fn deref(&self) -> &Self::Target {
-		self.0.as_ref().unchecked_ref()
-	}
-}
-
-impl MessageHandler {
-	/// Creates a [`MessageHandler`].
-	fn new() -> Self {
-		// We don't need to worry about the deallocation of this `Closure`, we only
-		// generate it once for every worker and store it in a thread-local, Rust will
-		// then deallocate it for us.
-		Self(Closure::wrap(Box::new(|event: &MessageEvent| {
-			// We reconstruct the pointer address from the bits stored as a `f64` in a
-			// `JsValue`.
-			#[allow(clippy::as_conversions)]
-			let message = event.data().as_f64().expect("expected `f64`").to_bits() as *mut Message;
-			// SAFETY: We created this pointer in `spawn_from_worker()`.
-			let message = *unsafe { Box::from_raw(message) };
-
-			match message {
-				Message::Spawn {
-					#[cfg(feature = "message")]
-					id,
-					context,
-				} => spawn_from_window(
-					#[cfg(feature = "message")]
-					id,
-					context,
-				),
-				#[cfg(feature = "message")]
-				Message::Terminate(id) => {
-					WORKERS.with(|workers| {
-						if let Some(worker) = workers.remove(id) {
-							worker.terminate();
-						}
-					});
-				}
-				#[cfg(feature = "message")]
-				Message::Close(id) => {
-					WORKERS.with(|workers| {
-						if workers.remove(id).is_none() {
-							web_sys::console::warn_1(&"unknown worker ID closed".into());
-						}
-					});
-				}
-			}
-		})))
-	}
 }
