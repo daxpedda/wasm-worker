@@ -1,8 +1,6 @@
 //! TODO
 
 #![allow(unsafe_code)]
-// TODO: Temporary.
-#![allow(rustdoc::missing_doc_code_examples)]
 
 mod global;
 mod message_handler;
@@ -38,10 +36,11 @@ use workers::{Id, IDS, WORKERS};
 /// send back a return value or an error, but Web Workers can be prematurely
 /// terminated with
 /// [`DedicatedWorkerGlobalScope.close()`](https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/close).
-/// This will cause a memory leak that never drops the [`Sender`] and the
-/// [`Future`] will never wake up and [`WorkerHandle`] will never the know that
-/// the Worker has finished. Therefore it is recommended to use
-/// [`WorkerHandle::terminate()`], which accounts for this possibility.
+/// This will cause a memory leak that never drops the
+/// [`Sender`](oneshot::Sender) and the [`Future`] will never wake up and
+/// [`WorkerHandle`] will never the know that the Worker has finished. Therefore
+/// it is recommended to use [`WorkerHandle::terminate()`], which accounts for
+/// this possibility.
 pub struct WorkerHandle<R> {
 	/// ID of the [`Worker`]. We could have stored the [`Worker`] here directly
 	/// if we are spawning from the window instead, but this way the

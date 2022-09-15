@@ -1,4 +1,5 @@
-//! Handling of [`Message`]s send with [`Worker::post_message`].
+//! Handling of [`Message`]s send with
+//! [`Worker::post_message()`](web_sys::Worker::post_message).
 
 use std::future::Future;
 use std::ops::Deref;
@@ -25,8 +26,8 @@ pub(crate) enum Message {
 	/// Instruct window to terminate a worker.
 	#[cfg(feature = "message")]
 	Terminate(Id),
-	/// Instruct window to delete this [`Worker`] from the
-	/// [`Workers`](workers::Workers) list.
+	/// Instruct window to delete this [`Worker`][web_sys::Worker] from the
+	/// [`Workers`](crate::workers::Workers) list.
 	#[cfg(feature = "message")]
 	Close(Id),
 }
