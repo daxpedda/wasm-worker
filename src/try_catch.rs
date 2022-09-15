@@ -6,7 +6,7 @@ use std::task::{Context, Poll};
 
 use pin_project_lite::pin_project;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 
 /// Wrap a function in a JS `try catch` block.
 pub(crate) fn try_<R>(fn_: impl FnOnce() -> R) -> Result<R, String> {
@@ -22,7 +22,12 @@ pub(crate) fn try_<R>(fn_: impl FnOnce() -> R) -> Result<R, String> {
 	let mut return_ = None;
 	let error =
 		__wasm_worker_try(&mut || return_ = Some(fn_.take().expect("called more than once")()));
-	return_.ok_or(format!("{error:?}"))
+
+	return_.ok_or_else(|| {
+		error
+			.dyn_ref::<js_sys::Error>()
+			.map_or_else(|| format!("{error:?}"), |error| error.message().into())
+	})
 }
 
 pin_project! {

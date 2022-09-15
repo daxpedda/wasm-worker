@@ -20,7 +20,6 @@ fn main() {}
 #[allow(clippy::future_not_send)]
 pub async fn main_js() -> Result<(), JsValue> {
 	panic::set_hook(Box::new(|panic_info| {
-		console_error_panic_hook::hook(panic_info);
 		wasm_worker::hook(panic_info);
 	}));
 
@@ -73,16 +72,18 @@ pub async fn main_js() -> Result<(), JsValue> {
 	}
 
 	// Panic.
-	assert_eq!(
+	assert!(matches!(
 		wasm_worker::spawn(|| panic!("panicking worker")).await,
-		Err(Error::Error(String::from("panicking worker"))),
-		"really?"
-	);
+		Err(Error::Error(error)) if error.starts_with("panicked at 'panicking worker'"),
+	));
 
 	// Async panic.
-	wasm_worker::spawn_async(|| async {
-		panic!("panicking async worker");
-	});
+	assert!(matches!(
+		wasm_worker::spawn_async(|| async {
+			panic!("panicking async worker");
+		}).await,
+		Err(Error::Error(error)) if error.starts_with("panicked at 'panicking async worker'"),
+	));
 
 	// Actually make sure that terminated workers aren't panicking; they have an
 	// built-in delay.
