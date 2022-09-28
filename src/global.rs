@@ -60,7 +60,7 @@ impl Global {
 	}
 
 	/// Returns the worker global scope. Panics if not in a worker.
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	pub(crate) fn worker(&self) -> &DedicatedWorkerGlobalScope {
 		match self {
 			Self::Window => panic!("expected to be in a worker"),

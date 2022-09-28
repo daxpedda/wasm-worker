@@ -10,7 +10,7 @@ use wasm_bindgen::prelude::Closure;
 use wasm_bindgen::JsCast;
 use web_sys::{DedicatedWorkerGlobalScope, MessageEvent};
 
-#[cfg(feature = "message")]
+#[cfg(feature = "track")]
 use crate::workers::{Id, WORKERS};
 
 /// Message sent to the window.
@@ -18,17 +18,17 @@ pub(crate) enum Message {
 	/// Instruct window to spawn a worker.
 	Spawn {
 		/// ID to use for the spawned worker.
-		#[cfg(feature = "message")]
+		#[cfg(feature = "track")]
 		id: Id,
 		/// Worker context to run.
 		context: WorkerContext,
 	},
 	/// Instruct window to terminate a worker.
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	Terminate(Id),
 	/// Instruct window to delete this [`Worker`][web_sys::Worker] from the
 	/// [`Workers`](crate::workers::Workers) list.
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	Close(Id),
 }
 
@@ -92,15 +92,15 @@ impl MessageHandler {
 
 			match message {
 				Message::Spawn {
-					#[cfg(feature = "message")]
+					#[cfg(feature = "track")]
 					id,
 					context,
 				} => crate::spawn_from_window(
-					#[cfg(feature = "message")]
+					#[cfg(feature = "track")]
 					id,
 					context,
 				),
-				#[cfg(feature = "message")]
+				#[cfg(feature = "track")]
 				Message::Terminate(id) => {
 					WORKERS.with(|workers| {
 						if let Some(worker) = workers.remove(id) {
@@ -108,7 +108,7 @@ impl MessageHandler {
 						}
 					});
 				}
-				#[cfg(feature = "message")]
+				#[cfg(feature = "track")]
 				Message::Close(id) => {
 					WORKERS.with(|workers| {
 						if workers.remove(id).is_none() {

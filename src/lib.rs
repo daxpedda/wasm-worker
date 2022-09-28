@@ -6,7 +6,7 @@ mod global;
 mod message_handler;
 mod try_catch;
 mod worker_url;
-#[cfg(feature = "message")]
+#[cfg(feature = "track")]
 mod workers;
 
 use std::fmt::{Debug, Display, Formatter};
@@ -26,7 +26,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
 use worker_url::WORKER_URL;
-#[cfg(feature = "message")]
+#[cfg(feature = "track")]
 use workers::{Id, IDS, WORKERS};
 
 /// Handle to the worker.
@@ -45,7 +45,7 @@ pub struct WorkerHandle<R> {
 	/// ID of the [`Worker`]. We could have stored the [`Worker`] here directly
 	/// if we are spawning from the window instead, but this way the
 	/// `WorkerHandle` stays [`Send`] and [`Sync`].
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	id: Id,
 	/// [`Receiver`] to be `await`ed for the return value.
 	return_: Option<Return<R>>,
@@ -57,7 +57,7 @@ struct Return<R>(Receiver<Result<R, Error>>);
 impl<R> Debug for WorkerHandle<R> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		let mut debug = f.debug_struct("WorkerHandle");
-		#[cfg(feature = "message")]
+		#[cfg(feature = "track")]
 		debug.field("id", &self.id);
 		debug.field("return_", &self.return_).finish()
 	}
@@ -103,7 +103,7 @@ impl<R> WorkerHandle<R> {
 	/// # Panics
 	/// Panics if trying to call from anything else than the window or a
 	/// dedicated worker.
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	pub fn terminate(self) -> Result<Option<R>, TerminateError> {
 		let result = self
 			.return_
@@ -204,18 +204,18 @@ where
 {
 	let (sender, receiver) = oneshot::channel();
 
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	let id = IDS.next();
 	let context = WorkerContext::Closure(Box::new(move || {
 		let result = try_catch::try_(f).map_err(Error::Error);
 		let _canceled = sender.send(result);
 
-		#[cfg(feature = "message")]
+		#[cfg(feature = "track")]
 		GLOBAL.with(|global| Message::Close(id).post_message(global.worker()));
 	}));
 
 	spawn_internal(
-		#[cfg(feature = "message")]
+		#[cfg(feature = "track")]
 		id,
 		context,
 		receiver,
@@ -239,20 +239,20 @@ where
 {
 	let (sender, receiver) = oneshot::channel();
 
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	let id = IDS.next();
 	let worker = WorkerContext::Future(Box::new(move || {
 		Box::pin(async move {
 			let result = TryFuture::new(f()).await.map_err(Error::Error);
 			let _canceled = sender.send(result);
 
-			#[cfg(feature = "message")]
+			#[cfg(feature = "track")]
 			GLOBAL.with(|global| Message::Close(id).post_message(global.worker()));
 		})
 	}));
 
 	spawn_internal(
-		#[cfg(feature = "message")]
+		#[cfg(feature = "track")]
 		id,
 		worker,
 		receiver,
@@ -268,33 +268,33 @@ pub fn hook(panic_info: &PanicInfo<'_>) -> ! {
 
 /// Internal worker spawning function.
 fn spawn_internal<R>(
-	#[cfg(feature = "message")] id: Id,
+	#[cfg(feature = "track")] id: Id,
 	context: WorkerContext,
 	receiver: Receiver<Result<R, Error>>,
 ) -> WorkerHandle<R> {
 	GLOBAL.with(|global| match global {
 		Global::Window => spawn_from_window(
-			#[cfg(feature = "message")]
+			#[cfg(feature = "track")]
 			id,
 			context,
 		),
 		Global::Worker(global) => spawn_from_worker(
 			global,
-			#[cfg(feature = "message")]
+			#[cfg(feature = "track")]
 			id,
 			context,
 		),
 	});
 
 	WorkerHandle {
-		#[cfg(feature = "message")]
+		#[cfg(feature = "track")]
 		id,
 		return_: Some(Return(receiver)),
 	}
 }
 
 /// Spawn worker from window.
-fn spawn_from_window(#[cfg(feature = "message")] id: Id, context: WorkerContext) {
+fn spawn_from_window(#[cfg(feature = "track")] id: Id, context: WorkerContext) {
 	// `Worker.new()` should only fail on unsupported `URL`s, this is consistent,
 	// except the `wasm_bindgen::script_url()` determined during run-time and part
 	// of the `WORKER_URL`, and is caught during testing.
@@ -320,7 +320,7 @@ fn spawn_from_window(#[cfg(feature = "message")] id: Id, context: WorkerContext)
 		unreachable!("`Worker.postMessage()` failed: {error:?}")
 	}
 
-	#[cfg(feature = "message")]
+	#[cfg(feature = "track")]
 	WORKERS
 		.with(|workers| workers.push(id, worker))
 		.expect("duplicate ID used");
@@ -329,11 +329,11 @@ fn spawn_from_window(#[cfg(feature = "message")] id: Id, context: WorkerContext)
 /// Spawn worker from worker.
 fn spawn_from_worker(
 	global: &DedicatedWorkerGlobalScope,
-	#[cfg(feature = "message")] id: Id,
+	#[cfg(feature = "track")] id: Id,
 	context: WorkerContext,
 ) {
 	Message::Spawn {
-		#[cfg(feature = "message")]
+		#[cfg(feature = "track")]
 		id,
 		context,
 	}

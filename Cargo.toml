@@ -5,7 +5,7 @@ publish = false
 version = "0.0.0"
 
 [features]
-message = ["dep:vec_map"]
+track = ["dep:vec_map"]
 
 [dependencies]
 futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
