@@ -23,6 +23,8 @@ pub async fn main_js() -> Result<(), JsValue> {
 		wasm_worker::hook(panic_info);
 	}));
 
+	console::log_1(&"Start Example".into());
+
 	// Spawning closures.
 	for index in 0..10 {
 		wasm_worker::spawn(move || console::log_1(&format!("Spawned closure: {index}").into()));
