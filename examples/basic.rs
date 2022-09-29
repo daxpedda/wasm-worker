@@ -87,6 +87,20 @@ pub async fn main_js() -> Result<(), JsValue> {
 		Err(Error::Error(error)) if error.starts_with("panicked at 'panicking async worker'"),
 	));
 
+	// Destructor.
+	wasm_worker::spawn(|| {
+		/// Struct to test if destructor is run.
+		struct Test;
+
+		impl Drop for Test {
+			fn drop(&mut self) {
+				console::log_1(&"Destructor run".into());
+			}
+		}
+
+		let _test = Test;
+	});
+
 	// Actually make sure that terminated workers aren't panicking; they have an
 	// built-in delay.
 	sleep(Duration::from_secs(2)).await;
