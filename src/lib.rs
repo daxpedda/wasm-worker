@@ -1,4 +1,107 @@
 //! TODO
+//!
+//! # Implementation Details
+//!
+//! ## Un-nested Workers
+//!
+//! The Web API creates a nested worker when you spawn a worker from a worker. A
+//! nested worker will terminate if the parent worker is closed.
+//!
+//! This does not align with Rust's [`std::thread`], therefor when using
+//! [`spawn()`] or [`spawn_async()`] from inside a worker, the new worker will
+//! be spawned from the window instead, preventing spawning nested workers
+//! altogether.
+//!
+//! ## Automatic Worker Closing
+//!
+//! When [spawning](spawn()) a worker, the given closure or [`Future`] is
+//! executed. After it is done, the worker will automatically close, as is done
+//! with Rust's [`std::thread`] implementation.
+//!
+//! This can be confusing if the background tasks were spawned, like a
+//! [`Promise`], that are expected to finish: as the worker will close, all
+//! [`Promise`]s will be aborted. To prevent this, [`Promise`]s can be `await`ed
+//! at the end of the given task.
+//!
+//! This is not considered an [issue](#issues) because the async runtime in the
+//! Web API is not multi-threaded and therefor this behavior is similar to how
+//! Rust native single-threaded async runtimes behave when the thread they are
+//! used in is finished.
+//!
+//! # Issues
+//!
+//! ## Messaging
+//!
+//! It is possible to overwrite a workers message handler by using
+//! [`DedicatedWorkerGlobalScope.onmessage()`]. Apart from not being useful, as
+//! the [`Worker`] object is not accessible and therefor
+//! [`Worker.postMessage()`] can't be called, it will also break any
+//! functionality provided by the `track` crate feature.
+//!
+//! [`DedicatedWorkerGlobalScope.postMessage()`] should also not be used, as the
+//! [`Worker.onmessage()`] handler is used for spawning workers from workers and
+//! functionality provided by the `track` crate feature.
+//!
+//! If you need to send JS values between workers, see [`send()`] or
+//! [`WorkerHandle::send()`].
+//!
+//! ## External Termination
+//!
+//! It is possible to terminate a worker by calling
+//! [`DedicatedWorkerGlobalScope.close()`]. This can cause multiple problems:
+//! - The corresponding [`WorkerHandle`] won't wake up when
+//!   [`poll`](Future::poll)ed.
+//! - The corresponding [`WorkerHandle::try_join()`] will always return
+//!   [`None`].
+//! - The corresponding [`WorkerHandle::is_terminated()`] will always return
+//!   [`false`].
+//! - The stack and TLS of this worker will be leaked.
+//!
+//! If you really need this functionality use [`terminate()`] or
+//! [`WorkerHandle::terminate()`].
+//!
+//! ## Internal Termination
+//!
+//! Using [`terminate()`] or [`WorkerHandle::terminate()`] solve the problems
+//! outlined in [#External Termination](#external-termination) but in addition
+//! to [not running TLS destructors](#tls-destructors) the stack is not unwound
+//! and therefor destructors of objects in the running task are not called.
+//!
+//! Only destructors aren't called, the stack is not leaked.
+//!
+//! Generally speaking, worker termination is not recommended unless you are
+//! trying to close the application.
+//!
+//! ## TLS Destructors
+//!
+//! TLS destructors in workers are never called. A way to avoid this issue is to
+//! never close workers by letting it's task never finish but to keep re-using
+//! them or to be careful not to use objects in TLS that have destructors.
+//!
+//! ## Panic Behavior
+//!
+//! The `wasm32-unknown-unknown` target can only be used with `panic = "abort"`,
+//! as Rust has no support for WASM exception handling. The expected Rust
+//! behavior is that on panicking the application should abort; the Web API has
+//! no support for aborting an instantiated WASM module.
+//!
+//! [wasm-worker](crate) will simply catch the panic and send it to the
+//! corresponding [`WorkerHandle`]. The worker will close, but the window will
+//! not. As a workaround one could terminate all workers and interrupt the main
+//! loop, keep in mind that spawned background tasks in the window, like a
+//! [`Promise`], will still continue running. Afterwards the browser is
+//! responsible for garbage-collecting the WASM module.
+//!
+//! This behavior also applies, but is not limited, to [`throw`],
+//! [`std::process::abort()`] and [`std::arch::wasm32::unreachable()`].
+//!
+//! [`DedicatedWorkerGlobalScope.close()`]: https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/close
+//! [`DedicatedWorkerGlobalScope.onmessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/message_event
+//! [`DedicatedWorkerGlobalScope.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/postMessage
+//! [`Promise`]: js_sys::Promise
+//! [`throw`]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/throw
+//! [`Worker.onmessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/Worker/message_event
+//! [`Worker.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/Worker/postMessage
 
 #![allow(unsafe_code)]
 
@@ -31,16 +134,7 @@ use workers::{Id, IDS, WORKERS};
 
 /// Handle to the worker.
 ///
-/// [`Poll`](Future::poll)ing [`WorkerHandle`] will return the return value of
-/// the associated worker. This depends on established [channels](oneshot) to
-/// send back a return value or an error, but Web Workers can be prematurely
-/// terminated with
-/// [`DedicatedWorkerGlobalScope.close()`](https://developer.mozilla.org/en-US/docs/Web/API/DedicatedWorkerGlobalScope/close).
-/// This will cause a memory leak that never drops the
-/// [`Sender`](oneshot::Sender) and the [`Future`] will never wake up and
-/// [`WorkerHandle`] will never the know that the Worker has finished. Therefore
-/// it is recommended to use [`WorkerHandle::terminate()`], which accounts for
-/// this possibility.
+/// See [#External Closing](#external-closing).
 pub struct WorkerHandle<R> {
 	/// ID of the [`Worker`]. We could have stored the [`Worker`] here directly
 	/// if we are spawning from the window instead, but this way the
@@ -51,7 +145,7 @@ pub struct WorkerHandle<R> {
 	return_: Option<Return<R>>,
 }
 
-/// Holds [`Receiver`] for return value.
+/// Holds the [`Receiver`] for return value.
 struct Return<R>(Receiver<Result<R, Error>>);
 
 impl<R> Debug for WorkerHandle<R> {
@@ -76,12 +170,6 @@ impl<R> Future for WorkerHandle<R> {
 	}
 }
 
-impl<R> Debug for Return<R> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_tuple("Running").field(&"Receiver<R>").finish()
-	}
-}
-
 impl<R> WorkerHandle<R> {
 	/// Terminates the spawned worker. This does not offer the worker an
 	/// opportunity to finish its operations; it is stopped at once.
@@ -89,16 +177,13 @@ impl<R> WorkerHandle<R> {
 	/// If the worker was already done, this will return the return value or the
 	/// error, otherwise will return [`None`].
 	///
+	/// See [#TLS Destructors](#tls-destructors).
+	///
 	/// # Errors
 	/// - [`TerminateError::Polled`] if the return value was already received by
 	///   [poll](Future::poll)ing.
 	/// - [`TerminateError::Error`] if the worker panicked or was already
 	///   terminated.
-	///
-	/// # Safety
-	/// This function will leak the workers stack and TLS. This function is not
-	/// marked as unsafe because Rust's safety guarantees don't cover leaking
-	/// memory or guaranteeing that destructors will run.
 	///
 	/// # Panics
 	/// Panics if trying to call from anything else than the window or a
@@ -129,6 +214,14 @@ impl<R> WorkerHandle<R> {
 		});
 
 		result
+	}
+}
+
+impl<R> Debug for Return<R> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.debug_tuple("Return")
+			.field(&"Receiver<Result<R, Error>>")
+			.finish()
 	}
 }
 
@@ -186,13 +279,12 @@ impl From<TerminateError> for JsValue {
 }
 
 /// Spawn a new worker and run the given closure in it. The worker will
-/// automatically terminate itself when the closure has finished running.
+/// automatically close itself when the closure has finished running.
 ///
-/// Nested workers terminate when the worker they are spawned from is closed,
-/// they are not supported. To be more aligned with Rust's [`std::thread`]
-/// spawning a worker in a worker will instead spawn the worker in the window,
-/// therefore finishing the worker it spawned from will not terminate
-/// the newly spawned worker.
+/// To be more aligned with Rust's [`std::thread`], spawning a worker in a
+/// worker will instead spawn the worker from the window. This in contrast to
+/// how nested workers behave in the browser: closing the worker it spawned from
+/// will not terminate the newly spawned worker.
 ///
 /// # Panics
 /// Panics if trying to spawn from anything else than the window or a dedicated

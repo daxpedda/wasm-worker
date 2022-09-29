@@ -1,10 +1,12 @@
-10
+12
+async
 Clippy
 deallocate
 deallocated
 deallocation
 destructors
 JS
+runtime/S
 spawner
 TLS
 TODO
