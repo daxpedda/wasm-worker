@@ -106,8 +106,8 @@
 #![allow(unsafe_code)]
 
 mod global;
-mod message_handler;
 mod try_catch;
+mod window_handler;
 mod worker_url;
 #[cfg(feature = "track")]
 mod workers;
@@ -123,11 +123,11 @@ use futures_channel::oneshot;
 use futures_channel::oneshot::Receiver;
 use global::{Global, GLOBAL};
 use js_sys::Array;
-use message_handler::{Message, WorkerContext, MESSAGE_HANDLER};
 use try_catch::TryFuture;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
+use window_handler::{WindowMessage, WorkerContext, WINDOW_HANDLER};
 use worker_url::WORKER_URL;
 #[cfg(feature = "track")]
 use workers::{Id, IDS, WORKERS};
@@ -210,7 +210,7 @@ impl<R> WorkerHandle<R> {
 				});
 			}
 			// Workers have to instruct the window to terminate the worker for them.
-			Global::Worker(worker) => Message::Terminate(self.id).post_message(worker),
+			Global::Worker(worker) => WindowMessage::Terminate(self.id).post_message(worker),
 		});
 
 		result
@@ -303,7 +303,7 @@ where
 		let _canceled = sender.send(result);
 
 		#[cfg(feature = "track")]
-		GLOBAL.with(|global| Message::Close(id).post_message(global.worker()));
+		GLOBAL.with(|global| WindowMessage::Close(id).post_message(global.worker()));
 	}));
 
 	spawn_internal(
@@ -343,7 +343,7 @@ where
 			let _canceled = sender.send(result);
 
 			#[cfg(feature = "track")]
-			GLOBAL.with(|global| Message::Close(id).post_message(global.worker()));
+			GLOBAL.with(|global| WindowMessage::Close(id).post_message(global.worker()));
 		})
 	}));
 
@@ -398,7 +398,7 @@ fn spawn_from_window(#[cfg(feature = "track")] id: Id, context: WorkerContext) {
 		.with(|worker_url| Worker::new(worker_url))
 		.expect("`Worker.new()` failed");
 
-	MESSAGE_HANDLER.with(|callback| worker.set_onmessage(Some(callback)));
+	WINDOW_HANDLER.with(|callback| worker.set_onmessage(Some(callback)));
 
 	let context = Box::into_raw(Box::new(context));
 
@@ -409,12 +409,11 @@ fn spawn_from_window(#[cfg(feature = "track")] id: Id, context: WorkerContext) {
 		&(context as usize).into(),
 	);
 
-	if let Err(error) = worker.post_message(&init) {
-		// SAFETY: We created this pointer just above. This is necessary to clean up
-		// memory in the case of an error.
-		drop(unsafe { Box::from_raw(context) });
-		unreachable!("`Worker.postMessage()` failed: {error:?}")
-	}
+	// `Worker.postMessage()` should only fail on unsupported messages, this is
+	// consistent and is caught during testing. This leaks memory if it fails.
+	worker
+		.post_message(&init)
+		.expect("`Worker.postMessage()` failed");
 
 	#[cfg(feature = "track")]
 	WORKERS
@@ -428,7 +427,7 @@ fn spawn_from_worker(
 	#[cfg(feature = "track")] id: Id,
 	context: WorkerContext,
 ) {
-	Message::Spawn {
+	WindowMessage::Spawn {
 		#[cfg(feature = "track")]
 		id,
 		context,
