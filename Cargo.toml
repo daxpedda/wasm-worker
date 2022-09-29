@@ -19,7 +19,6 @@ web-sys = { version = "0.3", features = [
 	"BlobPropertyBag",
 	"console",
 	"DedicatedWorkerGlobalScope",
-	"ErrorEvent",
 	"MessageEvent",
 	"Url",
 	"Worker",
