@@ -335,7 +335,11 @@ where
 	let id = IDS.next();
 	let worker = WorkerContext::Future(Box::new(move || {
 		Box::pin(async move {
-			let result = TryFuture::new(f()).await.map_err(Error::Error);
+			// Try to catch panics in the user-given closure that produces the `Future`.
+			let result = match try_catch::try_(f).map_err(Error::Error) {
+				Ok(f) => TryFuture::new(f).await.map_err(Error::Error),
+				Err(error) => Err(error),
+			};
 			let _canceled = sender.send(result);
 
 			#[cfg(feature = "track")]
