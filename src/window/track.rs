@@ -44,17 +44,12 @@ impl Ids {
 	}
 }
 
-thread_local! {
-	/// [`Workers`] map for window.
-	pub(crate) static WORKERS: Workers  = Workers::new();
-}
-
 /// [`Id`] to [`Worker`] map.
 pub(crate) struct Workers(RefCell<VecMap<Worker>>);
 
 impl Workers {
 	/// Creates an empty [`Workers`].
-	fn new() -> Self {
+	pub(super) fn new() -> Self {
 		Self(RefCell::new(VecMap::new()))
 	}
 

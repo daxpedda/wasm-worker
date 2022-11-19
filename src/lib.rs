@@ -18,10 +18,10 @@
 //! executed. After it is done, the worker will automatically close, as is done
 //! with Rust's [`std::thread`] implementation.
 //!
-//! This can be confusing if the background tasks were spawned, like a
-//! [`Promise`], that are expected to finish: as the worker will close, all
-//! [`Promise`]s will be aborted. To prevent this, [`Promise`]s can be `await`ed
-//! at the end of the given task.
+//! This can be confusing if background tasks were spawned, like a [`Promise`],
+//! that is expected to finish: as the worker will close, all [`Promise`]s will
+//! be aborted. To prevent this, [`Promise`]s can be `await`ed at the end of the
+//! given task.
 //!
 //! This is not considered an [issue](#issues) because the async runtime in the
 //! Web API is not multi-threaded and therefor this behavior is similar to how
@@ -36,11 +36,10 @@
 //! [`DedicatedWorkerGlobalScope.onmessage()`]. Apart from not being useful, as
 //! the [`Worker`] object is not accessible and therefor
 //! [`Worker.postMessage()`] can't be called, it will also break any
-//! functionality provided by the `track` crate feature.
+//! functionality provided by the "message" crate feature.
 //!
 //! [`DedicatedWorkerGlobalScope.postMessage()`] should also not be used, as the
-//! [`Worker.onmessage()`] handler is used for spawning workers from workers and
-//! functionality provided by the `track` crate feature.
+//! [`Worker.onmessage()`] handler is used by the "message" crate feature.
 //!
 //! If you need to send JS values between workers, see [`send()`] or
 //! [`WorkerHandle::send()`].
@@ -49,25 +48,20 @@
 //!
 //! It is possible to terminate a worker by calling
 //! [`DedicatedWorkerGlobalScope.close()`]. This can cause multiple problems:
-//! - The corresponding [`WorkerHandle`] won't wake up when
-//!   [`poll`](Future::poll)ed.
-//! - The corresponding [`WorkerHandle::try_join()`] will always return
-//!   [`None`].
-//! - The corresponding [`WorkerHandle::is_terminated()`] will always return
-//!   [`false`].
-//! - The stack and TLS of this worker will be leaked.
+//! - [`WorkerHandle`] won't wake up when [`poll`](Future::poll)ed.
+//! - [`WorkerHandle::try_join()`] will always return [`None`].
+//! - [`WorkerHandle::is_terminated()`] will always return [`false`].
+//! - The stack and TLS of the worker will be leaked.
 //!
 //! If you really need this functionality use [`terminate()`] or
 //! [`WorkerHandle::terminate()`].
 //!
 //! ## Internal Termination
 //!
-//! Using [`terminate()`] or [`WorkerHandle::terminate()`] solve the problems
-//! outlined in [#External Termination](#external-termination) but in addition
-//! to [not running TLS destructors](#tls-destructors) the stack is not unwound
-//! and therefor destructors of objects in the running task are not called.
-//!
-//! Only destructors aren't called, the stack is not leaked.
+//! Using [`terminate()`] or [`WorkerHandle::terminate()`] solves the problems
+//! outlined in ["External Termination"](#external-termination) but in addition
+//! to [not running TLS destructors](#tls-destructors) the stack is not
+//! deallocated.
 //!
 //! Generally speaking, worker termination is not recommended unless you are
 //! trying to close the application.
@@ -75,7 +69,7 @@
 //! ## TLS Destructors
 //!
 //! TLS destructors in workers are never called. A way to avoid this issue is to
-//! never close workers by letting it's task never finish but to keep re-using
+//! never close workers by letting their tasks never finish but to keep re-using
 //! them or to be careful not to use objects in TLS that have destructors.
 //!
 //! ## Panic Behavior
@@ -85,10 +79,15 @@
 //! behavior is that on panicking the application should abort; the Web API has
 //! no support for aborting an instantiated WASM module.
 //!
-//! [wasm-worker](crate) will simply catch the panic and send it to the
+//! Rust doesn't support continuing a program after panicking with `panic =
+//! "abort"`, some things can only continue to work correctly when [`Drop`]
+//! mechanics are properly respected. Therefore it is recommended to stop
+//! execution after a panic in a worker.
+//!
+//! [wasm-worker](crate) will catch panics in a worker and send it to the
 //! corresponding [`WorkerHandle`]. The worker will close, but the window will
-//! not. As a workaround one could terminate all workers and interrupt the main
-//! loop, keep in mind that spawned background tasks in the window, like a
+//! not. As a workaround one could terminate all workers and interrupt the "main
+//! loop", keep in mind that spawned background tasks in the window, like a
 //! [`Promise`], will still continue running. Afterwards the browser is
 //! responsible for garbage-collecting the WASM module.
 //!
@@ -107,10 +106,8 @@
 
 mod global;
 mod try_catch;
-mod window_handler;
-mod worker_url;
-#[cfg(feature = "track")]
-mod workers;
+mod window;
+mod worker;
 
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
@@ -126,15 +123,15 @@ use js_sys::Array;
 use try_catch::TryFuture;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
-use web_sys::{DedicatedWorkerGlobalScope, Worker};
-use window_handler::{WindowMessage, WorkerContext, WINDOW_HANDLER};
-use worker_url::WORKER_URL;
+use web_sys::Worker;
 #[cfg(feature = "track")]
-use workers::{Id, IDS, WORKERS};
+use window::{Id, IDS};
+use window::{Task, WindowMessage, WINDOW_STATE};
+use worker::{WORKER_SCRIPT, WORKER_STATE};
 
 /// Handle to the worker.
 ///
-/// See [#External Closing](#external-closing).
+/// See ["External Termination"](index.html#external-termination).
 pub struct WorkerHandle<R> {
 	/// ID of the [`Worker`]. We could have stored the [`Worker`] here directly
 	/// if we are spawning from the window instead, but this way the
@@ -162,7 +159,8 @@ impl<R> Future for WorkerHandle<R> {
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let return_ = self.return_.as_mut().expect("polled after completion");
-		let result = ready!(Pin::new(&mut return_.0).poll(cx)).unwrap_or(Err(Error::Terminated));
+		let result = ready!(Pin::new(&mut return_.0).poll(cx))
+			.expect("sender dropped without sending anything");
 
 		self.return_.take();
 
@@ -177,7 +175,7 @@ impl<R> WorkerHandle<R> {
 	/// If the worker was already done, this will return the return value or the
 	/// error, otherwise will return [`None`].
 	///
-	/// See [#TLS Destructors](#tls-destructors).
+	/// See ["Internal Termination"](index.html#internal-termination).
 	///
 	/// # Errors
 	/// - [`TerminateError::Polled`] if the return value was already received by
@@ -186,31 +184,42 @@ impl<R> WorkerHandle<R> {
 	///   terminated.
 	///
 	/// # Panics
-	/// Panics if trying to call from anything else than the window or a
-	/// dedicated worker.
+	/// Panics if called from anything else than the window or a dedicated
+	/// worker.
 	#[cfg(feature = "track")]
 	pub fn terminate(self) -> Result<Option<R>, TerminateError> {
-		let result = self
-			.return_
-			.ok_or(TerminateError::Polled)
-			.and_then(|Return(mut return_)| match return_.try_recv() {
-				Ok(Some(Ok(ok))) => Ok(Some(ok)),
-				Ok(Some(Err(error))) => Err(TerminateError::Error(error)),
-				Ok(None) => Ok(None),
-				Err(_) => Err(TerminateError::Error(Error::Terminated)),
-			});
+		let result =
+			self.return_.ok_or(TerminateError::Polled).and_then(
+				|Return(mut return_)| match return_
+					.try_recv()
+					.expect("sender dropped without sending anything")
+				{
+					Some(Ok(ok)) => Ok(Some(ok)),
+					Some(Err(error)) => Err(TerminateError::Error(error)),
+					None => Ok(None),
+				},
+			);
 
 		GLOBAL.with(|global| match global {
 			// The window has access to all workers, we can terminate right here.
 			Global::Window => {
-				WORKERS.with(|workers| {
-					if let Some(worker) = workers.remove(self.id) {
+				WINDOW_STATE.with(|state| {
+					if let Some(worker) = state.workers.remove(self.id) {
 						worker.terminate();
 					}
+
+					// If the worker isn't present, it means that we already
+					// cleaned it up. `result` could still be anything because
+					// of racing conditions.
 				});
 			}
 			// Workers have to instruct the window to terminate the worker for them.
-			Global::Worker(worker) => WindowMessage::Terminate(self.id).post_message(worker),
+			Global::Worker => WORKER_STATE.with(|state| {
+				state
+					.sender()
+					.unbounded_send(WindowMessage::Terminate(self.id))
+					.expect("receiver dropped somehow");
+			}),
 		});
 
 		result
@@ -298,18 +307,23 @@ where
 
 	#[cfg(feature = "track")]
 	let id = IDS.next();
-	let context = WorkerContext::Closure(Box::new(move || {
+	let task = Task::Closure(Box::new(move || {
 		let result = try_catch::try_(f).map_err(Error::Error);
 		let _canceled = sender.send(result);
 
 		#[cfg(feature = "track")]
-		GLOBAL.with(|global| WindowMessage::Close(id).post_message(global.worker()));
+		WORKER_STATE.with(|state| {
+			state
+				.sender()
+				.unbounded_send(WindowMessage::Finished(id))
+				.expect("receiver dropped somehow");
+		});
 	}));
 
 	spawn_internal(
 		#[cfg(feature = "track")]
 		id,
-		context,
+		task,
 		receiver,
 	)
 }
@@ -333,7 +347,7 @@ where
 
 	#[cfg(feature = "track")]
 	let id = IDS.next();
-	let worker = WorkerContext::Future(Box::new(move || {
+	let worker = Task::Future(Box::new(move || {
 		Box::pin(async move {
 			// Try to catch panics in the user-given closure that produces the `Future`.
 			let result = match try_catch::try_(f).map_err(Error::Error) {
@@ -343,7 +357,12 @@ where
 			let _canceled = sender.send(result);
 
 			#[cfg(feature = "track")]
-			GLOBAL.with(|global| WindowMessage::Close(id).post_message(global.worker()));
+			WORKER_STATE.with(|state| {
+				state
+					.sender()
+					.unbounded_send(WindowMessage::Finished(id))
+					.expect("receiver dropped somehow");
+			});
 		})
 	}));
 
@@ -365,20 +384,19 @@ pub fn hook(panic_info: &PanicInfo<'_>) -> ! {
 /// Internal worker spawning function.
 fn spawn_internal<R>(
 	#[cfg(feature = "track")] id: Id,
-	context: WorkerContext,
+	task: Task,
 	receiver: Receiver<Result<R, Error>>,
 ) -> WorkerHandle<R> {
 	GLOBAL.with(|global| match global {
 		Global::Window => spawn_from_window(
 			#[cfg(feature = "track")]
 			id,
-			context,
+			task,
 		),
-		Global::Worker(global) => spawn_from_worker(
-			global,
+		Global::Worker => spawn_from_worker(
 			#[cfg(feature = "track")]
 			id,
-			context,
+			task,
 		),
 	});
 
@@ -390,23 +408,21 @@ fn spawn_internal<R>(
 }
 
 /// Spawn worker from window.
-fn spawn_from_window(#[cfg(feature = "track")] id: Id, context: WorkerContext) {
+fn spawn_from_window(#[cfg(feature = "track")] id: Id, task: Task) {
 	// `Worker.new()` should only fail on unsupported `URL`s, this is consistent,
 	// except the `wasm_bindgen::script_url()` determined during run-time and part
 	// of the `WORKER_URL`, and is caught during testing.
-	let worker = WORKER_URL
+	let worker = WORKER_SCRIPT
 		.with(|worker_url| Worker::new(worker_url))
 		.expect("`Worker.new()` failed");
 
-	WINDOW_HANDLER.with(|callback| worker.set_onmessage(Some(callback)));
-
-	let context = Box::into_raw(Box::new(context));
+	let task = Box::into_raw(Box::new(task));
 
 	let init = Array::of3(
 		&wasm_bindgen::module(),
 		&wasm_bindgen::memory(),
 		#[allow(clippy::as_conversions)]
-		&(context as usize).into(),
+		&(task as usize).into(),
 	);
 
 	// `Worker.postMessage()` should only fail on unsupported messages, this is
@@ -416,23 +432,23 @@ fn spawn_from_window(#[cfg(feature = "track")] id: Id, context: WorkerContext) {
 		.expect("`Worker.postMessage()` failed");
 
 	#[cfg(feature = "track")]
-	WORKERS
-		.with(|workers| workers.push(id, worker))
+	WINDOW_STATE
+		.with(|state| state.workers.push(id, worker))
 		.expect("duplicate ID used");
 }
 
 /// Spawn worker from worker.
-fn spawn_from_worker(
-	global: &DedicatedWorkerGlobalScope,
-	#[cfg(feature = "track")] id: Id,
-	context: WorkerContext,
-) {
-	WindowMessage::Spawn {
-		#[cfg(feature = "track")]
-		id,
-		context,
-	}
-	.post_message(global);
+fn spawn_from_worker(#[cfg(feature = "track")] id: Id, task: Task) {
+	WORKER_STATE.with(|state| {
+		state
+			.sender()
+			.unbounded_send(WindowMessage::Spawn {
+				#[cfg(feature = "track")]
+				id,
+				task,
+			})
+			.expect("receiver dropped somehow");
+	});
 }
 
 /// This function is called to get back into the Rust module from inside the
@@ -440,11 +456,11 @@ fn spawn_from_worker(
 #[doc(hidden)]
 #[allow(clippy::future_not_send)]
 #[wasm_bindgen]
-pub async fn __wasm_worker_entry(context: usize) {
+pub async fn __wasm_worker_entry(task: usize) {
 	#[allow(clippy::as_conversions)]
-	// SAFETY: The argument is an address that has to be a valid pointer to a `WorkerContext`.
-	match *unsafe { Box::from_raw(context as *mut WorkerContext) } {
-		WorkerContext::Closure(fn_) => fn_(),
-		WorkerContext::Future(fn_) => fn_().await,
+	// SAFETY: The argument is an address that has to be a valid pointer to a `Task`.
+	match *unsafe { Box::from_raw(task as *mut Task) } {
+		Task::Closure(fn_) => fn_(),
+		Task::Future(fn_) => fn_().await,
 	};
 }

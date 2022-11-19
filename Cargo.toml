@@ -8,8 +8,10 @@ version = "0.0.0"
 track = ["dep:vec_map"]
 
 [dependencies]
-futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
+futures-channel = "0.3"
+futures-util = { version = "0.3", default-features = false }
 js-sys = "0.3"
+once_cell = { version = "1", default-features = false }
 pin-project-lite = "0.2"
 vec_map = { version = "0.8", optional = true }
 wasm-bindgen = { version = "0.2", default-features = false }

@@ -13,7 +13,6 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::DedicatedWorkerGlobalScope;
 
 thread_local! {
 	/// Cached [`Global`], so we don't have to run this code multiple times. When accessed the
@@ -26,7 +25,7 @@ pub(crate) enum Global {
 	/// Window.
 	Window,
 	/// Worker.
-	Worker(DedicatedWorkerGlobalScope),
+	Worker,
 }
 
 impl Global {
@@ -53,18 +52,9 @@ impl Global {
 		if !global.window().is_undefined() {
 			Self::Window
 		} else if !global.worker().is_undefined() {
-			Self::Worker(global.unchecked_into())
+			Self::Worker
 		} else {
 			panic!("only supported in a browser or web worker")
-		}
-	}
-
-	/// Returns the worker global scope. Panics if not in a worker.
-	#[cfg(feature = "track")]
-	pub(crate) fn worker(&self) -> &DedicatedWorkerGlobalScope {
-		match self {
-			Self::Window => panic!("expected to be in a worker"),
-			Self::Worker(global) => global,
 		}
 	}
 }
