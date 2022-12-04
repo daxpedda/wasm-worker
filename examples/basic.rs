@@ -59,7 +59,7 @@ pub async fn main_js() -> Result<(), JsValue> {
 		console::log_1(&format!("Return value: {}", future.await?).into());
 	}
 
-	// Cancel workers.
+	/*// Cancel workers.
 	let mut list = Vec::with_capacity(10);
 
 	for _ in 0..10 {
@@ -71,7 +71,7 @@ pub async fn main_js() -> Result<(), JsValue> {
 
 	for handle in list {
 		assert_eq!(handle.terminate(), Ok(None));
-	}
+	}*/
 
 	// Panic.
 	assert!(matches!(

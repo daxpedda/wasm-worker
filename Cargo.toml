@@ -1,3 +1,6 @@
+[workspace]
+members = ["", "core"]
+
 [package]
 edition = "2021"
 name = "wasm-worker"
@@ -5,7 +8,9 @@ publish = false
 version = "0.0.0"
 
 [features]
-track = ["dep:vec_map"]
+blocking = ["dep:pollster"]
+raw = []
+registry = ["dep:vec_map"]
 
 [dependencies]
 futures-channel = "0.3"
@@ -13,6 +18,7 @@ futures-util = { version = "0.3", default-features = false }
 js-sys = "0.3"
 once_cell = { version = "1", default-features = false }
 pin-project-lite = "0.2"
+pollster = { version = "0.2", optional = true }
 vec_map = { version = "0.8", optional = true }
 wasm-bindgen = { version = "0.2", default-features = false }
 wasm-bindgen-futures = "0.4"
@@ -31,7 +37,13 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 wasm-bindgen-test = "0.3"
 
 [patch.crates-io]
+# https://github.com/rust-lang/futures-rs/pull/2660
+# https://github.com/rust-lang/futures-rs/pull/2666
+# https://github.com/rust-lang/futures-rs/pull/2667
+futures-channel = { git = "https://github.com/daxpedda/futures-rs", branch = "despair" }
+futures-core = { git = "https://github.com/daxpedda/futures-rs", branch = "despair" }
 # https://github.com/rustwasm/wasm-bindgen/pull/3032
+# https://github.com/rustwasm/wasm-bindgen/pull/3059
 # https://github.com/rustwasm/wasm-bindgen/pull/3084
 # https://github.com/rustwasm/wasm-bindgen/pull/3092
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }

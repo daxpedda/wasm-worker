@@ -13,15 +13,15 @@ rustflags = [
 	# `rustflags` overwrite each other.
 	# See <https://github.com/rust-lang/cargo/issues/5376>.
 	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
-	# Deny `unsafe`.
-	"-Dunsafe_code",
 	# Clippy groups.
 	"-Wclippy::all",
 	"-Wclippy::cargo",
 	"-Wclippy::nursery",
 	"-Wclippy::pedantic",
 	# Allowed Clippy lints.
+	"-Aclippy::equatable_if_let",
 	"-Aclippy::module_name_repetitions",
+	"-Aclippy::option_if_let_else",
 	"-Aclippy::redundant_pub_crate",
 	"-Aclippy::tabs_in_doc_comments",
 	# Clippy restriction lints.

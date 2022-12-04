@@ -24,9 +24,11 @@ pub(crate) fn try_<R>(fn_: impl FnOnce() -> R) -> Result<R, String> {
 		__wasm_worker_try(&mut || return_ = Some(fn_.take().expect("called more than once")()));
 
 	return_.ok_or_else(|| {
-		error
-			.dyn_ref::<js_sys::Error>()
-			.map_or_else(|| format!("{error:?}"), |error| error.message().into())
+		if let Some(error) = error.dyn_ref::<js_sys::Error>() {
+			error.message().into()
+		} else {
+			format!("{error:?}")
+		}
 	})
 }
 
@@ -55,7 +57,7 @@ where
 
 impl<F: Future> TryFuture<F> {
 	/// Creates a new [`TryFuture`].
-	pub(crate) const fn new(fn_: F) -> Self {
+	pub(crate) const fn wrap(fn_: F) -> Self {
 		Self { fn_ }
 	}
 }
