@@ -39,6 +39,7 @@ use once_cell::unsync::OnceCell;
 use try_catch::TryFuture;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
+use wasm_worker_core as core;
 use web_sys::{console, Blob, BlobPropertyBag, DedicatedWorkerGlobalScope, Url, Worker};
 
 thread_local! {
@@ -245,9 +246,7 @@ impl<R> FusedFuture for WorkerLocalHandle<R> {
 }
 
 impl<R> WorkerHandle<R> {
-	fn try_recv(&mut self) {
-		
-	}
+	fn try_recv(&mut self) {}
 
 	#[allow(clippy::same_name_method)]
 	#[must_use]

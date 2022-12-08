@@ -16,7 +16,11 @@ web-sys = { version = "0.3", features = [
 	"Blob",
 	"BlobPropertyBag",
 	"console",
-    "DedicatedWorkerGlobalScope",
+	"DedicatedWorkerGlobalScope",
 	"Url",
-    "Worker",
+	"Worker",
 ] }
+
+[dev-dependencies]
+futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
+wasm-bindgen-test = "0.3"

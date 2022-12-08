@@ -138,7 +138,16 @@ pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
 	close.to_bool()
 }
 
+pub fn terminate() {
+	__wasm_worker_close();
+}
+
 #[wasm_bindgen]
 extern "C" {
 	fn __wasm_worker_close();
+
+	/// JS `try catch` block.
+	#[doc(hidden)]
+	#[allow(unused_doc_comments)]
+	pub fn __wasm_worker_try(fn_: &mut dyn FnMut()) -> JsValue;
 }

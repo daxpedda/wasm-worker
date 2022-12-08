@@ -1,5 +1,13 @@
 let wasm;
 
+function __wasm_worker_try(f) {
+	try {
+		f();
+	} catch (e) {
+		return e;
+	}
+}
+
 function __wasm_worker_close() {
 	wasm.__wbindgen_thread_destroy();
 	self.close();
