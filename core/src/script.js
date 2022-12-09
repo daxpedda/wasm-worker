@@ -18,7 +18,7 @@ self.onmessage = async event => {
 
 	wasm = await wasm_bindgen(module, memory);
 
-	if (await wasm.__wasm_worker_entry(task)) {
+	if (await wasm.__wasm_worker_entry(task) === true) {
 		__wasm_worker_close();
 	}
 };

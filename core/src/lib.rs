@@ -5,68 +5,34 @@
 	clippy::missing_panics_doc
 )]
 
-use std::future::Future;
-use std::ops::Deref;
-use std::pin::Pin;
+mod builder;
+mod global;
+mod script_url;
 
-use js_sys::Array;
+use std::borrow::Cow;
+use std::cell::Cell;
+use std::fmt::{self, Display};
+use std::future::Future;
+use std::rc::Rc;
+
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{console, Blob, BlobPropertyBag, DedicatedWorkerGlobalScope, Url, Worker};
+use wasm_bindgen::JsValue;
+use web_sys::{Worker, WorkerOptions};
 
-static SCRIPT_URL: Lazy<ScriptUrl> = Lazy::new(ScriptUrl::new);
-
-struct ScriptUrl(String);
-
-impl Deref for ScriptUrl {
-	type Target = str;
-
-	fn deref(&self) -> &Self::Target {
-		&self.0
-	}
-}
-
-impl ScriptUrl {
-	fn new() -> Self {
-		let script = format!(
-			"importScripts('{}');\n{}",
-			wasm_bindgen::script_url(),
-			include_str!("script.js")
-		);
-
-		let sequence = Array::of1(&JsValue::from(script));
-		let mut property = BlobPropertyBag::new();
-		property.type_("text/javascript");
-		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property);
-
-		let worker_url = blob
-			.and_then(|blob| Url::create_object_url_with_blob(&blob))
-			.expect("worker `Url` could not be created");
-
-		Self(worker_url)
-	}
-}
-
-impl Drop for ScriptUrl {
-	fn drop(&mut self) {
-		if let Err(error) = Url::revoke_object_url(&self.0) {
-			console::warn_1(&format!("worker `Url` could not be deallocated: {error:?}").into());
-		}
-	}
-}
+pub use self::builder::WorkerBuilder;
+pub use self::global::{global_with, Global};
+pub use self::script_url::{default_script_url, ScriptUrl};
 
 #[derive(Debug)]
 pub struct WorkerHandle(Worker);
 
 impl WorkerHandle {
-	#[cfg(feature = "raw")]
 	#[must_use]
 	pub const fn raw(&self) -> &Worker {
 		&self.0
 	}
 
-	#[cfg(feature = "raw")]
 	#[allow(clippy::missing_const_for_fn)]
 	#[must_use]
 	pub fn into_raw(self) -> Worker {
@@ -76,28 +42,6 @@ impl WorkerHandle {
 	pub fn terminate(self) {
 		self.0.terminate();
 	}
-}
-
-pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
-where
-	F1: 'static + FnOnce() -> F2 + Send,
-	F2: 'static + Future<Output = Close>,
-{
-	let work = Task(Box::new(move || Box::pin(async move { f().await })));
-	let task = Box::into_raw(Box::new(work));
-
-	let worker = Worker::new(&SCRIPT_URL).expect("`Worker.new()` failed");
-	let init = Array::of3(
-		&wasm_bindgen::module(),
-		&wasm_bindgen::memory(),
-		&task.into(),
-	);
-
-	worker
-		.post_message(&init)
-		.expect("`Worker.postMessage()` failed");
-
-	WorkerHandle(worker)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -115,31 +59,71 @@ impl Close {
 	}
 }
 
-#[doc(hidden)]
-#[allow(missing_debug_implementations)]
-pub struct Task(
-	Box<dyn 'static + FnOnce() -> Pin<Box<dyn 'static + Future<Output = Close>>> + Send>,
-);
+pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
+where
+	F1: 'static + FnOnce() -> F2 + Send,
+	F2: 'static + Future<Output = Close>,
+{
+	WorkerBuilder::new().unwrap().spawn(f)
+}
 
-#[doc(hidden)]
-#[allow(clippy::future_not_send)]
-#[wasm_bindgen]
-pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
-	js_sys::global()
-		.unchecked_into::<DedicatedWorkerGlobalScope>()
-		.set_onmessage(None);
+#[must_use]
+pub fn has_module_support() -> bool {
+	static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
+		#[wasm_bindgen]
+		struct Tester(Rc<Cell<bool>>);
 
-	// SAFETY: The argument is an address that has to be a valid pointer to a
-	// `Task`.
-	let Task(work) = *unsafe { Box::from_raw(task) };
+		#[wasm_bindgen]
+		impl Tester {
+			#[allow(unreachable_pub)]
+			#[wasm_bindgen(getter = type)]
+			pub fn type_(&self) {
+				self.0.set(true);
+			}
+		}
 
-	let close = work().await;
+		let tester = Rc::new(Cell::new(false));
+		let worker_options = WorkerOptions::from(JsValue::from(Tester(Rc::clone(&tester))));
+		let worker = Worker::new_with_options("data:,", &worker_options).unwrap();
+		worker.terminate();
 
-	close.to_bool()
+		tester.get()
+	});
+
+	*HAS_MODULE_SUPPORT
+}
+
+#[must_use]
+pub fn name() -> Option<String> {
+	global_with(|global| match global {
+		Global::Window(_) => None,
+		Global::DedicatedWorker(global) => Some(global.name()),
+	})
 }
 
 pub fn terminate() {
 	__wasm_worker_close();
+}
+
+#[derive(Clone, Debug)]
+pub enum Error<'url> {
+	NoModuleSupport(Cow<'url, ScriptUrl>),
+}
+
+impl Display for Error<'_> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::NoModuleSupport(_) => {
+				write!(f, "browser doesn't support worker modules")
+			}
+		}
+	}
+}
+
+impl From<Error<'_>> for JsValue {
+	fn from(value: Error<'_>) -> Self {
+		value.to_string().into()
+	}
 }
 
 #[wasm_bindgen]

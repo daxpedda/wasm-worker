@@ -454,7 +454,6 @@ fn spawn_from_worker(#[cfg(feature = "track")] id: Id, task: Task) {
 /// This function is called to get back into the Rust module from inside the
 /// spawned worker.
 #[doc(hidden)]
-#[allow(clippy::future_not_send)]
 #[wasm_bindgen]
 pub async fn __wasm_worker_entry(task: usize) {
 	#[allow(clippy::as_conversions)]

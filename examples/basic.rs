@@ -17,7 +17,6 @@ fn main() {}
 
 /// Workaround for `#[wasm_bindgen(start)]` not supporting `async fn main()`.
 #[wasm_bindgen(start)]
-#[allow(clippy::future_not_send)]
 pub async fn main_js() -> Result<(), JsValue> {
 	panic::set_hook(Box::new(|panic_info| {
 		wasm_worker::hook(panic_info);
@@ -109,7 +108,6 @@ pub async fn main_js() -> Result<(), JsValue> {
 }
 
 /// Putting a worker to sleep.
-#[allow(clippy::future_not_send)]
 async fn sleep(duration: Duration) {
 	JsFuture::from(Promise::new(&mut |resolve, _| {
 		let global: DedicatedWorkerGlobalScope = js_sys::global().unchecked_into();

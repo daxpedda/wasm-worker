@@ -632,7 +632,6 @@ impl Debug for Work {
 }
 
 #[doc(hidden)]
-#[allow(clippy::future_not_send)]
 #[wasm_bindgen]
 pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
 	js_sys::global()
