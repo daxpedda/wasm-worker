@@ -2,13 +2,24 @@ use std::borrow::Cow;
 
 use js_sys::Array;
 use once_cell::sync::Lazy;
-use wasm_bindgen::JsValue;
-use web_sys::{console, Blob, BlobPropertyBag, Url};
+use wasm_bindgen::{JsValue, ShimFormat};
+use web_sys::{Blob, BlobPropertyBag, Url};
 
 #[must_use]
 pub fn default_script_url() -> &'static ScriptUrl {
-	static SCRIPT_URL: Lazy<ScriptUrl> =
-		Lazy::new(|| ScriptUrl::new(&wasm_bindgen::script_url(), wasm_bindgen::shim_is_module()));
+	const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
+	static SCRIPT_URL: Lazy<ScriptUrl> = Lazy::new(|| {
+		ScriptUrl::new(
+			&wasm_bindgen::shim_url().expect(ERROR),
+			match &wasm_bindgen::shim_format() {
+				Some(ShimFormat::EsModule) => ScriptFormat::EsModule,
+				Some(ShimFormat::NoModules { global_name }) => ScriptFormat::Classic {
+					global: global_name,
+				},
+				Some(_) | None => panic!("{ERROR}"),
+			},
+		)
+	});
 
 	&SCRIPT_URL
 }
@@ -33,15 +44,31 @@ impl<'url> From<&'url ScriptUrl> for Cow<'url, ScriptUrl> {
 
 impl ScriptUrl {
 	#[must_use]
-	pub fn new(url: &str, is_module: bool) -> Self {
-		let script = if is_module {
-			format!(
-				"import wasm_bindgen from '{}';\n{}",
-				url,
-				include_str!("script.js")
-			)
-		} else {
-			format!("importScripts('{}');\n{}", url, include_str!("script.js"))
+	pub fn new(url: &str, format: ScriptFormat<'_>) -> Self {
+		let script = match format {
+			ScriptFormat::EsModule => {
+				format!(
+					"import __wasm_worker_wasm_bindgen, {{__wasm_worker_entry}} from '{}';\n\n{}",
+					url,
+					include_str!("script.js")
+				)
+			}
+
+			ScriptFormat::Classic { global } => {
+				#[rustfmt::skip]
+				let script = format!(
+					"\
+						importScripts('{}');\n\
+						const __wasm_worker_wasm_bindgen = {global};\n\
+						const __wasm_worker_entry = __wasm_worker_wasm_bindgen.__wasm_worker_entry;\n\
+						\n\
+						{}\
+					",
+					url,
+					include_str!("script.js")
+				);
+				script
+			}
 		};
 
 		let sequence = Array::of1(&JsValue::from(script));
@@ -53,7 +80,10 @@ impl ScriptUrl {
 			.and_then(|blob| Url::create_object_url_with_blob(&blob))
 			.unwrap();
 
-		Self { url, is_module }
+		Self {
+			url,
+			is_module: format.is_module(),
+		}
 	}
 
 	#[must_use]
@@ -67,10 +97,17 @@ impl ScriptUrl {
 	}
 }
 
-impl Drop for ScriptUrl {
-	fn drop(&mut self) {
-		if let Err(error) = Url::revoke_object_url(&self.url) {
-			console::warn_1(&format!("worker `Url` could not be deallocated: {error:?}").into());
+#[derive(Clone, Copy, Debug)]
+pub enum ScriptFormat<'global> {
+	EsModule,
+	Classic { global: &'global str },
+}
+
+impl ScriptFormat<'_> {
+	const fn is_module(self) -> bool {
+		match self {
+			ScriptFormat::EsModule => true,
+			ScriptFormat::Classic { .. } => false,
 		}
 	}
 }

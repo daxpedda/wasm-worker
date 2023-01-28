@@ -1,24 +1,24 @@
-let wasm;
+let __wasm_worker_wasm;
 
-function __wasm_worker_try(f) {
+function __wasm_worker_try(__wasm_worker_f) {
 	try {
-		f();
-	} catch (e) {
-		return e;
+		__wasm_worker_f();
+	} catch (__wasm_worker_e) {
+		return __wasm_worker_e;
 	}
 }
 
 function __wasm_worker_close() {
-	wasm.__wbindgen_thread_destroy();
+	__wasm_worker_wasm.__wbindgen_thread_destroy();
 	self.close();
 }
 
-self.onmessage = async event => {
-	const [module, memory, task] = event.data;
+self.onmessage = async __wasm_worker_event => {
+	const [__wasm_worker_module, __wasm_worker_memory, __wasm_worker_task] = __wasm_worker_event.data;
 
-	wasm = await wasm_bindgen(module, memory);
+	__wasm_worker_wasm = await __wasm_worker_wasm_bindgen(__wasm_worker_module, __wasm_worker_memory);
 
-	if (await wasm.__wasm_worker_entry(task) === true) {
+	if (await __wasm_worker_entry(__wasm_worker_task) === true) {
 		__wasm_worker_close();
 	}
 };

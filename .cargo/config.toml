@@ -1,18 +1,18 @@
 [build]
-rustflags = ["-C", "target-feature=+atomics,+bulk-memory,+mutable-globals"]
 target = "wasm32-unknown-unknown"
 
 [unstable]
 build-std = ["panic_abort", "std"]
 
 [target.wasm32-unknown-unknown]
+rustflags = [
+	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
+	"--cfg=web_sys_unstable_apis",
+]
 runner = "wasm-bindgen-test-runner"
 
 [target.'cfg(all())']
 rustflags = [
-	# `rustflags` overwrite each other.
-	# See <https://github.com/rust-lang/cargo/issues/5376>.
-	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
 	# Clippy groups.
 	"-Wclippy::all",
 	"-Wclippy::cargo",

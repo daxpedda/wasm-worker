@@ -38,13 +38,15 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 wasm-bindgen-test = "0.3"
 
 [patch.crates-io]
-# https://github.com/rust-lang/futures-rs/pull/2660
-# https://github.com/rust-lang/futures-rs/pull/2666
-# https://github.com/rust-lang/futures-rs/pull/2667
-futures-channel = { git = "https://github.com/daxpedda/futures-rs", branch = "despair" }
-futures-core = { git = "https://github.com/daxpedda/futures-rs", branch = "despair" }
-# https://github.com/rustwasm/wasm-bindgen/pull/3032
-# https://github.com/rustwasm/wasm-bindgen/pull/3059
-# https://github.com/rustwasm/wasm-bindgen/pull/3084
-# https://github.com/rustwasm/wasm-bindgen/pull/3092
+# Waiting for PR's to be merged and a new version to be released.
+# https://github.com/rustwasm/wasm-bindgen/pull/3059 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3169 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3185 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3236 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3084 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3243 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3168
+# https://github.com/rustwasm/wasm-bindgen/pull/3247
+# https://github.com/rustwasm/wasm-bindgen/pull/3252
+# https://github.com/rustwasm/wasm-bindgen/pull/3269 (merged)
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }

@@ -1,13 +1,17 @@
 use std::borrow::Cow;
+use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
+use std::rc::Rc;
 
 use js_sys::Array;
+use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use crate::{Close, Error, ScriptUrl, WorkerHandle};
+use super::{Close, Error, WorkerHandle};
+use crate::ScriptUrl;
 
 #[must_use = "does nothing unless spawned"]
 #[derive(Clone, Debug)]
@@ -26,7 +30,7 @@ impl WorkerBuilder<'_> {
 	) -> Result<WorkerBuilder<'url>, Error<'url>> {
 		let url = url.into();
 
-		if url.is_module() && !crate::has_module_support() {
+		if url.is_module() && !has_module_support() {
 			return Err(Error::NoModuleSupport(url));
 		}
 
@@ -48,7 +52,7 @@ impl WorkerBuilder<'_> {
 	) -> Result<WorkerBuilder<'url>, Cow<'url, ScriptUrl>> {
 		let url = url.into();
 
-		if url.is_module() && !crate::has_module_support() {
+		if url.is_module() && !has_module_support() {
 			return Err(url);
 		}
 
@@ -119,4 +123,30 @@ pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
 	let close = work().await;
 
 	close.to_bool()
+}
+
+#[must_use]
+fn has_module_support() -> bool {
+	static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
+		#[wasm_bindgen]
+		struct Tester(Rc<Cell<bool>>);
+
+		#[wasm_bindgen]
+		impl Tester {
+			#[allow(unreachable_pub)]
+			#[wasm_bindgen(getter = type)]
+			pub fn type_(&self) {
+				self.0.set(true);
+			}
+		}
+
+		let tester = Rc::new(Cell::new(false));
+		let worker_options = WorkerOptions::from(JsValue::from(Tester(Rc::clone(&tester))));
+		let worker = Worker::new_with_options("data:,", &worker_options).unwrap();
+		worker.terminate();
+
+		tester.get()
+	});
+
+	*HAS_MODULE_SUPPORT
 }

@@ -2,9 +2,9 @@ use std::time::Duration;
 
 use flag::Flag;
 use futures_util::future::{self, Either};
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsValue, ShimFormat};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker_core::{Close, ScriptUrl, WorkerBuilder};
+use wasm_worker_core::{Close, ScriptFormat, ScriptUrl, WorkerBuilder};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
@@ -41,6 +41,11 @@ async fn nested() {
 			});
 
 			inner_flag.await;
+
+			// Wait for nested worker to close.
+			// See https://bugs.chromium.org/p/chromium/issues/detail?id=1408115.
+			sleep::sleep(Duration::from_millis(250)).await;
+
 			outer_flag.signal();
 
 			Close::Yes
@@ -136,7 +141,16 @@ async fn builder_name() -> Result<(), JsValue> {
 async fn builder_url() -> Result<(), JsValue> {
 	let flag = Flag::new();
 
-	let url = ScriptUrl::new(&wasm_bindgen::script_url(), wasm_bindgen::shim_is_module());
+	let url = ScriptUrl::new(
+		&wasm_bindgen::shim_url().unwrap(),
+		match &wasm_bindgen::shim_format().unwrap() {
+			ShimFormat::EsModule => ScriptFormat::EsModule,
+			ShimFormat::NoModules { global_name } => ScriptFormat::Classic {
+				global: global_name,
+			},
+			_ => unimplemented!(),
+		},
+	);
 
 	WorkerBuilder::new_with_url(url)?.spawn({
 		let flag = flag.clone();
