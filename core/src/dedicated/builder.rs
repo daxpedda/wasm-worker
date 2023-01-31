@@ -6,7 +6,7 @@ use std::rc::Rc;
 use js_sys::Array;
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
 use super::{Close, Error, WorkerHandle};
@@ -78,7 +78,7 @@ impl WorkerBuilder<'_> {
 		} else {
 			Worker::new(&self.url.url)
 		}
-		.unwrap();
+		.unwrap_throw();
 
 		let init = Array::of3(
 			&wasm_bindgen::module(),
@@ -86,7 +86,7 @@ impl WorkerBuilder<'_> {
 			&task.into(),
 		);
 
-		worker.post_message(&init).unwrap();
+		worker.post_message(&init).unwrap_throw();
 
 		WorkerHandle(worker)
 	}
@@ -132,7 +132,7 @@ fn has_module_support() -> bool {
 
 		let tester = Rc::new(Cell::new(false));
 		let worker_options = WorkerOptions::from(JsValue::from(Tester(Rc::clone(&tester))));
-		let worker = Worker::new_with_options("data:,", &worker_options).unwrap();
+		let worker = Worker::new_with_options("data:,", &worker_options).unwrap_throw();
 		worker.terminate();
 
 		tester.get()

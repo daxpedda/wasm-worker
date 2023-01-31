@@ -69,7 +69,7 @@ impl ScriptUrl {
 
 		let url = blob
 			.and_then(|blob| Url::create_object_url_with_blob(&blob))
-			.unwrap();
+			.unwrap_throw();
 
 		Self {
 			url,

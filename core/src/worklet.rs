@@ -2,6 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
+use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Worklet;
 
@@ -28,7 +29,7 @@ impl Future for WorkletFuture {
 	type Output = ();
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		ready!(Pin::new(&mut self.0).poll(cx)).unwrap();
+		ready!(Pin::new(&mut self.0).poll(cx)).unwrap_throw();
 		Poll::Ready(())
 	}
 }
