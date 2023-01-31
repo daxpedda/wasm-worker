@@ -13,7 +13,6 @@ web-sys = { version = "0.3", features = [
 	"AudioData",
 	"Blob",
 	"BlobPropertyBag",
-	"console",
 	"DedicatedWorkerGlobalScope",
 	"ImageBitmap",
 	"MessagePort",
@@ -34,6 +33,7 @@ web-sys = { version = "0.3", features = [
 [dev-dependencies]
 futures-util = { version = "0.3", default-features = false }
 wasm-bindgen-test = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
 
 [[test]]
 name = "no_module_support"

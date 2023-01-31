@@ -9,7 +9,7 @@ use wasm_bindgen::JsValue;
 use web_sys::Worker;
 
 pub use self::builder::WorkerBuilder;
-use crate::{global_with, Global, Message, ScriptUrl};
+use crate::{global_with, Global, Message};
 
 pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
 where
@@ -80,10 +80,9 @@ impl Close {
 	}
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Error {
 	ModuleSupport,
-	Revoke { url: ScriptUrl, error: JsValue },
 }
 
 impl Display for Error {
@@ -91,9 +90,6 @@ impl Display for Error {
 		match self {
 			Self::ModuleSupport => {
 				write!(f, "browser doesn't support worker modules")
-			}
-			Self::Revoke { error, .. } => {
-				write!(f, "`URL` could not be revoked: {error:?}")
 			}
 		}
 	}
