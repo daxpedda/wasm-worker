@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use js_sys::Array;
 use once_cell::sync::Lazy;
 use wasm_bindgen::{JsValue, ShimFormat, UnwrapThrowExt};
@@ -24,22 +22,10 @@ pub fn default_script_url() -> &'static ScriptUrl {
 	&SCRIPT_URL
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ScriptUrl {
 	pub(crate) url: String,
 	is_module: bool,
-}
-
-impl From<ScriptUrl> for Cow<'_, ScriptUrl> {
-	fn from(value: ScriptUrl) -> Self {
-		Cow::Owned(value)
-	}
-}
-
-impl<'url> From<&'url ScriptUrl> for Cow<'url, ScriptUrl> {
-	fn from(value: &'url ScriptUrl) -> Self {
-		Cow::Borrowed(value)
-	}
 }
 
 impl Drop for ScriptUrl {
