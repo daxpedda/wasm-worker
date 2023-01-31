@@ -15,12 +15,13 @@ pub trait WorkletExt {
 pub struct WorkletFuture(JsFuture);
 
 impl WorkletExt for Worklet {
-    fn spawn<F1, F2>(f: F1) -> WorkletFuture
+	fn spawn<F1, F2>(f: F1) -> WorkletFuture
 	where
 		F1: 'static + FnOnce() -> F2 + Send,
-		F2: 'static + Future<Output = ()> {
-        todo!()
-    }
+		F2: 'static + Future<Output = ()>,
+	{
+		todo!()
+	}
 }
 
 impl Future for WorkletFuture {

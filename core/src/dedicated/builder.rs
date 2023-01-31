@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::Cell;
 use std::future::Future;
 use std::pin::Pin;
@@ -16,22 +15,18 @@ use crate::ScriptUrl;
 #[must_use = "does nothing unless spawned"]
 #[derive(Clone, Debug)]
 pub struct WorkerBuilder<'url> {
-	pub url: Cow<'url, ScriptUrl>,
+	url: &'url ScriptUrl,
 	options: Option<WorkerOptions>,
 }
 
 impl WorkerBuilder<'_> {
-	pub fn new() -> Result<WorkerBuilder<'static>, Error<'static>> {
+	pub fn new() -> Result<WorkerBuilder<'static>, Error> {
 		Self::new_with_url(crate::default_script_url())
 	}
 
-	pub fn new_with_url<'url, URL: Into<Cow<'url, ScriptUrl>>>(
-		url: URL,
-	) -> Result<WorkerBuilder<'url>, Error<'url>> {
-		let url = url.into();
-
+	pub fn new_with_url(url: &ScriptUrl) -> Result<WorkerBuilder<'_>, Error> {
 		if url.is_module() && !has_module_support() {
-			return Err(Error::NoModuleSupport(url));
+			return Err(Error::ModuleSupport);
 		}
 
 		let mut builder = WorkerBuilder { url, options: None };
@@ -46,14 +41,9 @@ impl WorkerBuilder<'_> {
 		Ok(builder)
 	}
 
-	pub fn url<'url, URL: Into<Cow<'url, ScriptUrl>>>(
-		mut self,
-		url: URL,
-	) -> Result<WorkerBuilder<'url>, Cow<'url, ScriptUrl>> {
-		let url = url.into();
-
+	pub fn url(mut self, url: &ScriptUrl) -> Result<WorkerBuilder<'_>, Error> {
 		if url.is_module() && !has_module_support() {
-			return Err(url);
+			return Err(Error::ModuleSupport);
 		}
 
 		if url.is_module() {

@@ -1,6 +1,5 @@
 mod builder;
 
-use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Display;
 use std::future::Future;
@@ -82,22 +81,26 @@ impl Close {
 }
 
 #[derive(Clone, Debug)]
-pub enum Error<'url> {
-	NoModuleSupport(Cow<'url, ScriptUrl>),
+pub enum Error {
+	ModuleSupport,
+	Revoke { url: ScriptUrl, error: JsValue },
 }
 
-impl Display for Error<'_> {
+impl Display for Error {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::NoModuleSupport(_) => {
+			Self::ModuleSupport => {
 				write!(f, "browser doesn't support worker modules")
+			}
+			Self::Revoke { error, .. } => {
+				write!(f, "`URL` could not be revoked: {error:?}")
 			}
 		}
 	}
 }
 
-impl From<Error<'_>> for JsValue {
-	fn from(value: Error<'_>) -> Self {
+impl From<Error> for JsValue {
+	fn from(value: Error) -> Self {
 		value.to_string().into()
 	}
 }

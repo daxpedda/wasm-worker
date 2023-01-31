@@ -152,7 +152,7 @@ async fn builder_url() -> Result<(), JsValue> {
 		},
 	);
 
-	WorkerBuilder::new_with_url(url)?.spawn({
+	WorkerBuilder::new_with_url(&url)?.spawn({
 		let flag = flag.clone();
 		move || async move {
 			flag.signal();

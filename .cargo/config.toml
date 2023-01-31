@@ -5,11 +5,11 @@ target = "wasm32-unknown-unknown"
 build-std = ["panic_abort", "std"]
 
 [target.wasm32-unknown-unknown]
+runner = "wasm-bindgen-test-runner"
 rustflags = [
 	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
 	"--cfg=web_sys_unstable_apis",
 ]
-runner = "wasm-bindgen-test-runner"
 
 [target.'cfg(all())']
 rustflags = [

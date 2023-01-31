@@ -3,7 +3,9 @@ use std::borrow::Cow;
 use js_sys::Array;
 use once_cell::sync::Lazy;
 use wasm_bindgen::{JsValue, ShimFormat};
-use web_sys::{Blob, BlobPropertyBag, Url};
+use web_sys::{console, Blob, BlobPropertyBag, Url};
+
+use crate::Error;
 
 #[must_use]
 pub fn default_script_url() -> &'static ScriptUrl {
@@ -42,6 +44,14 @@ impl<'url> From<&'url ScriptUrl> for Cow<'url, ScriptUrl> {
 	}
 }
 
+impl Drop for ScriptUrl {
+	fn drop(&mut self) {
+		if let Err(error) = Url::revoke_object_url(&self.url) {
+			console::warn_1(&format!("`URL` could not be revoked: {error:?}").into());
+		}
+	}
+}
+
 impl ScriptUrl {
 	#[must_use]
 	pub fn new(url: &str, format: ScriptFormat<'_>) -> Self {
@@ -53,7 +63,6 @@ impl ScriptUrl {
 					include_str!("script.js")
 				)
 			}
-
 			ScriptFormat::Classic { global } => {
 				#[rustfmt::skip]
 				let script = format!(
@@ -94,6 +103,14 @@ impl ScriptUrl {
 	#[must_use]
 	pub const fn is_module(&self) -> bool {
 		self.is_module
+	}
+
+	pub fn revoke(self) -> Result<(), Error> {
+		if let Err(error) = Url::revoke_object_url(&self.url) {
+			Err(Error::Revoke { url: self, error })
+		} else {
+			Ok(())
+		}
 	}
 }
 

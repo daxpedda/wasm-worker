@@ -7,8 +7,6 @@
 
 //! TODO:
 //! - Note Chrome nested Worker issue: <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-//! - Document that we don't clean up `ScriptUrl` because it might delete URLs
-//!   that are the same.
 
 mod dedicated;
 mod global;
