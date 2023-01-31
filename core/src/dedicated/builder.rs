@@ -74,9 +74,9 @@ impl WorkerBuilder<'_> {
 		let task = Box::into_raw(Box::new(work));
 
 		let worker = if let Some(options) = &self.options {
-			Worker::new_with_options(self.url.url(), options)
+			Worker::new_with_options(&self.url.url, options)
 		} else {
-			Worker::new(self.url.url())
+			Worker::new(&self.url.url)
 		}
 		.unwrap();
 

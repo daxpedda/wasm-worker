@@ -28,7 +28,7 @@ pub fn default_script_url() -> &'static ScriptUrl {
 
 #[derive(Clone, Debug)]
 pub struct ScriptUrl {
-	url: String,
+	pub(crate) url: String,
 	is_module: bool,
 }
 
@@ -93,11 +93,6 @@ impl ScriptUrl {
 			url,
 			is_module: format.is_module(),
 		}
-	}
-
-	#[must_use]
-	pub fn url(&self) -> &str {
-		&self.url
 	}
 
 	#[must_use]
