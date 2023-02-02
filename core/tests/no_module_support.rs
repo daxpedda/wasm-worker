@@ -7,6 +7,6 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 fn no_module_support() {
 	assert!(matches!(
 		WorkerBuilder::new().unwrap_err(),
-		Error::ModuleSupport(_)
+		Error::ModuleSupport,
 	));
 }
