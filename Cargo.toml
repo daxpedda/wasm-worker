@@ -39,14 +39,8 @@ wasm-bindgen-test = "0.3"
 
 [patch.crates-io]
 # Waiting for PR's to be merged and a new version to be released.
-# https://github.com/rustwasm/wasm-bindgen/pull/3059 (merged)
-# https://github.com/rustwasm/wasm-bindgen/pull/3169 (merged)
-# https://github.com/rustwasm/wasm-bindgen/pull/3185 (merged)
-# https://github.com/rustwasm/wasm-bindgen/pull/3236 (merged)
-# https://github.com/rustwasm/wasm-bindgen/pull/3084 (merged)
-# https://github.com/rustwasm/wasm-bindgen/pull/3243 (merged)
 # https://github.com/rustwasm/wasm-bindgen/pull/3168
 # https://github.com/rustwasm/wasm-bindgen/pull/3247
 # https://github.com/rustwasm/wasm-bindgen/pull/3252
-# https://github.com/rustwasm/wasm-bindgen/pull/3269 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3279 (merged)
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
