@@ -81,10 +81,6 @@ impl ScriptUrl {
 	pub const fn is_module(&self) -> bool {
 		self.is_module
 	}
-
-	pub fn revoke(self) {
-		Url::revoke_object_url(&self.url).expect_throw("can't fail");
-	}
 }
 
 #[derive(Clone, Copy, Debug)]
