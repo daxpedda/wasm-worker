@@ -3,12 +3,12 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, Window};
 
 #[derive(Clone, Debug)]
-pub enum Global {
+pub(crate) enum Global {
 	Window(Window),
 	DedicatedWorker(DedicatedWorkerGlobalScope),
 }
 
-pub fn global_with<F: FnOnce(&Global) -> R, R>(f: F) -> R {
+pub(crate) fn global_with<F: FnOnce(&Global) -> R, R>(f: F) -> R {
 	thread_local! {
 		static GLOBAL: Global = {
 			#[wasm_bindgen]

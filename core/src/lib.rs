@@ -27,7 +27,7 @@ use web_sys::{
 };
 
 pub use self::dedicated::{name, spawn, terminate, Close, Error, WorkerBuilder, WorkerHandle};
-pub use self::global::{global_with, Global};
+use self::global::{global_with, Global};
 pub use self::script_url::{default_script_url, ScriptFormat, ScriptUrl};
 
 #[derive(Debug)]
