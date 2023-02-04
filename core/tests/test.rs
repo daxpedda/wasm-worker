@@ -43,7 +43,7 @@ async fn nested() {
 			inner_flag.await;
 
 			// Wait for nested worker to close.
-			// See https://bugs.chromium.org/p/chromium/issues/detail?id=1408115.
+			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
 			sleep::sleep(Duration::from_millis(250)).await;
 
 			outer_flag.signal();
