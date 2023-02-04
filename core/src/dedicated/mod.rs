@@ -40,18 +40,9 @@ impl WorkerHandle {
 		self.worker
 	}
 
-	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
-		self.worker
-			.post_message_with_transfer(
-				message.as_js_value(),
-				&js_sys::Array::of1(message.as_js_value()),
-			)
-			.unwrap_throw();
-
-		message
-			.has_transfered()
-			.then_some(())
-			.ok_or(TransferError(message))
+	#[must_use]
+	pub fn has_on_message(&self) -> bool {
+		self.closure.is_some()
 	}
 
 	pub fn clear_on_message(&mut self) {
@@ -66,6 +57,20 @@ impl WorkerHandle {
 
 		self.worker
 			.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+	}
+
+	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
+		self.worker
+			.post_message_with_transfer(
+				message.as_js_value(),
+				&js_sys::Array::of1(message.as_js_value()),
+			)
+			.unwrap_throw();
+
+		message
+			.has_transfered()
+			.then_some(())
+			.ok_or(TransferError(message))
 	}
 
 	pub fn terminate(self) {
@@ -109,10 +114,28 @@ impl WorkerContext {
 		self.0.name()
 	}
 
+	#[must_use]
+	pub fn has_on_message(&self) -> bool {
+		Self::CLOSURE.with(|closure| closure.borrow().is_some())
+	}
+
 	pub fn clear_on_message(&self) {
 		Self::CLOSURE.with(|closure| closure.borrow_mut().take());
 
 		self.0.set_onmessage(None);
+	}
+
+	pub fn set_on_message<F: 'static + FnMut(&Self, MessageEvent)>(&self, mut on_message: F) {
+		Self::CLOSURE.with(|closure| {
+			let mut closure = closure.borrow_mut();
+
+			let context = self.clone();
+			let closure = closure.insert(Closure::new(move |event| {
+				on_message(&context, MessageEvent(event));
+			}));
+
+			self.0.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+		});
 	}
 
 	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
@@ -127,19 +150,6 @@ impl WorkerContext {
 			.has_transfered()
 			.then_some(())
 			.ok_or(TransferError(message))
-	}
-
-	pub fn set_on_message<F: 'static + FnMut(&Self, MessageEvent)>(&self, mut on_message: F) {
-		Self::CLOSURE.with(|closure| {
-			let mut closure = closure.borrow_mut();
-
-			let context = self.clone();
-			let closure = closure.insert(Closure::new(move |event| {
-				on_message(&context, MessageEvent(event))
-			}));
-
-			self.0.set_onmessage(Some(closure.as_ref().unchecked_ref()));
-		});
 	}
 
 	pub fn terminate(self) -> ! {
