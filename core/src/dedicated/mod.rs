@@ -23,26 +23,25 @@ where
 }
 
 #[derive(Debug)]
-pub struct WorkerHandle(Worker);
+pub struct WorkerHandle {
+	worker: Worker,
+	closure: Option<Closure<dyn FnMut(web_sys::MessageEvent)>>,
+}
 
 impl WorkerHandle {
 	#[must_use]
 	pub const fn raw(&self) -> &Worker {
-		&self.0
+		&self.worker
 	}
 
 	#[allow(clippy::missing_const_for_fn)]
 	#[must_use]
 	pub fn into_raw(self) -> Worker {
-		self.0
-	}
-
-	pub fn terminate(self) {
-		self.0.terminate();
+		self.worker
 	}
 
 	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
-		self.0
+		self.worker
 			.post_message_with_transfer(
 				message.as_js_value(),
 				&js_sys::Array::of1(message.as_js_value()),
@@ -53,6 +52,24 @@ impl WorkerHandle {
 			.has_transfered()
 			.then_some(())
 			.ok_or(TransferError(message))
+	}
+
+	pub fn clear_on_message(&mut self) {
+		self.closure.take();
+		self.worker.set_onmessage(None);
+	}
+
+	pub fn set_on_message<F: 'static + FnMut(MessageEvent)>(&mut self, mut on_message: F) {
+		let closure = self
+			.closure
+			.insert(Closure::new(move |event| on_message(MessageEvent(event))));
+
+		self.worker
+			.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+	}
+
+	pub fn terminate(self) {
+		self.worker.terminate();
 	}
 }
 
@@ -98,12 +115,28 @@ impl WorkerContext {
 		self.0.set_onmessage(None);
 	}
 
-	pub fn set_on_message<F: 'static + FnMut(MessageEvent)>(&self, mut on_message: F) {
+	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
+		self.0
+			.post_message_with_transfer(
+				message.as_js_value(),
+				&js_sys::Array::of1(message.as_js_value()),
+			)
+			.unwrap_throw();
+
+		message
+			.has_transfered()
+			.then_some(())
+			.ok_or(TransferError(message))
+	}
+
+	pub fn set_on_message<F: 'static + FnMut(&Self, MessageEvent)>(&self, mut on_message: F) {
 		Self::CLOSURE.with(|closure| {
 			let mut closure = closure.borrow_mut();
 
-			let closure =
-				closure.insert(Closure::new(move |event| on_message(MessageEvent(event))));
+			let context = self.clone();
+			let closure = closure.insert(Closure::new(move |event| {
+				on_message(&context, MessageEvent(event))
+			}));
 
 			self.0.set_onmessage(Some(closure.as_ref().unchecked_ref()));
 		});

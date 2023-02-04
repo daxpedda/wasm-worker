@@ -169,19 +169,19 @@ async fn builder_url() -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen_test]
-async fn array_buffer_transfer() {
+async fn array_buffer_transfer() -> Result<(), JsValue> {
 	let buffer = ArrayBuffer::new(1);
 	let array = Uint8Array::new(&buffer);
 	array.copy_from(&[42]);
 
 	let flag_start = Flag::new();
+	let flag_sent = Flag::new();
 	let flag_finish = Flag::new();
 
-	let worker = wasm_worker_core::spawn({
-		let flag_start = flag_start.clone();
-		let flag_finish = flag_finish.clone();
-		|context| async move {
-			context.set_on_message(move |event| {
+	let worker = WorkerBuilder::new()?
+		.set_on_message({
+			let flag_finish = flag_finish.clone();
+			move |event| {
 				if let Some(Message::ArrayBuffer(buffer)) = event.message() {
 					let array = Uint8Array::new(&buffer);
 					assert_eq!(array.get_index(0), 42);
@@ -190,13 +190,30 @@ async fn array_buffer_transfer() {
 				}
 
 				flag_finish.signal();
-			});
+			}
+		})
+		.spawn({
+			let flag_start = flag_start.clone();
+			let flag_sent = flag_sent.clone();
+			|context| async move {
+				context.set_on_message(move |context, event| {
+					if let Some(Message::ArrayBuffer(buffer)) = event.message() {
+						let array = Uint8Array::new(&buffer);
+						assert_eq!(array.get_index(0), 42);
 
-			flag_start.signal();
+						assert!(context.transfer_message(buffer.into()).is_ok());
+					} else {
+						panic!()
+					}
 
-			Close::No
-		}
-	});
+					flag_sent.signal();
+				});
+
+				flag_start.signal();
+
+				Close::No
+			}
+		});
 
 	flag_start.await;
 
@@ -204,9 +221,12 @@ async fn array_buffer_transfer() {
 		.transfer_message(Message::ArrayBuffer(buffer))
 		.is_ok());
 
+	flag_sent.await;
 	flag_finish.await;
 
 	worker.terminate();
+
+	Ok(())
 }
 
 mod sleep {

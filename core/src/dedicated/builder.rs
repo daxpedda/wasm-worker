@@ -1,22 +1,41 @@
 use std::cell::Cell;
+use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
 
 use js_sys::Array;
 use once_cell::sync::Lazy;
+use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{Close, ModuleSupportError, WorkerContext, WorkerHandle};
+use super::{Close, MessageEvent, ModuleSupportError, WorkerContext, WorkerHandle};
 use crate::ScriptUrl;
 
 #[must_use = "does nothing unless spawned"]
-#[derive(Clone, Debug)]
 pub struct WorkerBuilder<'url> {
 	url: &'url ScriptUrl,
 	options: Option<WorkerOptions>,
+	closure: Option<Box<dyn FnMut(web_sys::MessageEvent)>>,
+}
+
+impl Debug for WorkerBuilder<'_> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.debug_struct("WorkerBuilder")
+			.field("url", &self.url)
+			.field("options", &self.options)
+			.field(
+				"closure",
+				&if self.closure.is_some() {
+					"Some"
+				} else {
+					"None"
+				},
+			)
+			.finish()
+	}
 }
 
 impl WorkerBuilder<'_> {
@@ -29,7 +48,11 @@ impl WorkerBuilder<'_> {
 			return Err(ModuleSupportError);
 		}
 
-		let mut builder = WorkerBuilder { url, options: None };
+		let mut builder = WorkerBuilder {
+			url,
+			options: None,
+			closure: None,
+		};
 
 		if builder.url.is_module() {
 			builder
@@ -55,6 +78,7 @@ impl WorkerBuilder<'_> {
 		Ok(WorkerBuilder {
 			url,
 			options: self.options,
+			closure: self.closure,
 		})
 	}
 
@@ -65,7 +89,18 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn spawn<F1, F2>(&self, f: F1) -> WorkerHandle
+	pub fn clear_on_message(mut self) -> Self {
+		self.closure.take();
+		self
+	}
+
+	pub fn set_on_message<F: 'static + FnMut(MessageEvent)>(mut self, mut on_message: F) -> Self {
+		self.closure
+			.replace(Box::new(move |event| on_message(MessageEvent(event))));
+		self
+	}
+
+	pub fn spawn<F1, F2>(self, f: F1) -> WorkerHandle
 	where
 		F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
 		F2: 'static + Future<Output = Close>,
@@ -82,6 +117,15 @@ impl WorkerBuilder<'_> {
 		}
 		.unwrap_throw();
 
+		let closure = self.closure.map(Closure::new);
+
+		worker.set_onmessage(
+			closure
+				.as_ref()
+				.map(Closure::as_ref)
+				.map(JsCast::unchecked_ref),
+		);
+
 		let init = Array::of3(
 			&wasm_bindgen::module(),
 			&wasm_bindgen::memory(),
@@ -90,7 +134,7 @@ impl WorkerBuilder<'_> {
 
 		worker.post_message(&init).unwrap_throw();
 
-		WorkerHandle(worker)
+		WorkerHandle { worker, closure }
 	}
 }
 

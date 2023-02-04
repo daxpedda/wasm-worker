@@ -48,6 +48,12 @@ pub enum Message {
 	WritableStream(WritableStream),
 }
 
+impl From<ArrayBuffer> for Message {
+	fn from(value: ArrayBuffer) -> Self {
+		Self::ArrayBuffer(value)
+	}
+}
+
 impl Message {
 	fn from_js_value(data: JsValue) -> Option<Self> {
 		if ArrayBuffer::is_type_of(&data) {
