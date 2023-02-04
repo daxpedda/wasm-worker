@@ -28,16 +28,18 @@ pub struct WorkerHandle {
 	closure: Option<Closure<dyn FnMut(web_sys::MessageEvent)>>,
 }
 
+impl Drop for WorkerHandle {
+	fn drop(&mut self) {
+		if self.closure.is_some() {
+			self.worker.set_onmessage(None);
+		}
+	}
+}
+
 impl WorkerHandle {
 	#[must_use]
 	pub const fn raw(&self) -> &Worker {
 		&self.worker
-	}
-
-	#[allow(clippy::missing_const_for_fn)]
-	#[must_use]
-	pub fn into_raw(self) -> Worker {
-		self.worker
 	}
 
 	#[must_use]
