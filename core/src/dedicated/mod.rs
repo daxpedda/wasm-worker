@@ -66,7 +66,7 @@ impl WorkerHandle {
 	}
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Close {
 	Yes,
 	No,
@@ -81,7 +81,7 @@ impl Close {
 	}
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ModuleSupportError;
 
 impl Display for ModuleSupportError {

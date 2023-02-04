@@ -2,7 +2,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, Window};
 
-#[derive(Clone, Debug)]
 pub(crate) enum Global {
 	Window(Window),
 	DedicatedWorker(DedicatedWorkerGlobalScope),
