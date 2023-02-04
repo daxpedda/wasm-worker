@@ -60,6 +60,17 @@ impl WorkerContext {
 	}
 
 	#[must_use]
+	pub const fn raw(&self) -> &DedicatedWorkerGlobalScope {
+		&self.0
+	}
+
+	#[allow(clippy::missing_const_for_fn)]
+	#[must_use]
+	pub fn into_raw(self) -> DedicatedWorkerGlobalScope {
+		self.0
+	}
+
+	#[must_use]
 	pub fn name(&self) -> String {
 		self.0.name()
 	}
