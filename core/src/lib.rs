@@ -7,6 +7,8 @@
 
 //! TODO:
 //! - Note Chrome nested Worker issue: <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
+//! - Document that getting the default script url will fail if using no-modules
+//!   and not starting in a document.
 
 mod dedicated;
 mod global;
