@@ -1,12 +1,14 @@
 mod builder;
 
+use std::cell::RefCell;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Display;
 use std::future::Future;
 
+use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
 
 pub use self::builder::WorkerBuilder;
@@ -39,8 +41,18 @@ impl WorkerHandle {
 		self.0.terminate();
 	}
 
-	pub fn send_message(message: Message) {
-		todo!()
+	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
+		self.0
+			.post_message_with_transfer(
+				message.as_js_value(),
+				&js_sys::Array::of1(message.as_js_value()),
+			)
+			.unwrap_throw();
+
+		message
+			.has_transfered()
+			.then_some(())
+			.ok_or(TransferError(message))
 	}
 }
 
@@ -48,6 +60,11 @@ impl WorkerHandle {
 pub struct WorkerContext(DedicatedWorkerGlobalScope);
 
 impl WorkerContext {
+	thread_local! {
+		#[allow(clippy::type_complexity)]
+		static CLOSURE: RefCell<Option<Closure<dyn FnMut(web_sys::MessageEvent)>>> = RefCell::new(None);
+	}
+
 	#[must_use]
 	pub fn new() -> Option<Self> {
 		global_with(|global| {
@@ -75,9 +92,47 @@ impl WorkerContext {
 		self.0.name()
 	}
 
+	pub fn clear_on_message(&self) {
+		Self::CLOSURE.with(|closure| closure.borrow_mut().take());
+
+		self.0.set_onmessage(None);
+	}
+
+	pub fn set_on_message<F: 'static + FnMut(MessageEvent)>(&self, mut on_message: F) {
+		Self::CLOSURE.with(|closure| {
+			let mut closure = closure.borrow_mut();
+
+			let closure =
+				closure.insert(Closure::new(move |event| on_message(MessageEvent(event))));
+
+			self.0.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+		});
+	}
+
 	pub fn terminate(self) -> ! {
 		__wasm_worker_close();
 		unreachable!("continued after terminating");
+	}
+}
+
+#[derive(Debug)]
+pub struct MessageEvent(web_sys::MessageEvent);
+
+impl MessageEvent {
+	#[must_use]
+	pub fn message(&self) -> Option<Message> {
+		Message::from_js_value(self.0.data())
+	}
+
+	#[must_use]
+	pub const fn raw(&self) -> &web_sys::MessageEvent {
+		&self.0
+	}
+
+	#[allow(clippy::missing_const_for_fn)]
+	#[must_use]
+	pub fn into_raw(self) -> web_sys::MessageEvent {
+		self.0
 	}
 }
 
@@ -109,6 +164,23 @@ impl Error for ModuleSupportError {}
 
 impl From<ModuleSupportError> for JsValue {
 	fn from(value: ModuleSupportError) -> Self {
+		value.to_string().into()
+	}
+}
+
+#[derive(Debug)]
+pub struct TransferError(Message);
+
+impl Display for TransferError {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "message was not transfered: {:?}", self.0)
+	}
+}
+
+impl Error for TransferError {}
+
+impl From<TransferError> for JsValue {
+	fn from(value: TransferError) -> Self {
 		value.to_string().into()
 	}
 }
