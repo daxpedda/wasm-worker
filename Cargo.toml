@@ -26,7 +26,6 @@ wasm-worker-core = { version = "0.0", path = "core" }
 web-sys = { version = "0.3", features = [
 	"Blob",
 	"BlobPropertyBag",
-	"console",
 	"DedicatedWorkerGlobalScope",
 	"MessageEvent",
 	"Url",
@@ -36,6 +35,7 @@ web-sys = { version = "0.3", features = [
 [dev-dependencies]
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 wasm-bindgen-test = "0.3"
+web-sys = { version = "0.3", features = ["console"] }
 
 [patch.crates-io]
 # Waiting for PR's to be merged and a new version to be released.
