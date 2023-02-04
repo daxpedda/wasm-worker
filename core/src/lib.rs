@@ -27,7 +27,7 @@ use web_sys::{
 };
 
 pub use self::dedicated::{
-	 spawn, Close, ModuleSupportError, WorkerBuilder, WorkerContext, WorkerHandle,
+	spawn, Close, ModuleSupportError, WorkerBuilder, WorkerContext, WorkerHandle,
 };
 use self::global::{global_with, Global};
 pub use self::script_url::{default_script_url, ScriptFormat, ScriptUrl};
