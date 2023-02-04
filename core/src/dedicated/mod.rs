@@ -1,5 +1,6 @@
 mod builder;
 
+use std::error::Error;
 use std::fmt;
 use std::fmt::Display;
 use std::future::Future;
@@ -88,6 +89,8 @@ impl Display for ModuleSupportError {
 		write!(f, "browser doesn't support worker modules")
 	}
 }
+
+impl Error for ModuleSupportError {}
 
 impl From<ModuleSupportError> for JsValue {
 	fn from(value: ModuleSupportError) -> Self {
