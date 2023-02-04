@@ -1,3 +1,5 @@
+#![allow(unreachable_pub)]
+
 use std::time::Duration;
 
 use flag::Flag;
@@ -176,7 +178,7 @@ mod sleep {
 	use wasm_bindgen_futures::JsFuture;
 	use wasm_worker_core::Global;
 
-	pub(crate) struct Sleep(JsFuture);
+	pub struct Sleep(JsFuture);
 
 	impl Future for Sleep {
 		type Output = ();
@@ -187,7 +189,7 @@ mod sleep {
 		}
 	}
 
-	pub(crate) fn sleep(duration: Duration) -> Sleep {
+	pub fn sleep(duration: Duration) -> Sleep {
 		let future =
 			JsFuture::from(Promise::new(&mut |resolve, _| {
 				let duration = duration.as_millis().try_into().unwrap();
@@ -220,17 +222,17 @@ mod flag {
 	}
 
 	#[derive(Clone)]
-	pub(crate) struct Flag(Arc<Inner>);
+	pub struct Flag(Arc<Inner>);
 
 	impl Flag {
-		pub(crate) fn new() -> Self {
+		pub fn new() -> Self {
 			Self(Arc::new(Inner {
 				waker: AtomicWaker::new(),
 				set: AtomicBool::new(false),
 			}))
 		}
 
-		pub(crate) fn signal(&self) {
+		pub fn signal(&self) {
 			self.0.set.store(true, Ordering::Relaxed);
 			self.0.waker.wake();
 		}
