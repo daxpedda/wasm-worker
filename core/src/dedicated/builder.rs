@@ -102,9 +102,9 @@ pub struct Task(
 #[allow(unreachable_pub)]
 #[wasm_bindgen]
 pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
-	js_sys::global()
-		.unchecked_into::<DedicatedWorkerGlobalScope>()
-		.set_onmessage(None);
+	// Unhooking the message handler has to happen in JS because loading the WASM
+	// module will actually yield and introduces a race condition where messages
+	// sent will still be handled by the starter message handler.
 
 	// SAFETY: The argument is an address that has to be a valid pointer to a
 	// `Task`.
