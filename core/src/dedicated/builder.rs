@@ -89,14 +89,17 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn clear_on_message(mut self) -> Self {
+	pub fn clear_message_handler(mut self) -> Self {
 		self.closure.take();
 		self
 	}
 
-	pub fn set_on_message<F: 'static + FnMut(MessageEvent)>(mut self, mut on_message: F) -> Self {
+	pub fn set_message_handler<F: 'static + FnMut(MessageEvent)>(
+		mut self,
+		mut message_handler: F,
+	) -> Self {
 		self.closure
-			.replace(Box::new(move |event| on_message(MessageEvent(event))));
+			.replace(Box::new(move |event| message_handler(MessageEvent(event))));
 		self
 	}
 

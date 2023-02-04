@@ -179,7 +179,7 @@ async fn array_buffer_transfer() -> Result<(), JsValue> {
 	let flag_finish = Flag::new();
 
 	let worker = WorkerBuilder::new()?
-		.set_on_message({
+		.set_message_handler({
 			let flag_finish = flag_finish.clone();
 			move |event| {
 				if let Some(Message::ArrayBuffer(buffer)) = event.message() {
@@ -196,7 +196,7 @@ async fn array_buffer_transfer() -> Result<(), JsValue> {
 			let flag_start = flag_start.clone();
 			let flag_sent = flag_sent.clone();
 			|context| async move {
-				context.set_on_message(move |context, event| {
+				context.set_message_handler(move |context, event| {
 					if let Some(Message::ArrayBuffer(buffer)) = event.message() {
 						let array = Uint8Array::new(&buffer);
 						assert_eq!(array.get_index(0), 42);

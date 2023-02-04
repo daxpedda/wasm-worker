@@ -43,19 +43,22 @@ impl WorkerHandle {
 	}
 
 	#[must_use]
-	pub fn has_on_message(&self) -> bool {
+	pub fn has_message_handler(&self) -> bool {
 		self.closure.is_some()
 	}
 
-	pub fn clear_on_message(&mut self) {
+	pub fn clear_message_handler(&mut self) {
 		self.closure.take();
 		self.worker.set_onmessage(None);
 	}
 
-	pub fn set_on_message<F: 'static + FnMut(MessageEvent)>(&mut self, mut on_message: F) {
-		let closure = self
-			.closure
-			.insert(Closure::new(move |event| on_message(MessageEvent(event))));
+	pub fn set_message_handler<F: 'static + FnMut(MessageEvent)>(
+		&mut self,
+		mut message_handler: F,
+	) {
+		let closure = self.closure.insert(Closure::new(move |event| {
+			message_handler(MessageEvent(event))
+		}));
 
 		self.worker
 			.set_onmessage(Some(closure.as_ref().unchecked_ref()));
@@ -117,23 +120,26 @@ impl WorkerContext {
 	}
 
 	#[must_use]
-	pub fn has_on_message(&self) -> bool {
+	pub fn has_message_handler(&self) -> bool {
 		Self::CLOSURE.with(|closure| closure.borrow().is_some())
 	}
 
-	pub fn clear_on_message(&self) {
+	pub fn clear_message_handler(&self) {
 		Self::CLOSURE.with(|closure| closure.borrow_mut().take());
 
 		self.0.set_onmessage(None);
 	}
 
-	pub fn set_on_message<F: 'static + FnMut(&Self, MessageEvent)>(&self, mut on_message: F) {
+	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
+		&self,
+		mut message_handler: F,
+	) {
 		Self::CLOSURE.with(|closure| {
 			let mut closure = closure.borrow_mut();
 
 			let context = self.clone();
 			let closure = closure.insert(Closure::new(move |event| {
-				on_message(&context, MessageEvent(event));
+				message_handler(&context, MessageEvent(event));
 			}));
 
 			self.0.set_onmessage(Some(closure.as_ref().unchecked_ref()));
