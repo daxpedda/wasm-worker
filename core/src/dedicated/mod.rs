@@ -81,22 +81,16 @@ impl Close {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Error {
-	ModuleSupport,
-}
+pub struct ModuleSupportError;
 
-impl Display for Error {
+impl Display for ModuleSupportError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::ModuleSupport => {
-				write!(f, "browser doesn't support worker modules")
-			}
-		}
+		write!(f, "browser doesn't support worker modules")
 	}
 }
 
-impl From<Error> for JsValue {
-	fn from(value: Error) -> Self {
+impl From<ModuleSupportError> for JsValue {
+	fn from(value: ModuleSupportError) -> Self {
 		value.to_string().into()
 	}
 }

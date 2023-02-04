@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{Close, Error, WorkerHandle};
+use super::{Close, ModuleSupportError, WorkerHandle};
 use crate::ScriptUrl;
 
 #[must_use = "does nothing unless spawned"]
@@ -20,13 +20,13 @@ pub struct WorkerBuilder<'url> {
 }
 
 impl WorkerBuilder<'_> {
-	pub fn new() -> Result<WorkerBuilder<'static>, Error> {
+	pub fn new() -> Result<WorkerBuilder<'static>, ModuleSupportError> {
 		Self::new_with_url(crate::default_script_url())
 	}
 
-	pub fn new_with_url(url: &ScriptUrl) -> Result<WorkerBuilder<'_>, Error> {
+	pub fn new_with_url(url: &ScriptUrl) -> Result<WorkerBuilder<'_>, ModuleSupportError> {
 		if url.is_module() && !has_module_support() {
-			return Err(Error::ModuleSupport);
+			return Err(ModuleSupportError);
 		}
 
 		let mut builder = WorkerBuilder { url, options: None };
@@ -41,9 +41,9 @@ impl WorkerBuilder<'_> {
 		Ok(builder)
 	}
 
-	pub fn url(mut self, url: &ScriptUrl) -> Result<WorkerBuilder<'_>, Error> {
+	pub fn url(mut self, url: &ScriptUrl) -> Result<WorkerBuilder<'_>, ModuleSupportError> {
 		if url.is_module() && !has_module_support() {
-			return Err(Error::ModuleSupport);
+			return Err(ModuleSupportError);
 		}
 
 		if url.is_module() {
