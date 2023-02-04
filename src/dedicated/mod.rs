@@ -57,7 +57,7 @@ impl WorkerHandle {
 		mut message_handler: F,
 	) {
 		let closure = self.closure.insert(Closure::new(move |event| {
-			message_handler(MessageEvent(event))
+			message_handler(MessageEvent(event));
 		}));
 
 		self.worker
