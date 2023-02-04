@@ -16,7 +16,7 @@ async fn basic() {
 
 	wasm_worker_core::spawn({
 		let flag = flag.clone();
-		move || async move {
+		move |_| async move {
 			flag.signal();
 			Close::Yes
 		}
@@ -31,12 +31,12 @@ async fn nested() {
 
 	wasm_worker_core::spawn({
 		let outer_flag = outer_flag.clone();
-		move || async move {
+		move |_| async move {
 			let inner_flag = Flag::new();
 
 			wasm_worker_core::spawn({
 				let inner_flag = inner_flag.clone();
-				move || async move {
+				move |_| async move {
 					inner_flag.signal();
 					Close::Yes
 				}
@@ -65,7 +65,7 @@ async fn non_closing() {
 	let worker = wasm_worker_core::spawn({
 		let signal_flag = signal_flag.clone();
 		let response_flag = response_flag.clone();
-		move || async move {
+		move |_| async move {
 			wasm_bindgen_futures::spawn_local(async move {
 				signal_flag.await;
 				response_flag.signal();
@@ -88,7 +88,7 @@ async fn terminate() {
 	let worker = wasm_worker_core::spawn({
 		let signal_flag = signal_flag.clone();
 		let response_flag = response_flag.clone();
-		move || async move {
+		move |_| async move {
 			signal_flag.await;
 			response_flag.signal();
 
@@ -109,7 +109,7 @@ async fn builder_basic() -> Result<(), JsValue> {
 
 	WorkerBuilder::new()?.spawn({
 		let flag = flag.clone();
-		move || async move {
+		move |_| async move {
 			flag.signal();
 			Close::Yes
 		}
@@ -126,8 +126,8 @@ async fn builder_name() -> Result<(), JsValue> {
 
 	WorkerBuilder::new()?.name("test").spawn({
 		let flag = flag.clone();
-		move || async move {
-			assert_eq!(wasm_worker_core::name().unwrap(), "test");
+		move |context| async move {
+			assert_eq!(context.name(), "test");
 
 			flag.signal();
 			Close::Yes
@@ -156,7 +156,7 @@ async fn builder_url() -> Result<(), JsValue> {
 
 	WorkerBuilder::new_with_url(&url)?.spawn({
 		let flag = flag.clone();
-		move || async move {
+		move |_| async move {
 			flag.signal();
 			Close::Yes
 		}

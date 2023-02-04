@@ -9,7 +9,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{Close, ModuleSupportError, WorkerHandle};
+use super::{Close, ModuleSupportError, WorkerContext, WorkerHandle};
 use crate::ScriptUrl;
 
 #[must_use = "does nothing unless spawned"]
@@ -67,10 +67,12 @@ impl WorkerBuilder<'_> {
 
 	pub fn spawn<F1, F2>(&self, f: F1) -> WorkerHandle
 	where
-		F1: 'static + FnOnce() -> F2 + Send,
+		F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
 		F2: 'static + Future<Output = Close>,
 	{
-		let work = Task(Box::new(move || Box::pin(async move { f().await })));
+		let work = Task(Box::new(move |context| {
+			Box::pin(async move { f(context).await })
+		}));
 		let task = Box::into_raw(Box::new(work));
 
 		let worker = if let Some(options) = &self.options {
@@ -93,9 +95,17 @@ impl WorkerBuilder<'_> {
 }
 
 #[doc(hidden)]
-#[allow(missing_debug_implementations, unreachable_pub)]
+#[allow(
+	clippy::type_complexity,
+	missing_debug_implementations,
+	unreachable_pub
+)]
 pub struct Task(
-	Box<dyn 'static + FnOnce() -> Pin<Box<dyn 'static + Future<Output = Close>>> + Send>,
+	Box<
+		dyn 'static
+			+ FnOnce(WorkerContext) -> Pin<Box<dyn 'static + Future<Output = Close>>>
+			+ Send,
+	>,
 );
 
 #[doc(hidden)]
@@ -110,7 +120,8 @@ pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
 	// `Task`.
 	let Task(work) = *unsafe { Box::from_raw(task) };
 
-	let close = work().await;
+	let context = WorkerContext(js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>());
+	let close = work(context).await;
 
 	close.to_bool()
 }

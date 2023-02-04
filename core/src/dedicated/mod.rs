@@ -14,7 +14,7 @@ use crate::{global_with, Global, Message};
 
 pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
 where
-	F1: 'static + FnOnce() -> F2 + Send,
+	F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
 	F2: 'static + Future<Output = Close>,
 {
 	WorkerBuilder::new().unwrap().spawn(f)

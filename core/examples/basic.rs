@@ -6,7 +6,7 @@ use web_sys::console;
 fn main() {
 	console::log_1(&"start".into());
 
-	wasm_worker_core::spawn(|| async {
+	wasm_worker_core::spawn(|_| async {
 		console::log_1(&"thread".into());
 		Close::Yes
 	});
