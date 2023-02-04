@@ -7,7 +7,7 @@ use std::future::Future;
 
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
-use web_sys::Worker;
+use web_sys::{DedicatedWorkerGlobalScope, Worker};
 
 pub use self::builder::WorkerBuilder;
 use crate::{global_with, Global, Message};
@@ -18,28 +18,6 @@ where
 	F2: 'static + Future<Output = Close>,
 {
 	WorkerBuilder::new().unwrap().spawn(f)
-}
-
-#[must_use]
-pub fn name() -> Option<String> {
-	global_with(|global| {
-		if let Global::DedicatedWorker(global) = global {
-			Some(global.name())
-		} else {
-			None
-		}
-	})
-}
-
-pub fn terminate() -> ! {
-	global_with(|global| {
-		if let Global::DedicatedWorker(_) = global {
-			__wasm_worker_close();
-			unreachable!("continued after terminating");
-		} else {
-			panic!("called `terminate` not from a worker");
-		}
-	})
 }
 
 #[derive(Debug)]
@@ -63,6 +41,32 @@ impl WorkerHandle {
 
 	pub fn send_message(message: Message) {
 		todo!()
+	}
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WorkerContext(DedicatedWorkerGlobalScope);
+
+impl WorkerContext {
+	#[must_use]
+	pub fn new() -> Option<Self> {
+		global_with(|global| {
+			if let Global::DedicatedWorker(global) = global {
+				Some(Self(global.clone()))
+			} else {
+				None
+			}
+		})
+	}
+
+	#[must_use]
+	pub fn name(&self) -> String {
+		self.0.name()
+	}
+
+	pub fn terminate(self) -> ! {
+		__wasm_worker_close();
+		unreachable!("continued after terminating");
 	}
 }
 
