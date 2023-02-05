@@ -95,7 +95,7 @@ impl WorkerContext {
 	#[must_use]
 	pub fn new() -> Option<Self> {
 		global_with(|global| {
-			if let Global::DedicatedWorker(global) = global {
+			if let Some(Global::DedicatedWorker(global)) = global {
 				Some(Self(global.clone()))
 			} else {
 				None
