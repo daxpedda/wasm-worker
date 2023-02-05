@@ -33,6 +33,13 @@ impl From<ArrayBuffer> for Message {
 	}
 }
 
+#[cfg(web_sys_unstable_apis)]
+impl From<AudioData> for Message {
+	fn from(value: AudioData) -> Self {
+		Self::AudioData(value)
+	}
+}
+
 impl Message {
 	pub(crate) fn from_js_value(data: JsValue) -> Result<Self, MessageError> {
 		if data.is_instance_of::<ArrayBuffer>() {
@@ -101,8 +108,6 @@ impl Message {
 	pub fn has_array_buffer_support() -> bool {
 		static SUPPORT: Lazy<bool> = Lazy::new(|| {
 			let buffer = ArrayBuffer::new(1);
-			let array = Uint8Array::new(&buffer);
-			array.copy_from(&[0]);
 
 			let worker = Worker::new("data:,").unwrap_throw();
 			worker
