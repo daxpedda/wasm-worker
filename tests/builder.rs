@@ -28,25 +28,6 @@ async fn basic() -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen_test]
-async fn name() -> Result<(), JsValue> {
-	let flag = Flag::new();
-
-	WorkerBuilder::new()?.name("test").spawn({
-		let flag = flag.clone();
-		move |context| async move {
-			assert_eq!(context.name(), "test");
-
-			flag.signal();
-			Close::Yes
-		}
-	});
-
-	flag.await;
-
-	Ok(())
-}
-
-#[wasm_bindgen_test]
 async fn url() -> Result<(), JsValue> {
 	let flag = Flag::new();
 
@@ -64,6 +45,44 @@ async fn url() -> Result<(), JsValue> {
 	WorkerBuilder::new_with_url(&url)?.spawn({
 		let flag = flag.clone();
 		move |_| async move {
+			flag.signal();
+			Close::Yes
+		}
+	});
+
+	flag.await;
+
+	Ok(())
+}
+
+#[wasm_bindgen_test]
+async fn name() -> Result<(), JsValue> {
+	let flag = Flag::new();
+
+	WorkerBuilder::new()?.name("test").spawn({
+		let flag = flag.clone();
+		move |context| async move {
+			assert_eq!(context.name(), Some(String::from("test")));
+
+			flag.signal();
+			Close::Yes
+		}
+	});
+
+	flag.await;
+
+	Ok(())
+}
+
+#[wasm_bindgen_test]
+async fn clear_name() -> Result<(), JsValue> {
+	let flag = Flag::new();
+
+	WorkerBuilder::new()?.name("test").clear_name().spawn({
+		let flag = flag.clone();
+		move |context| async move {
+			assert_eq!(context.name(), None);
+
 			flag.signal();
 			Close::Yes
 		}

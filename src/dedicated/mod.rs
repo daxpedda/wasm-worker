@@ -115,8 +115,14 @@ impl WorkerContext {
 	}
 
 	#[must_use]
-	pub fn name(&self) -> String {
-		self.0.name()
+	pub fn name(&self) -> Option<String> {
+		let name = self.0.name();
+
+		if name.is_empty() {
+			None
+		} else {
+			Some(name)
+		}
 	}
 
 	#[must_use]
