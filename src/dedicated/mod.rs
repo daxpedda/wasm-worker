@@ -6,6 +6,7 @@ use std::fmt;
 use std::fmt::Display;
 use std::future::Future;
 
+use js_sys::Array;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
@@ -66,10 +67,7 @@ impl WorkerHandle {
 
 	pub fn transfer_message(&self, message: Message) {
 		self.worker
-			.post_message_with_transfer(
-				message.as_js_value(),
-				&js_sys::Array::of1(message.as_js_value()),
-			)
+			.post_message_with_transfer(message.as_js_value(), &Array::of1(message.as_js_value()))
 			.unwrap_throw();
 		drop(message);
 	}
@@ -150,10 +148,7 @@ impl WorkerContext {
 
 	pub fn transfer_message(&self, message: Message) {
 		self.0
-			.post_message_with_transfer(
-				message.as_js_value(),
-				&js_sys::Array::of1(message.as_js_value()),
-			)
+			.post_message_with_transfer(message.as_js_value(), &Array::of1(message.as_js_value()))
 			.unwrap_throw();
 		drop(message);
 	}
