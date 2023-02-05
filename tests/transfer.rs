@@ -20,7 +20,6 @@ async fn array_buffer() -> Result<(), JsValue> {
 	array.copy_from(&[42]);
 
 	let flag_start = Flag::new();
-	let flag_sent = Flag::new();
 	let flag_finish = Flag::new();
 
 	let worker = WorkerBuilder::new()?
@@ -39,7 +38,6 @@ async fn array_buffer() -> Result<(), JsValue> {
 		})
 		.spawn({
 			let flag_start = flag_start.clone();
-			let flag_sent = flag_sent.clone();
 			|context| async move {
 				context.set_message_handler(move |context, event| {
 					if let Some(Message::ArrayBuffer(buffer)) = event.message() {
@@ -50,8 +48,6 @@ async fn array_buffer() -> Result<(), JsValue> {
 					} else {
 						panic!()
 					}
-
-					flag_sent.signal();
 				});
 
 				flag_start.signal();
@@ -61,10 +57,7 @@ async fn array_buffer() -> Result<(), JsValue> {
 		});
 
 	flag_start.await;
-
 	worker.transfer_message(Message::ArrayBuffer(buffer));
-
-	flag_sent.await;
 	flag_finish.await;
 
 	worker.terminate();
