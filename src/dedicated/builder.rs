@@ -91,8 +91,9 @@ impl WorkerBuilder<'_, '_> {
 		mut self,
 		mut message_handler: F,
 	) -> Self {
-		self.message_handler
-			.replace(Box::new(move |event| message_handler(MessageEvent(event))));
+		self.message_handler.replace(Box::new(move |event| {
+			message_handler(MessageEvent::new(event));
+		}));
 		self
 	}
 

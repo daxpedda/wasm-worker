@@ -2,9 +2,9 @@ mod builder;
 
 use std::cell::RefCell;
 use std::error::Error;
-use std::fmt;
-use std::fmt::Display;
+use std::fmt::{self, Display, Formatter};
 use std::future::Future;
+use std::ops::Range;
 
 use js_sys::Array;
 use wasm_bindgen::closure::Closure;
@@ -13,7 +13,7 @@ use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
 
 pub use self::builder::WorkerBuilder;
-use crate::{global_with, Global, Message};
+use crate::{global_with, Global, Message, MessageError};
 
 pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
 where
@@ -58,18 +58,15 @@ impl WorkerHandle {
 		mut message_handler: F,
 	) {
 		let closure = self.closure.insert(Closure::new(move |event| {
-			message_handler(MessageEvent(event));
+			message_handler(MessageEvent::new(event));
 		}));
 
 		self.worker
 			.set_onmessage(Some(closure.as_ref().unchecked_ref()));
 	}
 
-	pub fn transfer_message(&self, message: Message) {
-		self.worker
-			.post_message_with_transfer(message.as_js_value(), &Array::of1(message.as_js_value()))
-			.unwrap_throw();
-		drop(message);
+	pub fn transfer_message<M: IntoIterator<Item = Message>>(&self, messages: M) {
+		WorkerOrContext::Worker(&self.worker).transfer_messages(messages);
 	}
 
 	pub fn terminate(self) {
@@ -139,18 +136,15 @@ impl WorkerContext {
 
 			let context = self.clone();
 			let closure = closure.insert(Closure::new(move |event| {
-				message_handler(&context, MessageEvent(event));
+				message_handler(&context, MessageEvent::new(event));
 			}));
 
 			self.0.set_onmessage(Some(closure.as_ref().unchecked_ref()));
 		});
 	}
 
-	pub fn transfer_message(&self, message: Message) {
-		self.0
-			.post_message_with_transfer(message.as_js_value(), &Array::of1(message.as_js_value()))
-			.unwrap_throw();
-		drop(message);
+	pub fn transfer_messages<M: IntoIterator<Item = Message>>(&self, messages: M) {
+		WorkerOrContext::Context(&self.0).transfer_messages(messages);
 	}
 
 	pub fn terminate(self) -> ! {
@@ -159,24 +153,155 @@ impl WorkerContext {
 	}
 }
 
+enum WorkerOrContext<'this> {
+	Worker(&'this Worker),
+	Context(&'this DedicatedWorkerGlobalScope),
+}
+
+impl WorkerOrContext<'_> {
+	fn post_message_with_transfer(
+		self,
+		message: &JsValue,
+		transfer: &JsValue,
+	) -> Result<(), JsValue> {
+		match self {
+			WorkerOrContext::Worker(worker) => worker.post_message_with_transfer(message, transfer),
+			WorkerOrContext::Context(context) => {
+				context.post_message_with_transfer(message, transfer)
+			}
+		}
+	}
+
+	fn transfer_messages<M: IntoIterator<Item = Message>>(self, messages: M) {
+		let mut messages = messages.into_iter().map(Message::into_js_value);
+
+		let array = 'array: {
+			let Some(message_1) = messages.next() else {
+				return
+			};
+
+			let Some(message_2) = messages.next() else {
+				return self
+					.post_message_with_transfer(&message_1, &Array::of1(&message_1))
+					.unwrap_throw();
+			};
+
+			let Some(message_3) = messages.next() else {
+				break 'array  Array::of2(&message_1, &message_2);
+			};
+
+			let Some(message_4) = messages.next() else {
+				break 'array Array::of3(&message_1, &message_2, &message_3);
+			};
+
+			if let Some(message_5) = messages.next() {
+				let array = Array::of5(&message_1, &message_2, &message_3, &message_4, &message_5);
+
+				for message in messages {
+					array.push(&message);
+				}
+
+				array
+			} else {
+				Array::of4(&message_1, &message_2, &message_3, &message_4)
+			}
+		};
+
+		self.post_message_with_transfer(&array, &array)
+			.unwrap_throw();
+	}
+}
+
 #[derive(Debug)]
-pub struct MessageEvent(web_sys::MessageEvent);
+pub struct MessageEvent {
+	event: web_sys::MessageEvent,
+	message_taken: bool,
+}
 
 impl MessageEvent {
+	const fn new(event: web_sys::MessageEvent) -> Self {
+		Self {
+			event,
+			message_taken: false,
+		}
+	}
+
 	#[must_use]
-	pub fn message(&self) -> Option<Message> {
-		Message::from_js_value(self.0.data())
+	pub fn messages(&self) -> Option<MessageIter> {
+		if self.message_taken {
+			return None;
+		}
+
+		let data = self.event.data();
+
+		Some(if data.is_array() {
+			let array: Array = data.unchecked_into();
+			let range = 0..array.length();
+
+			MessageIter(Inner::Array { array, range })
+		} else {
+			MessageIter(Inner::Single(Some(data)))
+		})
 	}
 
 	#[must_use]
 	pub const fn raw(&self) -> &web_sys::MessageEvent {
-		&self.0
+		&self.event
 	}
 
 	#[allow(clippy::missing_const_for_fn)]
 	#[must_use]
 	pub fn into_raw(self) -> web_sys::MessageEvent {
+		self.event
+	}
+}
+
+#[derive(Debug)]
+pub struct MessageIter(Inner);
+
+#[derive(Debug)]
+enum Inner {
+	Single(Option<JsValue>),
+	Array { array: Array, range: Range<u32> },
+}
+
+impl Iterator for MessageIter {
+	type Item = UnserializedMessage;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => {
+				let index = range.next()?;
+				Some(UnserializedMessage(array.get(index)))
+			}
+			Inner::Single(value) => value.take().map(UnserializedMessage),
+		}
+	}
+}
+
+#[derive(Debug)]
+pub struct UnserializedMessage(JsValue);
+
+impl UnserializedMessage {
+	#[must_use]
+	#[allow(clippy::missing_const_for_fn)]
+	pub fn into_raw(self) -> JsValue {
 		self.0
+	}
+
+	pub fn serialize(self) -> Result<Message, MessageError> {
+		Message::from_js_value(self.0)
+	}
+
+	pub fn serialize_as<T: JsCast>(self) -> Result<Message, MessageError>
+	where
+		Message: From<T>,
+	{
+		if self.0.is_instance_of::<T>() {
+			Ok(Message::from(self.0.unchecked_into::<T>()))
+		} else {
+			Err(MessageError(self.0))
+		}
 	}
 }
 
@@ -199,7 +324,7 @@ impl Close {
 pub struct ModuleSupportError;
 
 impl Display for ModuleSupportError {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "browser doesn't support worker modules")
 	}
 }

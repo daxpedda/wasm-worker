@@ -18,6 +18,9 @@ mod global;
 mod script_url;
 mod worklet;
 
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+
 use js_sys::{Array, ArrayBuffer, Uint8Array};
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -30,7 +33,8 @@ use web_sys::{
 };
 
 pub use self::dedicated::{
-	spawn, Close, MessageEvent, ModuleSupportError, WorkerBuilder, WorkerContext, WorkerHandle,
+	spawn, Close, MessageEvent, MessageIter, ModuleSupportError, UnserializedMessage,
+	WorkerBuilder, WorkerContext, WorkerHandle,
 };
 use self::global::{global_with, Global};
 pub use self::script_url::{default_script_url, ScriptFormat, ScriptUrl};
@@ -58,66 +62,66 @@ impl From<ArrayBuffer> for Message {
 }
 
 impl Message {
-	fn from_js_value(data: JsValue) -> Option<Self> {
+	fn from_js_value(data: JsValue) -> Result<Self, MessageError> {
 		if data.is_instance_of::<ArrayBuffer>() {
-			return Some(Self::ArrayBuffer(data.unchecked_into()));
+			return Ok(Self::ArrayBuffer(data.unchecked_into()));
 		}
 
 		#[cfg(web_sys_unstable_apis)]
 		if data.is_instance_of::<AudioData>() {
-			return Some(Self::AudioData(data.unchecked_into()));
+			return Ok(Self::AudioData(data.unchecked_into()));
 		}
 
 		if data.is_instance_of::<ImageBitmap>() {
-			return Some(Self::ImageBitmap(data.unchecked_into()));
+			return Ok(Self::ImageBitmap(data.unchecked_into()));
 		}
 
 		if data.is_instance_of::<MessagePort>() {
-			return Some(Self::MessagePort(data.unchecked_into()));
+			return Ok(Self::MessagePort(data.unchecked_into()));
 		}
 
 		if data.is_instance_of::<OffscreenCanvas>() {
-			return Some(Self::OffscreenCanvas(data.unchecked_into()));
+			return Ok(Self::OffscreenCanvas(data.unchecked_into()));
 		}
 
 		if data.is_instance_of::<ReadableStream>() {
-			return Some(Self::ReadableStream(data.unchecked_into()));
+			return Ok(Self::ReadableStream(data.unchecked_into()));
 		}
 
 		if data.is_instance_of::<RtcDataChannel>() {
-			return Some(Self::RtcDataChannel(data.unchecked_into()));
+			return Ok(Self::RtcDataChannel(data.unchecked_into()));
 		}
 
 		if data.is_instance_of::<TransformStream>() {
-			return Some(Self::TransformStream(data.unchecked_into()));
+			return Ok(Self::TransformStream(data.unchecked_into()));
 		}
 
 		#[cfg(web_sys_unstable_apis)]
 		if data.is_instance_of::<VideoFrame>() {
-			return Some(Self::VideoFrame(data.unchecked_into()));
+			return Ok(Self::VideoFrame(data.unchecked_into()));
 		}
 
 		if data.is_instance_of::<WritableStream>() {
-			return Some(Self::WritableStream(data.unchecked_into()));
+			return Ok(Self::WritableStream(data.unchecked_into()));
 		}
 
-		None
+		Err(MessageError(data))
 	}
 
-	fn as_js_value(&self) -> &JsValue {
+	fn into_js_value(self) -> JsValue {
 		match self {
-			Self::ArrayBuffer(value) => value,
+			Self::ArrayBuffer(value) => value.into(),
 			#[cfg(web_sys_unstable_apis)]
-			Self::AudioData(value) => value,
-			Self::ImageBitmap(value) => value,
-			Self::MessagePort(value) => value,
-			Self::OffscreenCanvas(value) => value,
-			Self::ReadableStream(value) => value,
-			Self::RtcDataChannel(value) => value,
-			Self::TransformStream(value) => value,
+			Self::AudioData(value) => value.into(),
+			Self::ImageBitmap(value) => value.into(),
+			Self::MessagePort(value) => value.into(),
+			Self::OffscreenCanvas(value) => value.into(),
+			Self::ReadableStream(value) => value.into(),
+			Self::RtcDataChannel(value) => value.into(),
+			Self::TransformStream(value) => value.into(),
 			#[cfg(web_sys_unstable_apis)]
-			Self::VideoFrame(value) => value,
-			Self::WritableStream(value) => value,
+			Self::VideoFrame(value) => value.into(),
+			Self::WritableStream(value) => value.into(),
 		}
 	}
 
@@ -138,6 +142,31 @@ impl Message {
 		});
 
 		*SUPPORT
+	}
+}
+
+#[derive(Debug)]
+pub struct MessageError(JsValue);
+
+impl Display for MessageError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "unexpected message: {:?}", self.0)
+	}
+}
+
+impl Error for MessageError {}
+
+impl From<MessageError> for JsValue {
+	fn from(value: MessageError) -> Self {
+		value.to_string().into()
+	}
+}
+
+impl MessageError {
+	#[must_use]
+	#[allow(clippy::missing_const_for_fn)]
+	pub fn into_raw(self) -> JsValue {
+		self.0
 	}
 }
 
