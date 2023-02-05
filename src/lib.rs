@@ -10,6 +10,8 @@
 //! - Note Chrome nested Worker issue: <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
 //! - Document that getting the default script url will fail if using no-modules
 //!   and not starting in a document.
+//! - Note possible race condition when sending to newly spawned worker not
+//!   receiving messages if receiving message handler wasn't setup yet.
 
 mod dedicated;
 mod global;
