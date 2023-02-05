@@ -12,7 +12,7 @@ use self::common::WorkerOrContext;
 pub use self::context::WorkerContext;
 pub use self::event::{MessageEvent, MessageIter};
 pub use self::handle::WorkerHandle;
-pub use self::worker_url::{default_worker_url, WorkerUrl, WorkerUrlFormat};
+pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 
 pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
 where

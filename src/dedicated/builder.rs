@@ -42,7 +42,7 @@ impl Debug for WorkerBuilder<'_, '_> {
 
 impl WorkerBuilder<'_, '_> {
 	pub fn new() -> Result<WorkerBuilder<'static, 'static>, ModuleSupportError> {
-		Self::new_with_url(crate::default_worker_url())
+		Self::new_with_url(WorkerUrl::default())
 	}
 
 	pub fn new_with_url(url: &WorkerUrl) -> Result<WorkerBuilder<'_, 'static>, ModuleSupportError> {

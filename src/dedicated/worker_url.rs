@@ -3,25 +3,6 @@ use once_cell::sync::Lazy;
 use wasm_bindgen::{JsValue, ShimFormat, UnwrapThrowExt};
 use web_sys::{Blob, BlobPropertyBag, Url};
 
-#[must_use]
-pub fn default_worker_url() -> &'static WorkerUrl {
-	static WORKER_URL: Lazy<WorkerUrl> = Lazy::new(|| {
-		const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
-		WorkerUrl::new(
-			&wasm_bindgen::shim_url().expect(ERROR),
-			match &wasm_bindgen::shim_format() {
-				Some(ShimFormat::EsModule) => WorkerUrlFormat::EsModule,
-				Some(ShimFormat::NoModules { global_name }) => WorkerUrlFormat::Classic {
-					global: global_name,
-				},
-				Some(_) | None => unreachable!("{ERROR}"),
-			},
-		)
-	});
-
-	&WORKER_URL
-}
-
 #[derive(Debug)]
 pub struct WorkerUrl {
 	pub(crate) url: String,
@@ -35,6 +16,26 @@ impl Drop for WorkerUrl {
 }
 
 impl WorkerUrl {
+	#[must_use]
+	#[allow(clippy::should_implement_trait)]
+	pub fn default() -> &'static Self {
+		static WORKER_URL: Lazy<WorkerUrl> = Lazy::new(|| {
+			const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
+			WorkerUrl::new(
+				&wasm_bindgen::shim_url().expect(ERROR),
+				match &wasm_bindgen::shim_format() {
+					Some(ShimFormat::EsModule) => WorkerUrlFormat::EsModule,
+					Some(ShimFormat::NoModules { global_name }) => WorkerUrlFormat::Classic {
+						global: global_name,
+					},
+					Some(_) | None => unreachable!("{ERROR}"),
+				},
+			)
+		});
+
+		&WORKER_URL
+	}
+
 	#[must_use]
 	pub fn new(url: &str, format: WorkerUrlFormat<'_>) -> Self {
 		let script = match format {
