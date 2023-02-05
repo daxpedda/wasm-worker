@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cell::Cell;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
@@ -15,20 +16,20 @@ use super::{Close, MessageEvent, ModuleSupportError, WorkerContext, WorkerHandle
 use crate::ScriptUrl;
 
 #[must_use = "does nothing unless spawned"]
-pub struct WorkerBuilder<'url> {
+pub struct WorkerBuilder<'url, 'name> {
 	url: &'url ScriptUrl,
-	options: Option<WorkerOptions>,
-	closure: Option<Box<dyn FnMut(web_sys::MessageEvent)>>,
+	name: Option<Cow<'name, str>>,
+	message_handler: Option<Box<dyn FnMut(web_sys::MessageEvent)>>,
 }
 
-impl Debug for WorkerBuilder<'_> {
+impl Debug for WorkerBuilder<'_, '_> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		f.debug_struct("WorkerBuilder")
 			.field("url", &self.url)
-			.field("options", &self.options)
+			.field("name", &self.name)
 			.field(
 				"closure",
-				&if self.closure.is_some() {
+				&if self.message_handler.is_some() {
 					"Some"
 				} else {
 					"None"
@@ -38,59 +39,25 @@ impl Debug for WorkerBuilder<'_> {
 	}
 }
 
-impl WorkerBuilder<'_> {
-	pub fn new() -> Result<WorkerBuilder<'static>, ModuleSupportError> {
+impl WorkerBuilder<'_, '_> {
+	pub fn new() -> Result<WorkerBuilder<'static, 'static>, ModuleSupportError> {
 		Self::new_with_url(crate::default_script_url())
 	}
 
-	pub fn new_with_url(url: &ScriptUrl) -> Result<WorkerBuilder<'_>, ModuleSupportError> {
+	pub fn new_with_url(url: &ScriptUrl) -> Result<WorkerBuilder<'_, 'static>, ModuleSupportError> {
 		if url.is_module() && !has_module_support() {
 			return Err(ModuleSupportError);
-		}
-
-		let mut builder = WorkerBuilder {
-			url,
-			options: None,
-			closure: None,
-		};
-
-		if builder.url.is_module() {
-			builder
-				.options
-				.get_or_insert_with(WorkerOptions::new)
-				.type_(WorkerType::Module);
-		}
-
-		Ok(builder)
-	}
-
-	pub fn url(mut self, url: &ScriptUrl) -> Result<WorkerBuilder<'_>, ModuleSupportError> {
-		if url.is_module() && !has_module_support() {
-			return Err(ModuleSupportError);
-		}
-
-		if url.is_module() {
-			self.options
-				.get_or_insert_with(WorkerOptions::new)
-				.type_(WorkerType::Module);
 		}
 
 		Ok(WorkerBuilder {
 			url,
-			options: self.options,
-			closure: self.closure,
+			name: None,
+			message_handler: None,
 		})
 	}
 
-	pub fn name(mut self, name: &str) -> Self {
-		self.options
-			.get_or_insert_with(WorkerOptions::new)
-			.name(name);
-		self
-	}
-
 	pub fn clear_message_handler(mut self) -> Self {
-		self.closure.take();
+		self.message_handler.take();
 		self
 	}
 
@@ -98,7 +65,7 @@ impl WorkerBuilder<'_> {
 		mut self,
 		mut message_handler: F,
 	) -> Self {
-		self.closure
+		self.message_handler
 			.replace(Box::new(move |event| message_handler(MessageEvent(event))));
 		self
 	}
@@ -113,14 +80,26 @@ impl WorkerBuilder<'_> {
 		}));
 		let task = Box::into_raw(Box::new(work));
 
-		let worker = if let Some(options) = &self.options {
-			Worker::new_with_options(&self.url.url, options)
+		let mut options = None;
+
+		if let Some(name) = self.name {
+			options.get_or_insert_with(WorkerOptions::new).name(&name);
+		}
+
+		if self.url.is_module() {
+			options
+				.get_or_insert_with(WorkerOptions::new)
+				.type_(WorkerType::Module);
+		}
+
+		let worker = if let Some(options) = options {
+			Worker::new_with_options(&self.url.url, &options)
 		} else {
 			Worker::new(&self.url.url)
 		}
 		.unwrap_throw();
 
-		let closure = self.closure.map(Closure::new);
+		let closure = self.message_handler.map(Closure::new);
 
 		worker.set_onmessage(
 			closure
@@ -138,6 +117,41 @@ impl WorkerBuilder<'_> {
 		worker.post_message(&init).unwrap_throw();
 
 		WorkerHandle { worker, closure }
+	}
+}
+
+impl<'name> WorkerBuilder<'_, 'name> {
+	pub fn url<'url>(
+		self,
+		url: &'url ScriptUrl,
+	) -> Result<WorkerBuilder<'url, 'name>, ModuleSupportError> {
+		if url.is_module() && !has_module_support() {
+			return Err(ModuleSupportError);
+		}
+
+		Ok(WorkerBuilder {
+			url,
+			name: self.name,
+			message_handler: self.message_handler,
+		})
+	}
+}
+
+impl<'url> WorkerBuilder<'url, '_> {
+	pub fn clear_name(self) -> WorkerBuilder<'url, 'static> {
+		WorkerBuilder {
+			url: self.url,
+			name: None,
+			message_handler: self.message_handler,
+		}
+	}
+
+	pub fn name<'name, N: Into<Cow<'name, str>>>(self, name: N) -> WorkerBuilder<'url, 'name> {
+		WorkerBuilder {
+			url: self.url,
+			name: Some(name.into()),
+			message_handler: self.message_handler,
+		}
 	}
 }
 
