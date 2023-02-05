@@ -13,7 +13,7 @@ use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
 
 pub use self::builder::WorkerBuilder;
-use crate::{global_with, Global, Message, MessageError};
+use crate::{global_with, Global, Message, RawMessage};
 
 pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
 where
@@ -275,32 +275,6 @@ impl Iterator for MessageIter {
 				Some(RawMessage(array.get(index)))
 			}
 			Inner::Single(value) => value.take().map(RawMessage),
-		}
-	}
-}
-
-#[derive(Debug)]
-pub struct RawMessage(JsValue);
-
-impl RawMessage {
-	#[must_use]
-	#[allow(clippy::missing_const_for_fn)]
-	pub fn into_raw(self) -> JsValue {
-		self.0
-	}
-
-	pub fn serialize(self) -> Result<Message, MessageError> {
-		Message::from_js_value(self.0)
-	}
-
-	pub fn serialize_as<T: JsCast>(self) -> Result<Message, MessageError>
-	where
-		Message: From<T>,
-	{
-		if self.0.is_instance_of::<T>() {
-			Ok(Message::from(self.0.unchecked_into::<T>()))
-		} else {
-			Err(MessageError(self.0))
 		}
 	}
 }
