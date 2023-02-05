@@ -38,7 +38,7 @@ async fn url() -> Result<(), JsValue> {
 			ShimFormat::NoModules { global_name } => ScriptFormat::Classic {
 				global: global_name,
 			},
-			_ => unimplemented!(),
+			_ => unreachable!("expected shim to be built for browsers"),
 		},
 	);
 
