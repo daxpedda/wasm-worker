@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::cell::Cell;
-use std::fmt::{self, Debug, Formatter};
+use std::error::Error;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -12,7 +13,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{Close, MessageEvent, ModuleSupportError, WorkerContext, WorkerHandle};
+use super::{Close, MessageEvent, WorkerContext, WorkerHandle};
 use crate::ScriptUrl;
 
 #[must_use = "does nothing unless spawned"]
@@ -212,4 +213,21 @@ pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
 	let close = work(context).await;
 
 	close.to_bool()
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ModuleSupportError;
+
+impl Display for ModuleSupportError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "browser doesn't support worker modules")
+	}
+}
+
+impl Error for ModuleSupportError {}
+
+impl From<ModuleSupportError> for JsValue {
+	fn from(value: ModuleSupportError) -> Self {
+		value.to_string().into()
+	}
 }

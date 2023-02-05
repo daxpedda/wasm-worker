@@ -2,8 +2,6 @@ mod builder;
 mod context;
 mod handle;
 
-use std::error::Error;
-use std::fmt::{self, Display, Formatter};
 use std::future::Future;
 use std::ops::Range;
 
@@ -11,7 +9,7 @@ use js_sys::Array;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
 
-pub use self::builder::WorkerBuilder;
+pub use self::builder::{ModuleSupportError, WorkerBuilder};
 pub use self::context::WorkerContext;
 pub use self::handle::WorkerHandle;
 use crate::{Message, RawMessage};
@@ -162,22 +160,5 @@ impl Close {
 			Self::Yes => true,
 			Self::No => false,
 		}
-	}
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ModuleSupportError;
-
-impl Display for ModuleSupportError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "browser doesn't support worker modules")
-	}
-}
-
-impl Error for ModuleSupportError {}
-
-impl From<ModuleSupportError> for JsValue {
-	fn from(value: ModuleSupportError) -> Self {
-		value.to_string().into()
 	}
 }
