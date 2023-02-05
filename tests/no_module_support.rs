@@ -10,8 +10,5 @@ fn check() {
 
 #[wasm_bindgen_test]
 fn builder_error() {
-	assert!(matches!(
-		WorkerBuilder::new().unwrap_err(),
-		ModuleSupportError,
-	));
+	assert_eq!(WorkerBuilder::new().unwrap_err(), ModuleSupportError,);
 }
