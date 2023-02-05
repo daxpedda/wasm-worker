@@ -13,7 +13,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{Close, MessageEvent, WorkerContext, WorkerHandle};
+use super::{MessageEvent, WorkerContext, WorkerHandle};
 use crate::ScriptUrl;
 
 #[must_use = "does nothing unless spawned"]
@@ -179,6 +179,21 @@ impl<'url> WorkerBuilder<'url, '_> {
 			url: self.url,
 			name: Some(name.into()),
 			message_handler: self.message_handler,
+		}
+	}
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Close {
+	Yes,
+	No,
+}
+
+impl Close {
+	const fn to_bool(self) -> bool {
+		match self {
+			Self::Yes => true,
+			Self::No => false,
 		}
 	}
 }
