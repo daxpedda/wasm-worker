@@ -266,23 +266,23 @@ enum Inner {
 }
 
 impl Iterator for MessageIter {
-	type Item = UnserializedMessage;
+	type Item = RawMessage;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		match &mut self.0 {
 			Inner::Array { array, range } => {
 				let index = range.next()?;
-				Some(UnserializedMessage(array.get(index)))
+				Some(RawMessage(array.get(index)))
 			}
-			Inner::Single(value) => value.take().map(UnserializedMessage),
+			Inner::Single(value) => value.take().map(RawMessage),
 		}
 	}
 }
 
 #[derive(Debug)]
-pub struct UnserializedMessage(JsValue);
+pub struct RawMessage(JsValue);
 
-impl UnserializedMessage {
+impl RawMessage {
 	#[must_use]
 	#[allow(clippy::missing_const_for_fn)]
 	pub fn into_raw(self) -> JsValue {
