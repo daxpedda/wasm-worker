@@ -56,45 +56,45 @@ impl From<ArrayBuffer> for Message {
 
 impl Message {
 	fn from_js_value(data: JsValue) -> Option<Self> {
-		if ArrayBuffer::is_type_of(&data) {
+		if data.is_instance_of::<ArrayBuffer>() {
 			return Some(Self::ArrayBuffer(data.unchecked_into()));
 		}
 
 		#[cfg(web_sys_unstable_apis)]
-		if AudioData::is_type_of(&data) {
+		if data.is_instance_of::<AudioData>() {
 			return Some(Self::AudioData(data.unchecked_into()));
 		}
 
-		if ImageBitmap::is_type_of(&data) {
+		if data.is_instance_of::<ImageBitmap>() {
 			return Some(Self::ImageBitmap(data.unchecked_into()));
 		}
 
-		if MessagePort::is_type_of(&data) {
+		if data.is_instance_of::<MessagePort>() {
 			return Some(Self::MessagePort(data.unchecked_into()));
 		}
 
-		if OffscreenCanvas::is_type_of(&data) {
+		if data.is_instance_of::<OffscreenCanvas>() {
 			return Some(Self::OffscreenCanvas(data.unchecked_into()));
 		}
 
-		if ReadableStream::is_type_of(&data) {
+		if data.is_instance_of::<ReadableStream>() {
 			return Some(Self::ReadableStream(data.unchecked_into()));
 		}
 
-		if RtcDataChannel::is_type_of(&data) {
+		if data.is_instance_of::<RtcDataChannel>() {
 			return Some(Self::RtcDataChannel(data.unchecked_into()));
 		}
 
-		if TransformStream::is_type_of(&data) {
+		if data.is_instance_of::<TransformStream>() {
 			return Some(Self::TransformStream(data.unchecked_into()));
 		}
 
 		#[cfg(web_sys_unstable_apis)]
-		if VideoFrame::is_type_of(&data) {
+		if data.is_instance_of::<VideoFrame>() {
 			return Some(Self::VideoFrame(data.unchecked_into()));
 		}
 
-		if WritableStream::is_type_of(&data) {
+		if data.is_instance_of::<WritableStream>() {
 			return Some(Self::WritableStream(data.unchecked_into()));
 		}
 
