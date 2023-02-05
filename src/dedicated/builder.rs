@@ -45,7 +45,7 @@ impl WorkerBuilder<'_, '_> {
 	}
 
 	pub fn new_with_url(url: &ScriptUrl) -> Result<WorkerBuilder<'_, 'static>, ModuleSupportError> {
-		if url.is_module() && !has_module_support() {
+		if url.is_module() && !Self::has_module_support() {
 			return Err(ModuleSupportError);
 		}
 
@@ -54,6 +54,32 @@ impl WorkerBuilder<'_, '_> {
 			name: None,
 			message_handler: None,
 		})
+	}
+
+	#[must_use]
+	pub fn has_module_support() -> bool {
+		static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
+			#[wasm_bindgen]
+			struct Tester(Rc<Cell<bool>>);
+
+			#[wasm_bindgen]
+			impl Tester {
+				#[allow(unreachable_pub)]
+				#[wasm_bindgen(getter = type)]
+				pub fn type_(&self) {
+					self.0.set(true);
+				}
+			}
+
+			let tester = Rc::new(Cell::new(false));
+			let worker_options = WorkerOptions::from(JsValue::from(Tester(Rc::clone(&tester))));
+			let worker = Worker::new_with_options("data:,", &worker_options).unwrap_throw();
+			worker.terminate();
+
+			tester.get()
+		});
+
+		*HAS_MODULE_SUPPORT
 	}
 
 	pub fn clear_message_handler(mut self) -> Self {
@@ -125,7 +151,7 @@ impl<'name> WorkerBuilder<'_, 'name> {
 		self,
 		url: &'url ScriptUrl,
 	) -> Result<WorkerBuilder<'url, 'name>, ModuleSupportError> {
-		if url.is_module() && !has_module_support() {
+		if url.is_module() && !Self::has_module_support() {
 			return Err(ModuleSupportError);
 		}
 
@@ -185,30 +211,4 @@ pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
 	let close = work(context).await;
 
 	close.to_bool()
-}
-
-#[must_use]
-fn has_module_support() -> bool {
-	static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
-		#[wasm_bindgen]
-		struct Tester(Rc<Cell<bool>>);
-
-		#[wasm_bindgen]
-		impl Tester {
-			#[allow(unreachable_pub)]
-			#[wasm_bindgen(getter = type)]
-			pub fn type_(&self) {
-				self.0.set(true);
-			}
-		}
-
-		let tester = Rc::new(Cell::new(false));
-		let worker_options = WorkerOptions::from(JsValue::from(Tester(Rc::clone(&tester))));
-		let worker = Worker::new_with_options("data:,", &worker_options).unwrap_throw();
-		worker.terminate();
-
-		tester.get()
-	});
-
-	*HAS_MODULE_SUPPORT
 }
