@@ -2,11 +2,11 @@ use std::cell::RefCell;
 
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::DedicatedWorkerGlobalScope;
 
 use super::WorkerOrContext;
-use crate::{global_with, Global, Message, MessageEvent};
+use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerContext(pub(super) DedicatedWorkerGlobalScope);
@@ -19,13 +19,27 @@ impl WorkerContext {
 
 	#[must_use]
 	pub fn new() -> Option<Self> {
-		global_with(|global| {
-			if let Some(Global::DedicatedWorker(global)) = global {
-				Some(Self(global.clone()))
-			} else {
-				None
+		thread_local! {
+			static GLOBAL: Option<DedicatedWorkerGlobalScope> = {
+				#[wasm_bindgen]
+				extern "C" {
+					type Global;
+
+					#[wasm_bindgen(method, getter, js_name = DedicatedWorkerGlobalScope)]
+					fn worker(this: &Global) -> JsValue;
+				}
+
+				let global: Global = js_sys::global().unchecked_into();
+
+				if global.worker().is_undefined() {
+					None
+				} else {
+					Some(global.unchecked_into())
+				}
 			}
-		})
+		}
+
+		GLOBAL.with(|global| global.as_ref().cloned()).map(Self)
 	}
 
 	#[must_use]

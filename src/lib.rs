@@ -14,7 +14,6 @@
 //!   receiving messages if receiving message handler wasn't setup yet.
 
 mod dedicated;
-mod global;
 mod message;
 mod worklet;
 
@@ -25,7 +24,6 @@ pub use self::dedicated::{
 	spawn, spawn_async, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder,
 	WorkerContext, WorkerHandle, WorkerUrl, WorkerUrlFormat,
 };
-use self::global::{global_with, Global};
 pub use self::message::{Message, MessageError, RawMessage};
 
 #[wasm_bindgen]
