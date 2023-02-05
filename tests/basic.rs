@@ -29,17 +29,17 @@ async fn basic() {
 
 #[wasm_bindgen_test]
 async fn nested() {
-	let outer_flag = Flag::new();
+	let inner_flag = Flag::new();
 
 	wasm_worker::spawn_async({
-		let outer_flag = outer_flag.clone();
+		let outer_flag = inner_flag.clone();
 		|_| async move {
 			let inner_flag = Flag::new();
 
 			wasm_worker::spawn({
-				let inner_flag = inner_flag.clone();
+				let outer_flag = inner_flag.clone();
 				move |_| {
-					inner_flag.signal();
+					outer_flag.signal();
 					Close::Yes
 				}
 			});
@@ -56,7 +56,56 @@ async fn nested() {
 		}
 	});
 
-	outer_flag.await;
+	inner_flag.await;
+}
+
+#[wasm_bindgen_test]
+async fn nested_nested() {
+	let inner_flag = Flag::new();
+
+	wasm_worker::spawn_async({
+		let outer_flag = inner_flag.clone();
+		|_| async move {
+			let inner_flag = Flag::new();
+
+			wasm_worker::spawn_async({
+				let outer_flag = inner_flag.clone();
+				|_| async move {
+					let inner_flag = Flag::new();
+
+					wasm_worker::spawn({
+						let outer_flag = inner_flag.clone();
+						move |_| {
+							outer_flag.signal();
+							Close::Yes
+						}
+					});
+
+					inner_flag.await;
+
+					// Wait for nested worker to close.
+					// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
+					util::sleep(Duration::from_millis(250)).await;
+
+					outer_flag.signal();
+
+					Close::Yes
+				}
+			});
+
+			inner_flag.await;
+
+			// Wait for nested worker to close.
+			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
+			util::sleep(Duration::from_millis(250)).await;
+
+			outer_flag.signal();
+
+			Close::Yes
+		}
+	});
+
+	inner_flag.await;
 }
 
 #[wasm_bindgen_test]
