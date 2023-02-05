@@ -16,19 +16,17 @@
 mod dedicated;
 mod global;
 mod message;
-mod script_url;
 mod worklet;
 
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 pub use self::dedicated::{
-	spawn, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder, WorkerContext,
-	WorkerHandle,
+	default_script_url, spawn, Close, MessageEvent, MessageIter, ModuleSupportError, ScriptFormat,
+	ScriptUrl, WorkerBuilder, WorkerContext, WorkerHandle,
 };
 use self::global::{global_with, Global};
 pub use self::message::{Message, MessageError, RawMessage};
-pub use self::script_url::{default_script_url, ScriptFormat, ScriptUrl};
 
 #[wasm_bindgen]
 extern "C" {

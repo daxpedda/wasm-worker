@@ -3,6 +3,7 @@ mod common;
 mod context;
 mod event;
 mod handle;
+mod script_url;
 
 use std::future::Future;
 
@@ -11,6 +12,7 @@ use self::common::WorkerOrContext;
 pub use self::context::WorkerContext;
 pub use self::event::{MessageEvent, MessageIter};
 pub use self::handle::WorkerHandle;
+pub use self::script_url::{default_script_url, ScriptFormat, ScriptUrl};
 
 pub fn spawn<F1, F2>(f: F1) -> WorkerHandle
 where
