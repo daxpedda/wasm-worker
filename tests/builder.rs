@@ -16,7 +16,7 @@ async fn basic() -> Result<(), JsValue> {
 
 	WorkerBuilder::new()?.spawn({
 		let flag = flag.clone();
-		move |_| async move {
+		move |_| {
 			flag.signal();
 			Close::Yes
 		}
@@ -44,7 +44,7 @@ async fn url() -> Result<(), JsValue> {
 
 	WorkerBuilder::new_with_url(&url)?.spawn({
 		let flag = flag.clone();
-		move |_| async move {
+		move |_| {
 			flag.signal();
 			Close::Yes
 		}
@@ -61,7 +61,7 @@ async fn name() -> Result<(), JsValue> {
 
 	WorkerBuilder::new()?.name("test").spawn({
 		let flag = flag.clone();
-		move |context| async move {
+		move |context| {
 			assert_eq!(context.name(), Some(String::from("test")));
 
 			flag.signal();
@@ -80,7 +80,7 @@ async fn clear_name() -> Result<(), JsValue> {
 
 	WorkerBuilder::new()?.name("test").clear_name().spawn({
 		let flag = flag.clone();
-		move |context| async move {
+		move |context| {
 			assert_eq!(context.name(), None);
 
 			flag.signal();

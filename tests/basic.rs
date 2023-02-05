@@ -18,7 +18,7 @@ async fn basic() {
 
 	wasm_worker::spawn({
 		let flag = flag.clone();
-		move |_| async move {
+		move |_| {
 			flag.signal();
 			Close::Yes
 		}
@@ -31,14 +31,14 @@ async fn basic() {
 async fn nested() {
 	let outer_flag = Flag::new();
 
-	wasm_worker::spawn({
+	wasm_worker::spawn_async({
 		let outer_flag = outer_flag.clone();
-		move |_| async move {
+		|_| async move {
 			let inner_flag = Flag::new();
 
 			wasm_worker::spawn({
 				let inner_flag = inner_flag.clone();
-				move |_| async move {
+				move |_| {
 					inner_flag.signal();
 					Close::Yes
 				}
@@ -64,10 +64,10 @@ async fn non_closing() {
 	let signal_flag = Flag::new();
 	let response_flag = Flag::new();
 
-	let worker = wasm_worker::spawn({
+	let worker = wasm_worker::spawn_async({
 		let signal_flag = signal_flag.clone();
 		let response_flag = response_flag.clone();
-		move |_| async move {
+		|_| async {
 			wasm_bindgen_futures::spawn_local(async move {
 				signal_flag.await;
 				response_flag.signal();
@@ -87,10 +87,10 @@ async fn terminate() {
 	let signal_flag = Flag::new();
 	let response_flag = Flag::new();
 
-	let worker = wasm_worker::spawn({
+	let worker = wasm_worker::spawn_async({
 		let signal_flag = signal_flag.clone();
 		let response_flag = response_flag.clone();
-		move |_| async move {
+		|_| async move {
 			signal_flag.await;
 			response_flag.signal();
 

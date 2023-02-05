@@ -98,15 +98,27 @@ impl WorkerBuilder<'_, '_> {
 		self
 	}
 
-	pub fn spawn<F1, F2>(self, f: F1) -> WorkerHandle
+	pub fn spawn<F>(self, f: F) -> WorkerHandle
+	where
+		F: 'static + FnMut(WorkerContext) -> Close + Send,
+	{
+		self.spawn_internal(Task::Classic(Box::new(f)))
+	}
+
+	pub fn spawn_async<F1, F2>(self, f: F1) -> WorkerHandle
 	where
 		F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
 		F2: 'static + Future<Output = Close>,
 	{
-		let work = Task(Box::new(move |context| {
-			Box::pin(async move { f(context).await })
+		let task = Task::Future(Box::new(move |context| {
+			Box::pin(async move { Ok(f(context).await.to_bool().into()) })
 		}));
-		let task = Box::into_raw(Box::new(work));
+
+		self.spawn_internal(task)
+	}
+
+	fn spawn_internal(self, task: Task) -> WorkerHandle {
+		let task = Box::into_raw(Box::new(task));
 
 		let mut options = None;
 
@@ -204,30 +216,35 @@ impl Close {
 	missing_debug_implementations,
 	unreachable_pub
 )]
-pub struct Task(
-	Box<
-		dyn 'static
-			+ FnOnce(WorkerContext) -> Pin<Box<dyn 'static + Future<Output = Close>>>
-			+ Send,
-	>,
-);
+pub enum Task {
+	Classic(Box<dyn 'static + FnMut(WorkerContext) -> Close>),
+	Future(
+		Box<
+			dyn 'static
+				+ FnOnce(
+					WorkerContext,
+				) -> Pin<Box<dyn 'static + Future<Output = Result<JsValue, JsValue>>>>
+				+ Send,
+		>,
+	),
+}
 
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 #[wasm_bindgen]
-pub async fn __wasm_worker_entry(task: *mut Task) -> bool {
+pub fn __wasm_worker_entry(task: *mut Task) -> JsValue {
 	// Unhooking the message handler has to happen in JS because loading the WASM
 	// module will actually yield and introduces a race condition where messages
 	// sent will still be handled by the starter message handler.
 
+	let context = WorkerContext(js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>());
+
 	// SAFETY: The argument is an address that has to be a valid pointer to a
 	// `Task`.
-	let Task(work) = *unsafe { Box::from_raw(task) };
-
-	let context = WorkerContext(js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>());
-	let close = work(context).await;
-
-	close.to_bool()
+	match *unsafe { Box::from_raw(task) } {
+		Task::Classic(mut classic) => classic(context).to_bool().into(),
+		Task::Future(future) => wasm_bindgen_futures::future_to_promise(future(context)).into(),
+	}
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

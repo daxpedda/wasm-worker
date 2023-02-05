@@ -22,8 +22,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 pub use self::dedicated::{
-	spawn, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder, WorkerContext,
-	WorkerHandle, WorkerUrl, WorkerUrlFormat,
+	spawn, spawn_async, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder,
+	WorkerContext, WorkerHandle, WorkerUrl, WorkerUrlFormat,
 };
 use self::global::{global_with, Global};
 pub use self::message::{Message, MessageError, RawMessage};

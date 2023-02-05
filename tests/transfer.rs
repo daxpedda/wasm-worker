@@ -42,7 +42,7 @@ async fn array_buffer() -> Result<(), JsValue> {
 		})
 		.spawn({
 			let flag_start = flag_start.clone();
-			|context| async move {
+			move |context| {
 				context.set_message_handler(move |context, event| {
 					let mut messages = event.messages().unwrap();
 
