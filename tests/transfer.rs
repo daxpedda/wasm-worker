@@ -85,10 +85,11 @@ async fn array_buffer() -> Result<(), JsValue> {
 		.set_message_handler({
 			let flag_finish = flag_finish.clone();
 			move |event| {
-				let mut messages = event.messages().unwrap();
-
-				if let Ok(Message::ArrayBuffer(buffer)) =
-					messages.next().unwrap().serialize_as::<ArrayBuffer>()
+				if let Ok(Message::ArrayBuffer(buffer)) = event
+					.messages()
+					.next()
+					.unwrap()
+					.serialize_as::<ArrayBuffer>()
 				{
 					let array = Uint8Array::new(&buffer);
 					assert_eq!(array.get_index(0), 42);
@@ -103,10 +104,11 @@ async fn array_buffer() -> Result<(), JsValue> {
 			let flag_start = flag_start.clone();
 			move |context| {
 				context.set_message_handler(move |context, event| {
-					let mut messages = event.messages().unwrap();
-
-					if let Ok(Message::ArrayBuffer(buffer)) =
-						messages.next().unwrap().serialize_as::<ArrayBuffer>()
+					if let Ok(Message::ArrayBuffer(buffer)) = event
+						.messages()
+						.next()
+						.unwrap()
+						.serialize_as::<ArrayBuffer>()
 					{
 						let array = Uint8Array::new(&buffer);
 						assert_eq!(array.get_index(0), 42);

@@ -21,21 +21,21 @@ impl MessageEvent {
 	}
 
 	#[must_use]
-	pub fn messages(&self) -> Option<MessageIter> {
+	pub fn messages(&self) -> MessageIter {
 		if self.message_taken {
-			return None;
+			return MessageIter(Inner::Single(None));
 		}
 
 		let data = self.event.data();
 
-		Some(if data.is_array() {
+		if data.is_array() {
 			let array: Array = data.unchecked_into();
 			let range = 0..array.length();
 
 			MessageIter(Inner::Array { array, range })
 		} else {
 			MessageIter(Inner::Single(Some(data)))
-		})
+		}
 	}
 
 	#[must_use]
