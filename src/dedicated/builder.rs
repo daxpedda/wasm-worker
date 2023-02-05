@@ -143,7 +143,7 @@ impl WorkerBuilder<'_, '_> {
 
 		worker.post_message(&init).unwrap_throw();
 
-		WorkerHandle { worker, closure }
+		WorkerHandle::new(worker, closure)
 	}
 }
 
