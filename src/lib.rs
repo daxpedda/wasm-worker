@@ -8,7 +8,7 @@
 
 //! TODO:
 //! - Note Chrome nested Worker issue: <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-//! - Document that getting the default script url will fail if using no-modules
+//! - Document that getting the default worker url will fail if using no-modules
 //!   and not starting in a document.
 //! - Note possible race condition when sending to newly spawned worker not
 //!   receiving messages if receiving message handler wasn't setup yet.
@@ -22,8 +22,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
 pub use self::dedicated::{
-	default_script_url, spawn, Close, MessageEvent, MessageIter, ModuleSupportError, ScriptFormat,
-	ScriptUrl, WorkerBuilder, WorkerContext, WorkerHandle,
+	default_worker_url, spawn, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder,
+	WorkerContext, WorkerHandle, WorkerUrl, WorkerUrlFormat,
 };
 use self::global::{global_with, Global};
 pub use self::message::{Message, MessageError, RawMessage};

@@ -4,14 +4,14 @@ use wasm_bindgen::{JsValue, ShimFormat, UnwrapThrowExt};
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 #[must_use]
-pub fn default_script_url() -> &'static ScriptUrl {
-	const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
-	static SCRIPT_URL: Lazy<ScriptUrl> = Lazy::new(|| {
-		ScriptUrl::new(
+pub fn default_worker_url() -> &'static WorkerUrl {
+	static WORKER_URL: Lazy<WorkerUrl> = Lazy::new(|| {
+		const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
+		WorkerUrl::new(
 			&wasm_bindgen::shim_url().expect(ERROR),
 			match &wasm_bindgen::shim_format() {
-				Some(ShimFormat::EsModule) => ScriptFormat::EsModule,
-				Some(ShimFormat::NoModules { global_name }) => ScriptFormat::Classic {
+				Some(ShimFormat::EsModule) => WorkerUrlFormat::EsModule,
+				Some(ShimFormat::NoModules { global_name }) => WorkerUrlFormat::Classic {
 					global: global_name,
 				},
 				Some(_) | None => unreachable!("{ERROR}"),
@@ -19,33 +19,33 @@ pub fn default_script_url() -> &'static ScriptUrl {
 		)
 	});
 
-	&SCRIPT_URL
+	&WORKER_URL
 }
 
 #[derive(Debug)]
-pub struct ScriptUrl {
+pub struct WorkerUrl {
 	pub(crate) url: String,
 	is_module: bool,
 }
 
-impl Drop for ScriptUrl {
+impl Drop for WorkerUrl {
 	fn drop(&mut self) {
 		Url::revoke_object_url(&self.url).unwrap_throw();
 	}
 }
 
-impl ScriptUrl {
+impl WorkerUrl {
 	#[must_use]
-	pub fn new(url: &str, format: ScriptFormat<'_>) -> Self {
+	pub fn new(url: &str, format: WorkerUrlFormat<'_>) -> Self {
 		let script = match format {
-			ScriptFormat::EsModule => {
+			WorkerUrlFormat::EsModule => {
 				format!(
 					"import __wasm_worker_wasm_bindgen, {{__wasm_worker_entry}} from '{}';\n\n{}",
 					url,
-					include_str!("script.js")
+					include_str!("worker.js")
 				)
 			}
-			ScriptFormat::Classic { global } => {
+			WorkerUrlFormat::Classic { global } => {
 				#[rustfmt::skip]
 				let script = format!(
 					"\
@@ -56,7 +56,7 @@ impl ScriptUrl {
 						{}\
 					",
 					url,
-					include_str!("script.js")
+					include_str!("worker.js")
 				);
 				script
 			}
@@ -84,16 +84,16 @@ impl ScriptUrl {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum ScriptFormat<'global> {
+pub enum WorkerUrlFormat<'global> {
 	EsModule,
 	Classic { global: &'global str },
 }
 
-impl ScriptFormat<'_> {
+impl WorkerUrlFormat<'_> {
 	const fn is_module(self) -> bool {
 		match self {
-			ScriptFormat::EsModule => true,
-			ScriptFormat::Classic { .. } => false,
+			WorkerUrlFormat::EsModule => true,
+			WorkerUrlFormat::Classic { .. } => false,
 		}
 	}
 }

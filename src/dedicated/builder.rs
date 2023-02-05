@@ -14,11 +14,11 @@ use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
 use super::{MessageEvent, WorkerContext, WorkerHandle};
-use crate::ScriptUrl;
+use crate::WorkerUrl;
 
 #[must_use = "does nothing unless spawned"]
 pub struct WorkerBuilder<'url, 'name> {
-	url: &'url ScriptUrl,
+	url: &'url WorkerUrl,
 	name: Option<Cow<'name, str>>,
 	message_handler: Option<Box<dyn FnMut(web_sys::MessageEvent)>>,
 }
@@ -42,10 +42,10 @@ impl Debug for WorkerBuilder<'_, '_> {
 
 impl WorkerBuilder<'_, '_> {
 	pub fn new() -> Result<WorkerBuilder<'static, 'static>, ModuleSupportError> {
-		Self::new_with_url(crate::default_script_url())
+		Self::new_with_url(crate::default_worker_url())
 	}
 
-	pub fn new_with_url(url: &ScriptUrl) -> Result<WorkerBuilder<'_, 'static>, ModuleSupportError> {
+	pub fn new_with_url(url: &WorkerUrl) -> Result<WorkerBuilder<'_, 'static>, ModuleSupportError> {
 		if url.is_module() && !Self::has_module_support() {
 			return Err(ModuleSupportError);
 		}
@@ -151,7 +151,7 @@ impl WorkerBuilder<'_, '_> {
 impl<'name> WorkerBuilder<'_, 'name> {
 	pub fn url<'url>(
 		self,
-		url: &'url ScriptUrl,
+		url: &'url WorkerUrl,
 	) -> Result<WorkerBuilder<'url, 'name>, ModuleSupportError> {
 		if url.is_module() && !Self::has_module_support() {
 			return Err(ModuleSupportError);

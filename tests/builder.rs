@@ -4,7 +4,7 @@ mod util;
 
 use wasm_bindgen::{JsValue, ShimFormat};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{Close, ScriptFormat, ScriptUrl, WorkerBuilder};
+use wasm_worker::{Close, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
 
 use self::util::Flag;
 
@@ -31,11 +31,11 @@ async fn basic() -> Result<(), JsValue> {
 async fn url() -> Result<(), JsValue> {
 	let flag = Flag::new();
 
-	let url = ScriptUrl::new(
+	let url = WorkerUrl::new(
 		&wasm_bindgen::shim_url().unwrap(),
 		match &wasm_bindgen::shim_format().unwrap() {
-			ShimFormat::EsModule => ScriptFormat::EsModule,
-			ShimFormat::NoModules { global_name } => ScriptFormat::Classic {
+			ShimFormat::EsModule => WorkerUrlFormat::EsModule,
+			ShimFormat::NoModules { global_name } => WorkerUrlFormat::Classic {
 				global: global_name,
 			},
 			_ => unreachable!("expected shim to be built for browsers"),
