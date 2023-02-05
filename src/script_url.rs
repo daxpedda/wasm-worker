@@ -14,7 +14,7 @@ pub fn default_script_url() -> &'static ScriptUrl {
 				Some(ShimFormat::NoModules { global_name }) => ScriptFormat::Classic {
 					global: global_name,
 				},
-				Some(_) | None => panic!("{ERROR}"),
+				Some(_) | None => unreachable!("{ERROR}"),
 			},
 		)
 	});
@@ -30,7 +30,7 @@ pub struct ScriptUrl {
 
 impl Drop for ScriptUrl {
 	fn drop(&mut self) {
-		Url::revoke_object_url(&self.url).expect_throw("can't fail");
+		Url::revoke_object_url(&self.url).unwrap_throw();
 	}
 }
 
