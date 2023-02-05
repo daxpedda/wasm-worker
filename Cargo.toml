@@ -23,7 +23,6 @@ web-sys = { version = "0.3", features = [
 	"TransformStream",
 	"Url",
 	"VideoFrame",
-	"Window",
 	"Worker",
 	"WorkerOptions",
 	"WorkerType",
@@ -34,7 +33,7 @@ web-sys = { version = "0.3", features = [
 [dev-dependencies]
 futures-util = { version = "0.3", default-features = false }
 wasm-bindgen-test = "0.3"
-web-sys = { version = "0.3", features = ["console"] }
+web-sys = { version = "0.3", features = ["console", "Window"] }
 
 [[test]]
 name = "no_module_support"
