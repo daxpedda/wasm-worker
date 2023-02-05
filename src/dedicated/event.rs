@@ -1,3 +1,4 @@
+use std::iter::FusedIterator;
 use std::ops::Range;
 
 use js_sys::Array;
@@ -65,6 +66,29 @@ impl Iterator for MessageIter {
 		match &mut self.0 {
 			Inner::Array { array, range } => {
 				let index = range.next()?;
+				Some(RawMessage(array.get(index)))
+			}
+			Inner::Single(value) => value.take().map(RawMessage),
+		}
+	}
+
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		match &self.0 {
+			Inner::Array { range, .. } => range.size_hint(),
+			Inner::Single(value) => value.iter().size_hint(),
+		}
+	}
+}
+
+impl ExactSizeIterator for MessageIter {}
+
+impl FusedIterator for MessageIter {}
+
+impl DoubleEndedIterator for MessageIter {
+	fn next_back(&mut self) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => {
+				let index = range.next_back()?;
 				Some(RawMessage(array.get(index)))
 			}
 			Inner::Single(value) => value.take().map(RawMessage),
