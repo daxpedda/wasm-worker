@@ -16,14 +16,15 @@ mod global;
 mod script_url;
 mod worklet;
 
-use js_sys::ArrayBuffer;
+use js_sys::{Array, ArrayBuffer, Uint8Array};
+use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{AudioData, VideoFrame};
 use web_sys::{
 	ImageBitmap, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel, TransformStream,
-	WritableStream,
+	Worker, WritableStream,
 };
 
 pub use self::dedicated::{
@@ -118,24 +119,23 @@ impl Message {
 		}
 	}
 
-	fn has_transfered(&self) -> bool {
-		match self {
-			Self::ArrayBuffer(array_buffer) => array_buffer.byte_length() == 0,
-			#[cfg(web_sys_unstable_apis)]
-			Self::AudioData(audio_data) => {
-				//web_sys::console::log_1(audio_data);
-				todo!()
-			}
-			Self::ImageBitmap(value) => todo!(),
-			Self::MessagePort(value) => todo!(),
-			Self::OffscreenCanvas(value) => todo!(),
-			Self::ReadableStream(value) => todo!(),
-			Self::RtcDataChannel(value) => todo!(),
-			Self::TransformStream(value) => todo!(),
-			#[cfg(web_sys_unstable_apis)]
-			Self::VideoFrame(value) => todo!(),
-			Self::WritableStream(value) => todo!(),
-		}
+	#[must_use]
+	pub fn has_array_buffer_support() -> bool {
+		static SUPPORT: Lazy<bool> = Lazy::new(|| {
+			let buffer = ArrayBuffer::new(1);
+			let array = Uint8Array::new(&buffer);
+			array.copy_from(&[0]);
+
+			let worker = Worker::new("data:,").unwrap_throw();
+			worker
+				.post_message_with_transfer(&buffer, &Array::of1(&buffer))
+				.unwrap_throw();
+			worker.terminate();
+
+			buffer.byte_length() == 0
+		});
+
+		*SUPPORT
 	}
 }
 

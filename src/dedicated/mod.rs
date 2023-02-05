@@ -64,18 +64,14 @@ impl WorkerHandle {
 			.set_onmessage(Some(closure.as_ref().unchecked_ref()));
 	}
 
-	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
+	pub fn transfer_message(&self, message: Message) {
 		self.worker
 			.post_message_with_transfer(
 				message.as_js_value(),
 				&js_sys::Array::of1(message.as_js_value()),
 			)
 			.unwrap_throw();
-
-		message
-			.has_transfered()
-			.then_some(())
-			.ok_or(TransferError(message))
+		drop(message);
 	}
 
 	pub fn terminate(self) {
@@ -152,18 +148,14 @@ impl WorkerContext {
 		});
 	}
 
-	pub fn transfer_message(&self, message: Message) -> Result<(), TransferError> {
+	pub fn transfer_message(&self, message: Message) {
 		self.0
 			.post_message_with_transfer(
 				message.as_js_value(),
 				&js_sys::Array::of1(message.as_js_value()),
 			)
 			.unwrap_throw();
-
-		message
-			.has_transfered()
-			.then_some(())
-			.ok_or(TransferError(message))
+		drop(message);
 	}
 
 	pub fn terminate(self) -> ! {
@@ -221,23 +213,6 @@ impl Error for ModuleSupportError {}
 
 impl From<ModuleSupportError> for JsValue {
 	fn from(value: ModuleSupportError) -> Self {
-		value.to_string().into()
-	}
-}
-
-#[derive(Debug)]
-pub struct TransferError(Message);
-
-impl Display for TransferError {
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "message was not transfered: {:?}", self.0)
-	}
-}
-
-impl Error for TransferError {}
-
-impl From<TransferError> for JsValue {
-	fn from(value: TransferError) -> Self {
 		value.to_string().into()
 	}
 }

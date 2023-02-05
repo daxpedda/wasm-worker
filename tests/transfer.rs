@@ -12,7 +12,9 @@ use self::util::Flag;
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
-async fn array_buffer_transfer() -> Result<(), JsValue> {
+async fn array_buffer() -> Result<(), JsValue> {
+	assert!(Message::has_array_buffer_support());
+
 	let buffer = ArrayBuffer::new(1);
 	let array = Uint8Array::new(&buffer);
 	array.copy_from(&[42]);
@@ -44,7 +46,7 @@ async fn array_buffer_transfer() -> Result<(), JsValue> {
 						let array = Uint8Array::new(&buffer);
 						assert_eq!(array.get_index(0), 42);
 
-						assert!(context.transfer_message(buffer.into()).is_ok());
+						context.transfer_message(buffer.into());
 					} else {
 						panic!()
 					}
@@ -60,9 +62,7 @@ async fn array_buffer_transfer() -> Result<(), JsValue> {
 
 	flag_start.await;
 
-	assert!(worker
-		.transfer_message(Message::ArrayBuffer(buffer))
-		.is_ok());
+	worker.transfer_message(Message::ArrayBuffer(buffer));
 
 	flag_sent.await;
 	flag_finish.await;
