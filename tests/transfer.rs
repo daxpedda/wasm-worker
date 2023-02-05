@@ -9,6 +9,11 @@ use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, Message, WorkerBuilder};
+#[cfg(web_sys_unstable_apis)]
+use {
+	wasm_bindgen::UnwrapThrowExt,
+	web_sys::{AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat},
+};
 
 use self::util::Flag;
 
@@ -127,6 +132,73 @@ async fn array_buffer() -> Result<(), JsValue> {
 
 	flag_start.await;
 	worker.transfer_message([buffer.into()]);
+	flag_finish.await;
+
+	worker.terminate();
+
+	Ok(())
+}
+
+#[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
+async fn audio_data() -> Result<(), JsValue> {
+	if !Message::has_audio_data_support() {
+		return Ok(());
+	}
+
+	let init = AudioDataInit::new(
+		&ArrayBuffer::new(42),
+		AudioSampleFormat::U8,
+		1,
+		42,
+		3000.,
+		0.,
+	);
+	let data = AudioData::new(&init).unwrap_throw();
+
+	let flag_start = Flag::new();
+	let flag_finish = Flag::new();
+
+	let worker = WorkerBuilder::new()?
+		.set_message_handler({
+			let flag_finish = flag_finish.clone();
+			move |event| {
+				if let Ok(Message::AudioData(data)) =
+					event.messages().next().unwrap().serialize_as::<AudioData>()
+				{
+					let size = data.allocation_size(&AudioDataCopyToOptions::new(0));
+					assert_eq!(size, 42);
+				} else {
+					panic!()
+				}
+
+				flag_finish.signal();
+			}
+		})
+		.spawn({
+			let flag_start = flag_start.clone();
+			move |context| {
+				context.set_message_handler(move |context, event| {
+					if let Ok(Message::AudioData(data)) =
+						event.messages().next().unwrap().serialize_as::<AudioData>()
+					{
+						let size = data.allocation_size(&AudioDataCopyToOptions::new(0));
+						assert_eq!(size, 42);
+
+						context.transfer_messages([data.into()]);
+					} else {
+						panic!()
+					}
+				});
+
+				flag_start.signal();
+
+				Close::No
+			}
+		});
+
+	flag_start.await;
+	worker.transfer_message([data.into()]);
 	flag_finish.await;
 
 	worker.terminate();

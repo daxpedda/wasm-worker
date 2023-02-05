@@ -1,11 +1,11 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 
-use js_sys::{Array, ArrayBuffer, Uint8Array};
+use js_sys::{Array, ArrayBuffer};
 use once_cell::sync::Lazy;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 #[cfg(web_sys_unstable_apis)]
-use web_sys::{AudioData, VideoFrame};
+use web_sys::{AudioData, AudioDataInit, AudioSampleFormat, VideoFrame};
 use web_sys::{
 	ImageBitmap, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel, TransformStream,
 	Worker, WritableStream,
@@ -116,6 +116,42 @@ impl Message {
 			worker.terminate();
 
 			buffer.byte_length() == 0
+		});
+
+		*SUPPORT
+	}
+
+	#[must_use]
+	#[cfg(web_sys_unstable_apis)]
+	pub fn has_audio_data_support() -> bool {
+		use wasm_bindgen::prelude::wasm_bindgen;
+
+		static SUPPORT: Lazy<bool> = Lazy::new(|| {
+			#[wasm_bindgen]
+			extern "C" {
+				type Global;
+
+				#[wasm_bindgen(method, getter, js_name = AudioData)]
+				fn audio_data(this: &Global) -> JsValue;
+			}
+
+			let global: Global = js_sys::global().unchecked_into();
+
+			if global.audio_data().is_undefined() {
+				return false;
+			}
+
+			let init =
+				AudioDataInit::new(&ArrayBuffer::new(1), AudioSampleFormat::U8, 1, 1, 3000., 0.);
+			let data = AudioData::new(&init).unwrap_throw();
+
+			let worker = Worker::new("data:,").unwrap_throw();
+			worker
+				.post_message_with_transfer(&data, &Array::of1(&data))
+				.unwrap_throw();
+			worker.terminate();
+
+			data.format().is_none()
 		});
 
 		*SUPPORT
