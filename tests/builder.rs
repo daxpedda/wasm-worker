@@ -106,7 +106,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 	WorkerBuilder::new()?
 		.set_message_handler({
 			let flag_received = flag_received.clone();
-			move |_| flag_received.signal()
+			move |_, _| flag_received.signal()
 		})
 		.clear_message_handler()
 		.spawn(|context| {

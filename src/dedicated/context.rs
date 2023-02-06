@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::WorkerOrContext;
+use super::{MessageClosure, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -14,7 +14,7 @@ pub struct WorkerContext(pub(super) DedicatedWorkerGlobalScope);
 impl WorkerContext {
 	thread_local! {
 		#[allow(clippy::type_complexity)]
-		static CLOSURE: RefCell<Option<Closure<dyn FnMut(web_sys::MessageEvent)>>> = RefCell::new(None);
+		static CLOSURE: RefCell<MessageClosure> = RefCell::new(None);
 	}
 
 	#[must_use]

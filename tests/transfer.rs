@@ -33,7 +33,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 	let mut worker = WorkerBuilder::new()?
 		.set_message_handler({
 			let flag_received = flag_spawner_received.clone();
-			move |_| flag_received.signal()
+			move |_, _| flag_received.signal()
 		})
 		.spawn_async({
 			let flag_spawner_start = flag_spawner_start.clone();
@@ -97,7 +97,7 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 	let worker = WorkerBuilder::new()?
 		.set_message_handler({
 			let flag_finish = flag_finish.clone();
-			move |event| {
+			move |_, event| {
 				let value = event
 					.messages()
 					.next()

@@ -1,10 +1,11 @@
 use std::borrow::Cow;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
+use std::ops::Deref;
 use std::pin::Pin;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use js_sys::Array;
 use once_cell::sync::Lazy;
@@ -13,31 +14,15 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{MessageEvent, WorkerContext, WorkerHandle};
+use super::{MessageClosure, MessageEvent, WorkerContext, WorkerHandle};
 use crate::WorkerUrl;
 
 #[must_use = "does nothing unless spawned"]
+#[derive(Debug)]
 pub struct WorkerBuilder<'url, 'name> {
 	url: &'url WorkerUrl,
 	name: Option<Cow<'name, str>>,
-	message_handler: Option<Box<dyn FnMut(web_sys::MessageEvent)>>,
-}
-
-impl Debug for WorkerBuilder<'_, '_> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("WorkerBuilder")
-			.field("url", &self.url)
-			.field("name", &self.name)
-			.field(
-				"closure",
-				&if self.message_handler.is_some() {
-					"Some"
-				} else {
-					"None"
-				},
-			)
-			.finish()
-	}
+	message_handler: Rc<RefCell<MessageClosure>>,
 }
 
 impl WorkerBuilder<'_, '_> {
@@ -53,7 +38,7 @@ impl WorkerBuilder<'_, '_> {
 		Ok(WorkerBuilder {
 			url,
 			name: None,
-			message_handler: None,
+			message_handler: Rc::new(RefCell::new(None)),
 		})
 	}
 
@@ -83,18 +68,25 @@ impl WorkerBuilder<'_, '_> {
 		*HAS_MODULE_SUPPORT
 	}
 
-	pub fn clear_message_handler(mut self) -> Self {
-		self.message_handler.take();
+	pub fn clear_message_handler(self) -> Self {
+		RefCell::borrow_mut(&self.message_handler).take();
 		self
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(MessageEvent)>(
-		mut self,
+	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandle, MessageEvent)>(
+		self,
 		mut message_handler: F,
 	) -> Self {
-		self.message_handler.replace(Box::new(move |event| {
-			message_handler(MessageEvent::new(event));
-		}));
+		let message_handler_holder = Rc::downgrade(&self.message_handler);
+		RefCell::borrow_mut(&self.message_handler).replace(Closure::new(Box::new(
+			move |event: web_sys::MessageEvent| {
+				let handle = WorkerHandle::new_weak(
+					event.target().unwrap().unchecked_into(),
+					Weak::clone(&message_handler_holder),
+				);
+				message_handler(&handle, MessageEvent::new(event));
+			},
+		)));
 		self
 	}
 
@@ -139,14 +131,9 @@ impl WorkerBuilder<'_, '_> {
 		}
 		.unwrap_throw();
 
-		let closure = self.message_handler.map(Closure::new);
-
-		worker.set_onmessage(
-			closure
-				.as_ref()
-				.map(Closure::as_ref)
-				.map(JsCast::unchecked_ref),
-		);
+		if let Some(message_handler) = RefCell::borrow(&self.message_handler).deref() {
+			worker.set_onmessage(Some(message_handler.as_ref().unchecked_ref()));
+		}
 
 		let init = Array::of3(
 			&wasm_bindgen::module(),
@@ -156,7 +143,7 @@ impl WorkerBuilder<'_, '_> {
 
 		worker.post_message(&init).unwrap_throw();
 
-		WorkerHandle::new(worker, closure)
+		WorkerHandle::new(worker, self.message_handler)
 	}
 }
 

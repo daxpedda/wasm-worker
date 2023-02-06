@@ -1,8 +1,11 @@
 use js_sys::Array;
+use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
 
 use crate::Message;
+
+pub(super) type MessageClosure = Option<Closure<dyn FnMut(web_sys::MessageEvent)>>;
 
 pub(super) enum WorkerOrContext<'this> {
 	Worker(&'this Worker),
