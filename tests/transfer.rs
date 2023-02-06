@@ -75,6 +75,32 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 	Ok(())
 }
 
+#[wasm_bindgen_test]
+fn has_message_handler() -> Result<(), JsValue> {
+	let worker = WorkerBuilder::new()?
+		.set_message_handler(|_, _| ())
+		.spawn(|_| Close::Yes);
+	assert!(worker.has_message_handler());
+	worker.clear_message_handler();
+	assert!(!worker.has_message_handler());
+
+	let worker = WorkerBuilder::new()?
+		.set_message_handler(|_, _| ())
+		.clear_message_handler()
+		.spawn(|_| Close::Yes);
+	assert!(!worker.has_message_handler());
+
+	let worker = wasm_worker::spawn(|_| Close::Yes);
+
+	assert!(!worker.has_message_handler());
+	worker.set_message_handler(|_, _| ());
+	assert!(worker.has_message_handler());
+	worker.clear_message_handler();
+	assert!(!worker.has_message_handler());
+
+	Ok(())
+}
+
 async fn test_transfer<T: JsCast + Into<Message>>(
 	support: impl FnOnce() -> bool,
 	force: bool,
