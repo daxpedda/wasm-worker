@@ -11,7 +11,7 @@ pub use self::builder::{Close, ModuleSupportError, WorkerBuilder};
 use self::common::{MessageClosure, WorkerOrContext};
 pub use self::context::WorkerContext;
 pub use self::event::{MessageEvent, MessageIter};
-pub use self::handle::WorkerHandle;
+pub use self::handle::{WorkerHandle, WorkerHandleRef};
 pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 
 pub fn spawn<F>(f: F) -> WorkerHandle

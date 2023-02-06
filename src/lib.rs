@@ -22,7 +22,7 @@ use wasm_bindgen::JsValue;
 
 pub use self::dedicated::{
 	spawn, spawn_async, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder,
-	WorkerContext, WorkerHandle, WorkerUrl, WorkerUrlFormat,
+	WorkerContext, WorkerHandle, WorkerHandleRef, WorkerUrl, WorkerUrlFormat,
 };
 pub use self::message::{Message, MessageError, RawMessage};
 

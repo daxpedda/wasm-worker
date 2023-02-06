@@ -14,7 +14,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{MessageClosure, MessageEvent, WorkerContext, WorkerHandle};
+use super::{MessageClosure, MessageEvent, WorkerContext, WorkerHandle, WorkerHandleRef};
 use crate::WorkerUrl;
 
 #[must_use = "does nothing unless spawned"]
@@ -73,14 +73,14 @@ impl WorkerBuilder<'_, '_> {
 		self
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandle, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
 		self,
 		mut message_handler: F,
 	) -> Self {
 		let message_handler_holder = Rc::downgrade(&self.message_handler);
 		RefCell::borrow_mut(&self.message_handler).replace(Closure::new(Box::new(
 			move |event: web_sys::MessageEvent| {
-				let handle = WorkerHandle::new_weak(
+				let handle = WorkerHandleRef::new(
 					event.target().unwrap().unchecked_into(),
 					Weak::clone(&message_handler_holder),
 				);
