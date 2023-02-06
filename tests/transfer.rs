@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use futures_util::{future, FutureExt};
 use js_sys::{ArrayBuffer, Uint8Array};
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, Message, WorkerBuilder};
 #[cfg(web_sys_unstable_apis)]
@@ -75,13 +75,21 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 	Ok(())
 }
 
-#[wasm_bindgen_test]
-async fn array_buffer() -> Result<(), JsValue> {
-	assert!(Message::has_array_buffer_support());
+async fn test_transfer<T: JsCast + Into<Message>>(
+	support: impl FnOnce() -> bool,
+	force: bool,
+	init: impl FnOnce() -> T,
+	assert: impl 'static + Copy + Fn(&T) + Send,
+) -> Result<(), JsValue> {
+	if !support() {
+		if force {
+			panic!("type unsupported in this browser")
+		} else {
+			return Ok(());
+		}
+	}
 
-	let buffer = ArrayBuffer::new(1);
-	let array = Uint8Array::new(&buffer);
-	array.copy_from(&[42]);
+	let value = init();
 
 	let flag_start = Flag::new();
 	let flag_finish = Flag::new();
@@ -90,17 +98,14 @@ async fn array_buffer() -> Result<(), JsValue> {
 		.set_message_handler({
 			let flag_finish = flag_finish.clone();
 			move |event| {
-				if let Ok(Message::ArrayBuffer(buffer)) = event
+				let value = event
 					.messages()
 					.next()
 					.unwrap()
-					.serialize_as::<ArrayBuffer>()
-				{
-					let array = Uint8Array::new(&buffer);
-					assert_eq!(array.get_index(0), 42);
-				} else {
-					panic!()
-				}
+					.serialize_as::<T>()
+					.unwrap();
+
+				assert(&value);
 
 				flag_finish.signal();
 			}
@@ -109,19 +114,16 @@ async fn array_buffer() -> Result<(), JsValue> {
 			let flag_start = flag_start.clone();
 			move |context| {
 				context.set_message_handler(move |context, event| {
-					if let Ok(Message::ArrayBuffer(buffer)) = event
+					let value = event
 						.messages()
 						.next()
 						.unwrap()
-						.serialize_as::<ArrayBuffer>()
-					{
-						let array = Uint8Array::new(&buffer);
-						assert_eq!(array.get_index(0), 42);
+						.serialize_as::<T>()
+						.unwrap();
 
-						context.transfer_messages([buffer.into()]);
-					} else {
-						panic!()
-					}
+					assert(&value);
+
+					context.transfer_messages([value.into()]);
 				});
 
 				flag_start.signal();
@@ -131,7 +133,7 @@ async fn array_buffer() -> Result<(), JsValue> {
 		});
 
 	flag_start.await;
-	worker.transfer_message([buffer.into()]);
+	worker.transfer_message([value.into()]);
 	flag_finish.await;
 
 	worker.terminate();
@@ -140,68 +142,45 @@ async fn array_buffer() -> Result<(), JsValue> {
 }
 
 #[wasm_bindgen_test]
+async fn array_buffer() -> Result<(), JsValue> {
+	test_transfer(
+		Message::has_array_buffer_support,
+		true,
+		|| {
+			let buffer = ArrayBuffer::new(1);
+			let array = Uint8Array::new(&buffer);
+			array.copy_from(&[42]);
+			buffer
+		},
+		|buffer| {
+			let array = Uint8Array::new(buffer);
+			assert_eq!(array.get_index(0), 42);
+		},
+	)
+	.await
+}
+
+#[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
 async fn audio_data() -> Result<(), JsValue> {
-	if !Message::has_audio_data_support() {
-		return Ok(());
-	}
-
-	let init = AudioDataInit::new(
-		&ArrayBuffer::new(42),
-		AudioSampleFormat::U8,
-		1,
-		42,
-		3000.,
-		0.,
-	);
-	let data = AudioData::new(&init).unwrap_throw();
-
-	let flag_start = Flag::new();
-	let flag_finish = Flag::new();
-
-	let worker = WorkerBuilder::new()?
-		.set_message_handler({
-			let flag_finish = flag_finish.clone();
-			move |event| {
-				if let Ok(Message::AudioData(data)) =
-					event.messages().next().unwrap().serialize_as::<AudioData>()
-				{
-					let size = data.allocation_size(&AudioDataCopyToOptions::new(0));
-					assert_eq!(size, 42);
-				} else {
-					panic!()
-				}
-
-				flag_finish.signal();
-			}
-		})
-		.spawn({
-			let flag_start = flag_start.clone();
-			move |context| {
-				context.set_message_handler(move |context, event| {
-					if let Ok(Message::AudioData(data)) =
-						event.messages().next().unwrap().serialize_as::<AudioData>()
-					{
-						let size = data.allocation_size(&AudioDataCopyToOptions::new(0));
-						assert_eq!(size, 42);
-
-						context.transfer_messages([data.into()]);
-					} else {
-						panic!()
-					}
-				});
-
-				flag_start.signal();
-
-				Close::No
-			}
-		});
-
-	flag_start.await;
-	worker.transfer_message([data.into()]);
-	flag_finish.await;
-
-	worker.terminate();
-
-	Ok(())
+	test_transfer(
+		Message::has_audio_data_support,
+		false,
+		|| {
+			let init = AudioDataInit::new(
+				&ArrayBuffer::new(42),
+				AudioSampleFormat::U8,
+				1,
+				42,
+				3000.,
+				0.,
+			);
+			AudioData::new(&init).unwrap_throw()
+		},
+		|data| {
+			let size = data.allocation_size(&AudioDataCopyToOptions::new(0));
+			assert_eq!(size, 42);
+		},
+	)
+	.await
 }
