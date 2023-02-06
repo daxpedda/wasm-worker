@@ -39,12 +39,7 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 		.set_message_handler({
 			let flag_finish = flag_finish.clone();
 			move |_, event| {
-				let value = event
-					.messages()
-					.next()
-					.unwrap()
-					.serialize_as::<T>()
-					.unwrap();
+				let value: T = event.messages().next().unwrap().serialize_as().unwrap();
 
 				assert(&value);
 
@@ -55,12 +50,7 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 			let flag_start = flag_start.clone();
 			move |context| {
 				context.set_message_handler(move |context, event| {
-					let value = event
-						.messages()
-						.next()
-						.unwrap()
-						.serialize_as::<T>()
-						.unwrap();
+					let value: T = event.messages().next().unwrap().serialize_as().unwrap();
 
 					assert(&value);
 
