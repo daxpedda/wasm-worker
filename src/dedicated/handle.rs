@@ -48,13 +48,13 @@ impl WorkerHandle {
 		RefCell::borrow(&self.message_handler).is_some()
 	}
 
-	pub fn clear_message_handler(&mut self) {
+	pub fn clear_message_handler(&self) {
 		RefCell::borrow_mut(&self.message_handler).take();
 		self.worker.set_onmessage(None);
 	}
 
 	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
-		&mut self,
+		&self,
 		mut new_message_handler: F,
 	) {
 		let handle = WorkerHandleRef {
@@ -106,7 +106,7 @@ impl WorkerHandleRef {
 		})
 	}
 
-	pub fn clear_message_handler(&mut self) {
+	pub fn clear_message_handler(&self) {
 		if let Some(messange_handler) = Weak::upgrade(&self.message_handler) {
 			messange_handler.take();
 			self.worker.set_onmessage(None);
@@ -114,7 +114,7 @@ impl WorkerHandleRef {
 	}
 
 	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
-		&mut self,
+		&self,
 		mut new_message_handler: F,
 	) {
 		if let Some(message_handler) = Weak::upgrade(&self.message_handler) {
