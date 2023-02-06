@@ -71,7 +71,7 @@ impl WorkerHandle {
 			.set_onmessage(Some(message_handler.as_ref().unchecked_ref()));
 	}
 
-	pub fn transfer_message<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
+	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
 		WorkerOrContext::Worker(&self.worker).transfer_messages(messages);
 	}
 
@@ -133,7 +133,7 @@ impl WorkerHandleRef {
 		}
 	}
 
-	pub fn transfer_message<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
+	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
 		WorkerOrContext::Worker(&self.worker).transfer_messages(messages);
 	}
 

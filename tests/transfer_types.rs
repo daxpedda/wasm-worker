@@ -74,7 +74,7 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 		});
 
 	flag_start.await;
-	worker.transfer_message([value]);
+	worker.transfer_messages([value]);
 	flag_finish.await;
 
 	worker.terminate();

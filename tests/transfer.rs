@@ -5,7 +5,7 @@ mod util;
 use std::time::Duration;
 
 use futures_util::{future, FutureExt};
-use js_sys::ArrayBuffer;
+use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, Message, WorkerBuilder};
@@ -53,7 +53,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 	flag_spawner_start.signal();
 	flag_worker_start.await;
 
-	worker.transfer_message([buffer]);
+	worker.transfer_messages([buffer]);
 
 	let result = future::select_all([
 		flag_spawner_received.map(|_| true).boxed_local(),
@@ -92,6 +92,75 @@ fn has_message_handler() -> Result<(), JsValue> {
 	assert!(worker.has_message_handler());
 	worker.clear_message_handler();
 	assert!(!worker.has_message_handler());
+
+	Ok(())
+}
+
+#[wasm_bindgen_test]
+async fn multi_messages() -> Result<(), JsValue> {
+	assert!(Message::has_array_buffer_support());
+
+	let flag = Flag::new();
+
+	let worker = WorkerBuilder::new()?
+		.set_message_handler(move |context, event| {
+			let messages: Vec<ArrayBuffer> = event
+				.messages()
+				.map(|message| message.serialize_as().unwrap())
+				.collect();
+
+			assert_eq!(messages.len(), 3);
+
+			for (index, buffer) in (1_u8..).zip(&messages) {
+				let array = Uint8Array::new(buffer);
+				assert_eq!(buffer.byte_length(), index.into());
+				let mut output = [0; 3];
+				array.copy_to(&mut output[..index.into()]);
+				assert!(output[..index.into()].iter().all(|value| *value == index));
+			}
+
+			context.transfer_messages(messages);
+		})
+		.spawn_async({
+			let flag = flag.clone();
+			|context| async move {
+				context.set_message_handler(move |_, event| {
+					let messages = event.messages();
+					assert_eq!(messages.len(), 3);
+
+					for (index, message) in (1_u8..).zip(messages) {
+						let buffer: ArrayBuffer = message.serialize_as().unwrap();
+						let array = Uint8Array::new(&buffer);
+						assert_eq!(buffer.byte_length(), index.into());
+						let mut output = [0; 3];
+						array.copy_to(&mut output[..index.into()]);
+						assert!(output[..index.into()].iter().all(|value| *value == index));
+					}
+
+					flag.signal();
+				});
+
+				let buffer_1 = ArrayBuffer::new(1);
+				let array = Uint8Array::new(&buffer_1);
+				array.copy_from(&[1]);
+
+				let buffer_2 = ArrayBuffer::new(2);
+				let array = Uint8Array::new(&buffer_2);
+				array.copy_from(&[2; 2]);
+
+				let buffer_3 = ArrayBuffer::new(3);
+				let array = Uint8Array::new(&buffer_3);
+				array.copy_from(&[3; 3]);
+
+				context.transfer_messages([buffer_1, buffer_2, buffer_3]);
+
+				Close::No
+			}
+		});
+
+	flag.await;
+
+	worker.terminate();
 
 	Ok(())
 }
