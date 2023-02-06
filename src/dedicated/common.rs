@@ -23,8 +23,14 @@ impl WorkerOrContext<'_> {
 		}
 	}
 
-	pub(super) fn transfer_messages<M: IntoIterator<Item = Message>>(self, messages: M) {
-		let mut messages = messages.into_iter().map(Message::into_js_value);
+	pub(super) fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
+		self,
+		messages: M,
+	) {
+		let mut messages = messages
+			.into_iter()
+			.map(Into::into)
+			.map(Message::into_js_value);
 
 		let array = 'array: {
 			let Some(message_1) = messages.next() else {

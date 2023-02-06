@@ -111,7 +111,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 		.clear_message_handler()
 		.spawn(|context| {
 			let buffer = ArrayBuffer::new(1);
-			context.transfer_messages([buffer.into()]);
+			context.transfer_messages([buffer]);
 
 			Close::Yes
 		});

@@ -47,7 +47,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 				flag_spawner_start.await;
 
 				let buffer = ArrayBuffer::new(1);
-				context.transfer_messages([buffer.into()]);
+				context.transfer_messages([buffer]);
 
 				Close::No
 			}
@@ -58,7 +58,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 	flag_spawner_start.signal();
 	flag_worker_start.await;
 
-	worker.transfer_message([buffer.into()]);
+	worker.transfer_message([buffer]);
 
 	let result = future::select_all([
 		flag_spawner_received.map(|_| true).boxed_local(),
@@ -123,7 +123,7 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 
 					assert(&value);
 
-					context.transfer_messages([value.into()]);
+					context.transfer_messages([value]);
 				});
 
 				flag_start.signal();
@@ -133,7 +133,7 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 		});
 
 	flag_start.await;
-	worker.transfer_message([value.into()]);
+	worker.transfer_message([value]);
 	flag_finish.await;
 
 	worker.terminate();

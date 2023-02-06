@@ -91,7 +91,7 @@ impl WorkerContext {
 		});
 	}
 
-	pub fn transfer_messages<M: IntoIterator<Item = Message>>(&self, messages: M) {
+	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
 		WorkerOrContext::Context(&self.0).transfer_messages(messages);
 	}
 
