@@ -172,12 +172,9 @@ impl RawMessage {
 		Message::from_js_value(self.0)
 	}
 
-	pub fn serialize_as<T: JsCast>(self) -> Result<Message, MessageError>
-	where
-		Message: From<T>,
-	{
+	pub fn serialize_as<T: JsCast + Into<Message>>(self) -> Result<T, MessageError> {
 		if self.0.is_instance_of::<T>() {
-			Ok(Message::from(self.0.unchecked_into::<T>()))
+			Ok(self.0.unchecked_into::<T>())
 		} else {
 			Err(MessageError(self.0))
 		}
