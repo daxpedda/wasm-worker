@@ -8,7 +8,7 @@ mod worker_url;
 use std::future::Future;
 
 pub use self::builder::{Close, ModuleSupportError, WorkerBuilder};
-use self::common::{MessageClosure, WorkerOrContext};
+use self::common::{Closure, WorkerOrContext};
 pub use self::context::WorkerContext;
 pub use self::event::{MessageEvent, MessageIter};
 pub use self::handle::{WorkerHandle, WorkerHandleRef};

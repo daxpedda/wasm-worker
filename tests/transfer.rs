@@ -4,7 +4,8 @@ mod util;
 
 use std::time::Duration;
 
-use futures_util::{future, FutureExt};
+use futures_util::future::{self, Either};
+use futures_util::FutureExt;
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -163,4 +164,97 @@ async fn multi_messages() -> Result<(), JsValue> {
 	worker.terminate();
 
 	Ok(())
+}
+
+#[wasm_bindgen_test]
+async fn async_message_handler() {
+	assert!(Message::has_array_buffer_support());
+
+	let flag = Flag::new();
+
+	let worker = wasm_worker::spawn(|context| {
+		let buffer = ArrayBuffer::new(1);
+		context.transfer_messages([buffer]);
+
+		Close::Yes
+	});
+
+	worker.set_message_handler_async({
+		let flag = flag.clone();
+		move |_, _| {
+			let flag = flag.clone();
+			async move {
+				util::sleep(Duration::from_millis(250)).await;
+				flag.signal();
+			}
+		}
+	});
+
+	let result = future::select(flag, util::sleep(Duration::from_millis(500))).await;
+	assert!(matches!(result, Either::Left(((), _))));
+}
+
+#[wasm_bindgen_test]
+async fn abort_async_message_handler() {
+	assert!(Message::has_array_buffer_support());
+
+	let mut received_1 = Flag::new();
+	let received_1_broken = Flag::new();
+	let start_2 = Flag::new();
+	let received_2 = Flag::new();
+
+	let worker = wasm_worker::spawn_async({
+		let start_2 = start_2.clone();
+		|context| async move {
+			let buffer = ArrayBuffer::new(1);
+			context.transfer_messages([buffer]);
+
+			start_2.await;
+
+			let buffer = ArrayBuffer::new(1);
+			context.transfer_messages([buffer]);
+
+			Close::Yes
+		}
+	});
+
+	worker.set_message_handler_async({
+		let received_1 = received_1.clone();
+		let received_1_broken = received_1_broken.clone();
+
+		move |_, _| {
+			let received_1 = received_1.clone();
+			let received_1_broken = received_1_broken.clone();
+			async move {
+				received_1.signal();
+				util::sleep(Duration::from_millis(250)).await;
+				received_1_broken.signal();
+			}
+		}
+	});
+
+	(&mut received_1).await;
+
+	worker.set_message_handler_async({
+		let received_2 = received_2.clone();
+		move |_, _| {
+			let received_2 = received_2.clone();
+			async move {
+				util::sleep(Duration::from_millis(500)).await;
+				received_2.signal();
+			}
+		}
+	});
+
+	start_2.signal();
+
+	let result = future::select_all([
+		received_1_broken.map(|_| false).boxed_local(),
+		received_2.map(|_| true).boxed_local(),
+		util::sleep(Duration::from_millis(750))
+			.map(|_| false)
+			.boxed_local(),
+	])
+	.await;
+	assert!(result.0);
 }

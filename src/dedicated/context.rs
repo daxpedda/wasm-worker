@@ -1,11 +1,11 @@
 use std::cell::RefCell;
+use std::future::Future;
 
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::{MessageClosure, WorkerOrContext};
+use super::{Closure, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -14,7 +14,7 @@ pub struct WorkerContext(pub(super) DedicatedWorkerGlobalScope);
 impl WorkerContext {
 	thread_local! {
 		#[allow(clippy::type_complexity)]
-		static CLOSURE: RefCell<MessageClosure> = RefCell::new(None);
+		static CLOSURE: RefCell<Option<Closure>> = RefCell::new(None);
 	}
 
 	#[must_use]
@@ -83,11 +83,30 @@ impl WorkerContext {
 			let mut closure = closure.borrow_mut();
 
 			let context = self.clone();
-			let closure = closure.insert(Closure::new(move |event| {
+			let closure = closure.insert(Closure::classic(move |event| {
 				message_handler(&context, MessageEvent::new(event));
 			}));
 
-			self.0.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+			self.0.set_onmessage(Some(closure));
+		});
+	}
+
+	pub fn set_message_handler_async<
+		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
+		F2: 'static + Future<Output = ()>,
+	>(
+		&self,
+		mut message_handler: F1,
+	) {
+		Self::CLOSURE.with(|closure| {
+			let mut closure = closure.borrow_mut();
+
+			let context = self.clone();
+			let closure = closure.insert(Closure::future(move |event| {
+				message_handler(&context, MessageEvent::new(event))
+			}));
+
+			self.0.set_onmessage(Some(closure));
 		});
 	}
 

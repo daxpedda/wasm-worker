@@ -1,17 +1,16 @@
 use std::cell::RefCell;
+use std::future::Future;
 use std::rc::{Rc, Weak};
 
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::JsCast;
 use web_sys::Worker;
 
-use super::{MessageClosure, WorkerOrContext};
+use super::{Closure, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
 pub struct WorkerHandle {
 	worker: Worker,
-	message_handler: Rc<RefCell<MessageClosure>>,
+	message_handler: Rc<RefCell<Option<Closure>>>,
 }
 
 impl Drop for WorkerHandle {
@@ -31,7 +30,7 @@ impl PartialEq for WorkerHandle {
 }
 
 impl WorkerHandle {
-	pub(super) fn new(worker: Worker, message_handler: Rc<RefCell<MessageClosure>>) -> Self {
+	pub(super) fn new(worker: Worker, message_handler: Rc<RefCell<Option<Closure>>>) -> Self {
 		Self {
 			worker,
 			message_handler,
@@ -63,12 +62,31 @@ impl WorkerHandle {
 		};
 
 		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
-		let message_handler = message_handler.insert(Closure::new(move |event| {
+		let message_handler = message_handler.insert(Closure::classic(move |event| {
 			new_message_handler(&handle, MessageEvent::new(event));
 		}));
 
-		self.worker
-			.set_onmessage(Some(message_handler.as_ref().unchecked_ref()));
+		self.worker.set_onmessage(Some(message_handler));
+	}
+
+	pub fn set_message_handler_async<
+		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
+		F2: 'static + Future<Output = ()>,
+	>(
+		&self,
+		mut new_message_handler: F1,
+	) {
+		let handle = WorkerHandleRef {
+			worker: self.worker.clone(),
+			message_handler: Rc::downgrade(&self.message_handler),
+		};
+
+		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
+		let message_handler = message_handler.insert(Closure::future(move |event| {
+			new_message_handler(&handle, MessageEvent::new(event))
+		}));
+
+		self.worker.set_onmessage(Some(message_handler));
 	}
 
 	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
@@ -83,11 +101,11 @@ impl WorkerHandle {
 #[derive(Debug)]
 pub struct WorkerHandleRef {
 	worker: Worker,
-	message_handler: Weak<RefCell<MessageClosure>>,
+	message_handler: Weak<RefCell<Option<Closure>>>,
 }
 
 impl WorkerHandleRef {
-	pub(super) fn new(worker: Worker, message_handler: Weak<RefCell<MessageClosure>>) -> Self {
+	pub(super) fn new(worker: Worker, message_handler: Weak<RefCell<Option<Closure>>>) -> Self {
 		Self {
 			worker,
 			message_handler,
@@ -124,12 +142,33 @@ impl WorkerHandleRef {
 			};
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
-			let message_handler = message_handler.insert(Closure::new(move |event| {
+			let message_handler = message_handler.insert(Closure::classic(move |event| {
 				new_message_handler(&handle, MessageEvent::new(event));
 			}));
 
-			self.worker
-				.set_onmessage(Some(message_handler.as_ref().unchecked_ref()));
+			self.worker.set_onmessage(Some(message_handler));
+		}
+	}
+
+	pub fn set_message_handler_async<
+		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
+		F2: 'static + Future<Output = ()>,
+	>(
+		&self,
+		mut new_message_handler: F1,
+	) {
+		if let Some(message_handler) = Weak::upgrade(&self.message_handler) {
+			let handle = Self {
+				worker: self.worker.clone(),
+				message_handler: Weak::clone(&self.message_handler),
+			};
+
+			let mut message_handler = RefCell::borrow_mut(&message_handler);
+			let message_handler = message_handler.insert(Closure::future(move |event| {
+				new_message_handler(&handle, MessageEvent::new(event))
+			}));
+
+			self.worker.set_onmessage(Some(message_handler));
 		}
 	}
 

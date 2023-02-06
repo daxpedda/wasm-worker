@@ -1,11 +1,87 @@
-use js_sys::Array;
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::{JsValue, UnwrapThrowExt};
+use std::future::Future;
+use std::ops::Deref;
+use std::pin::Pin;
+use std::rc::{Rc, Weak};
+use std::task::{ready, Context, Poll};
+
+use js_sys::{Array, Function};
+use pin_project_lite::pin_project;
+use wasm_bindgen::closure::Closure as JsClosure;
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
 
 use crate::Message;
 
-pub(super) type MessageClosure = Option<Closure<dyn FnMut(web_sys::MessageEvent)>>;
+#[derive(Debug)]
+pub(super) enum Closure {
+	Classic(JsClosure<dyn FnMut(web_sys::MessageEvent)>),
+	Future {
+		_aborted: Rc<()>,
+		closure: JsClosure<dyn FnMut(web_sys::MessageEvent) -> JsValue>,
+	},
+}
+
+impl Deref for Closure {
+	type Target = Function;
+
+	fn deref(&self) -> &Self::Target {
+		match self {
+			Self::Classic(closure) => closure.as_ref(),
+			Self::Future { closure, .. } => closure.as_ref(),
+		}
+		.unchecked_ref()
+	}
+}
+
+impl Closure {
+	pub(super) fn classic(closure: impl 'static + FnMut(web_sys::MessageEvent)) -> Self {
+		Self::Classic(JsClosure::new(closure))
+	}
+
+	pub(super) fn future<F: 'static + Future<Output = ()>>(
+		mut closure: impl 'static + FnMut(web_sys::MessageEvent) -> F,
+	) -> Self {
+		let aborted = Rc::new(());
+
+		let closure = JsClosure::new({
+			let aborted = Rc::downgrade(&aborted);
+			move |event| {
+				let closure = &mut closure;
+
+				wasm_bindgen_futures::future_to_promise(Abortable {
+					aborted: Weak::clone(&aborted),
+					future: closure(event),
+				})
+				.into()
+			}
+		});
+
+		Self::Future {
+			_aborted: aborted,
+			closure,
+		}
+	}
+}
+
+pin_project! {
+	struct Abortable<F> {
+		aborted: Weak<()>,
+		#[pin]
+		future: F,
+	}
+}
+
+impl<F: 'static + Future<Output = ()>> Future for Abortable<F> {
+	type Output = Result<JsValue, JsValue>;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		if self.aborted.upgrade().is_some() {
+			ready!(self.project().future.poll(cx));
+		}
+
+		Poll::Ready(Ok(JsValue::UNDEFINED))
+	}
+}
 
 pub(super) enum WorkerOrContext<'this> {
 	Worker(&'this Worker),

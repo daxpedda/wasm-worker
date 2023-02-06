@@ -9,12 +9,11 @@ use std::rc::{Rc, Weak};
 
 use js_sys::Array;
 use once_cell::sync::Lazy;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::{MessageClosure, MessageEvent, WorkerContext, WorkerHandle, WorkerHandleRef};
+use super::{Closure, MessageEvent, WorkerContext, WorkerHandle, WorkerHandleRef};
 use crate::WorkerUrl;
 
 #[must_use = "does nothing unless spawned"]
@@ -22,7 +21,7 @@ use crate::WorkerUrl;
 pub struct WorkerBuilder<'url, 'name> {
 	url: &'url WorkerUrl,
 	name: Option<Cow<'name, str>>,
-	message_handler: Rc<RefCell<MessageClosure>>,
+	message_handler: Rc<RefCell<Option<Closure>>>,
 }
 
 impl WorkerBuilder<'_, '_> {
@@ -78,7 +77,7 @@ impl WorkerBuilder<'_, '_> {
 		mut message_handler: F,
 	) -> Self {
 		let message_handler_holder = Rc::downgrade(&self.message_handler);
-		RefCell::borrow_mut(&self.message_handler).replace(Closure::new(Box::new(
+		RefCell::borrow_mut(&self.message_handler).replace(Closure::classic(
 			move |event: web_sys::MessageEvent| {
 				let handle = WorkerHandleRef::new(
 					event.target().unwrap().unchecked_into(),
@@ -86,7 +85,27 @@ impl WorkerBuilder<'_, '_> {
 				);
 				message_handler(&handle, MessageEvent::new(event));
 			},
-		)));
+		));
+		self
+	}
+
+	pub fn set_message_handler_async<
+		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
+		F2: 'static + Future<Output = ()>,
+	>(
+		self,
+		mut message_handler: F1,
+	) -> Self {
+		let message_handler_holder = Rc::downgrade(&self.message_handler);
+		RefCell::borrow_mut(&self.message_handler).replace(Closure::future(
+			move |event: web_sys::MessageEvent| {
+				let handle = WorkerHandleRef::new(
+					event.target().unwrap().unchecked_into(),
+					Weak::clone(&message_handler_holder),
+				);
+				message_handler(&handle, MessageEvent::new(event))
+			},
+		));
 		self
 	}
 
@@ -132,7 +151,7 @@ impl WorkerBuilder<'_, '_> {
 		.unwrap_throw();
 
 		if let Some(message_handler) = RefCell::borrow(&self.message_handler).deref() {
-			worker.set_onmessage(Some(message_handler.as_ref().unchecked_ref()));
+			worker.set_onmessage(Some(message_handler));
 		}
 
 		let init = Array::of3(
@@ -165,6 +184,7 @@ impl<'name> WorkerBuilder<'_, 'name> {
 }
 
 impl<'url> WorkerBuilder<'url, '_> {
+	#[allow(clippy::missing_const_for_fn)]
 	pub fn clear_name(self) -> WorkerBuilder<'url, 'static> {
 		WorkerBuilder {
 			url: self.url,
