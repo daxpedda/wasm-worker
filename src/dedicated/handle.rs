@@ -47,9 +47,12 @@ impl WorkerHandle {
 		RefCell::borrow(&self.message_handler).is_some()
 	}
 
-	pub fn clear_message_handler(&self) {
-		RefCell::borrow_mut(&self.message_handler).take();
+	#[allow(clippy::must_use_candidate)]
+	pub fn clear_message_handler(&self) -> OldMessageHandler {
+		let old_message_handler = RefCell::borrow_mut(&self.message_handler).take();
 		self.worker.set_onmessage(None);
+
+		OldMessageHandler::new(old_message_handler)
 	}
 
 	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
@@ -130,10 +133,15 @@ impl WorkerHandleRef {
 		})
 	}
 
-	pub fn clear_message_handler(&self) {
+	#[allow(clippy::must_use_candidate)]
+	pub fn clear_message_handler(&self) -> OldMessageHandler {
 		if let Some(messange_handler) = Weak::upgrade(&self.message_handler) {
-			messange_handler.take();
+			let old_message_handler = messange_handler.take();
 			self.worker.set_onmessage(None);
+
+			OldMessageHandler::new(old_message_handler)
+		} else {
+			OldMessageHandler::new(None)
 		}
 	}
 

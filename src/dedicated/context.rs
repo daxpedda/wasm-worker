@@ -69,10 +69,13 @@ impl WorkerContext {
 		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow().is_some())
 	}
 
-	pub fn clear_message_handler(&self) {
-		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());
-
+	#[allow(clippy::must_use_candidate)]
+	pub fn clear_message_handler(&self) -> OldMessageHandler {
+		let old_message_handler =
+			Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());
 		self.0.set_onmessage(None);
+
+		OldMessageHandler::new(old_message_handler)
 	}
 
 	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
