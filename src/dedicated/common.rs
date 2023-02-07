@@ -70,17 +70,14 @@ impl Closure {
 		let closure = JsClosure::new({
 			let running = Rc::downgrade(&running);
 			move |event| {
-				if let Some(running) = Weak::upgrade(&running) {
-					let closure = &mut closure;
+				let running = Weak::upgrade(&running).unwrap();
+				let closure = &mut closure;
 
-					wasm_bindgen_futures::future_to_promise(Abortable {
-						running,
-						future: closure(event),
-					})
-					.into()
-				} else {
-					JsValue::UNDEFINED
-				}
+				wasm_bindgen_futures::future_to_promise(Abortable {
+					running,
+					future: closure(event),
+				})
+				.into()
 			}
 		});
 
