@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -18,25 +17,34 @@ use crate::WorkerUrl;
 
 #[must_use = "does nothing unless spawned"]
 #[derive(Debug)]
-pub struct WorkerBuilder<'url, 'name> {
+pub struct WorkerBuilder<'url> {
 	url: &'url WorkerUrl,
-	name: Option<Cow<'name, str>>,
+	options: Option<WorkerOptions>,
 	message_handler: Rc<RefCell<Option<Closure>>>,
 }
 
-impl WorkerBuilder<'_, '_> {
-	pub fn new() -> Result<WorkerBuilder<'static, 'static>, ModuleSupportError> {
+impl WorkerBuilder<'_> {
+	pub fn new() -> Result<WorkerBuilder<'static>, ModuleSupportError> {
 		Self::new_with_url(WorkerUrl::default())
 	}
 
-	pub fn new_with_url(url: &WorkerUrl) -> Result<WorkerBuilder<'_, 'static>, ModuleSupportError> {
-		if url.is_module() && !Self::has_module_support() {
-			return Err(ModuleSupportError);
-		}
+	pub fn new_with_url(url: &WorkerUrl) -> Result<WorkerBuilder<'_>, ModuleSupportError> {
+		#[allow(clippy::if_then_some_else_none)]
+		let options = if url.is_module() {
+			if !Self::has_module_support() {
+				return Err(ModuleSupportError);
+			}
+
+			let mut options = WorkerOptions::new();
+			options.type_(WorkerType::Module);
+			Some(options)
+		} else {
+			None
+		};
 
 		Ok(WorkerBuilder {
 			url,
-			name: None,
+			options,
 			message_handler: Rc::new(RefCell::new(None)),
 		})
 	}
@@ -67,8 +75,10 @@ impl WorkerBuilder<'_, '_> {
 		*HAS_MODULE_SUPPORT
 	}
 
-	pub fn clear_message_handler(self) -> Self {
-		RefCell::borrow_mut(&self.message_handler).take();
+	pub fn name(mut self, name: &str) -> Self {
+		self.options
+			.get_or_insert_with(WorkerOptions::new)
+			.name(name);
 		self
 	}
 
@@ -134,19 +144,7 @@ impl WorkerBuilder<'_, '_> {
 	fn spawn_internal(self, task: Task) -> WorkerHandle {
 		let task = Box::into_raw(Box::new(task));
 
-		let mut options = None;
-
-		if let Some(name) = self.name {
-			options.get_or_insert_with(WorkerOptions::new).name(&name);
-		}
-
-		if self.url.is_module() {
-			options
-				.get_or_insert_with(WorkerOptions::new)
-				.type_(WorkerType::Module);
-		}
-
-		let worker = if let Some(options) = options {
+		let worker = if let Some(options) = self.options {
 			Worker::new_with_options(&self.url.url, &options)
 		} else {
 			Worker::new(&self.url.url)
@@ -166,42 +164,6 @@ impl WorkerBuilder<'_, '_> {
 		worker.post_message(&init).unwrap_throw();
 
 		WorkerHandle::new(worker, self.message_handler)
-	}
-}
-
-impl<'name> WorkerBuilder<'_, 'name> {
-	pub fn url<'url>(
-		self,
-		url: &'url WorkerUrl,
-	) -> Result<WorkerBuilder<'url, 'name>, ModuleSupportError> {
-		if url.is_module() && !Self::has_module_support() {
-			return Err(ModuleSupportError);
-		}
-
-		Ok(WorkerBuilder {
-			url,
-			name: self.name,
-			message_handler: self.message_handler,
-		})
-	}
-}
-
-impl<'url> WorkerBuilder<'url, '_> {
-	#[allow(clippy::missing_const_for_fn)]
-	pub fn clear_name(self) -> WorkerBuilder<'url, 'static> {
-		WorkerBuilder {
-			url: self.url,
-			name: None,
-			message_handler: self.message_handler,
-		}
-	}
-
-	pub fn name<'name, N: Into<Cow<'name, str>>>(self, name: N) -> WorkerBuilder<'url, 'name> {
-		WorkerBuilder {
-			url: self.url,
-			name: Some(name.into()),
-			message_handler: self.message_handler,
-		}
 	}
 }
 

@@ -80,12 +80,6 @@ fn has_message_handler() -> Result<(), JsValue> {
 	worker.clear_message_handler();
 	assert!(!worker.has_message_handler());
 
-	let worker = WorkerBuilder::new()?
-		.set_message_handler(|_, _| ())
-		.clear_message_handler()
-		.spawn(|_| Close::Yes);
-	assert!(!worker.has_message_handler());
-
 	let worker = wasm_worker::spawn(|_| Close::Yes);
 
 	assert!(!worker.has_message_handler());

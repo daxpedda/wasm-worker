@@ -2,13 +2,9 @@
 
 mod util;
 
-use std::time::Duration;
-
-use futures_util::future::{self, Either};
-use js_sys::ArrayBuffer;
 use wasm_bindgen::{JsValue, ShimFormat};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{Close, Message, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
+use wasm_worker::{Close, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
 
 use self::util::Flag;
 
@@ -74,50 +70,6 @@ async fn name() -> Result<(), JsValue> {
 	});
 
 	flag.await;
-
-	Ok(())
-}
-
-#[wasm_bindgen_test]
-async fn clear_name() -> Result<(), JsValue> {
-	let flag = Flag::new();
-
-	WorkerBuilder::new()?.name("test").clear_name().spawn({
-		let flag = flag.clone();
-		move |context| {
-			assert_eq!(context.name(), None);
-
-			flag.signal();
-			Close::Yes
-		}
-	});
-
-	flag.await;
-
-	Ok(())
-}
-
-#[wasm_bindgen_test]
-async fn clear_message_handler() -> Result<(), JsValue> {
-	assert!(Message::has_array_buffer_support());
-
-	let flag_received = Flag::new();
-
-	WorkerBuilder::new()?
-		.set_message_handler({
-			let flag_received = flag_received.clone();
-			move |_, _| flag_received.signal()
-		})
-		.clear_message_handler()
-		.spawn(|context| {
-			let buffer = ArrayBuffer::new(1);
-			context.transfer_messages([buffer]);
-
-			Close::Yes
-		});
-
-	let result = future::select(flag_received, util::sleep(Duration::from_millis(250))).await;
-	assert!(matches!(result, Either::Right(((), _))));
 
 	Ok(())
 }
