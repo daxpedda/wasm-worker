@@ -77,15 +77,18 @@ impl WorkerBuilder<'_, '_> {
 		mut message_handler: F,
 	) -> Self {
 		let message_handler_holder = Rc::downgrade(&self.message_handler);
-		RefCell::borrow_mut(&self.message_handler).replace(Closure::classic(
+		RefCell::borrow_mut(&self.message_handler).replace(Closure::classic({
+			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
-				let handle = WorkerHandleRef::new(
-					event.target().unwrap().unchecked_into(),
-					Weak::clone(&message_handler_holder),
-				);
-				message_handler(&handle, MessageEvent::new(event));
-			},
-		));
+				let handle = handle.get_or_insert_with(|| {
+					WorkerHandleRef::new(
+						event.target().unwrap().unchecked_into(),
+						Weak::clone(&message_handler_holder),
+					)
+				});
+				message_handler(handle, MessageEvent::new(event));
+			}
+		}));
 		self
 	}
 
