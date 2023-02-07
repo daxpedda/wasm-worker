@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::{Closure, WorkerOrContext};
+use super::{Closure, OldMessageHandler, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -14,7 +14,7 @@ pub struct WorkerContext(pub(super) DedicatedWorkerGlobalScope);
 impl WorkerContext {
 	thread_local! {
 		#[allow(clippy::type_complexity)]
-		static CLOSURE: RefCell<Option<Closure>> = RefCell::new(None);
+		static MESSAGE_HANDLER: RefCell<Option<Closure>> = RefCell::new(None);
 	}
 
 	#[must_use]
@@ -66,29 +66,32 @@ impl WorkerContext {
 
 	#[must_use]
 	pub fn has_message_handler(&self) -> bool {
-		Self::CLOSURE.with(|closure| closure.borrow().is_some())
+		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow().is_some())
 	}
 
 	pub fn clear_message_handler(&self) {
-		Self::CLOSURE.with(|closure| closure.borrow_mut().take());
+		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());
 
 		self.0.set_onmessage(None);
 	}
 
 	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
 		&self,
-		mut message_handler: F,
-	) {
-		Self::CLOSURE.with(|closure| {
-			let mut closure = closure.borrow_mut();
+		mut new_message_handler: F,
+	) -> OldMessageHandler {
+		Self::MESSAGE_HANDLER.with(|message_handler| {
+			let mut message_handler = message_handler.borrow_mut();
 
 			let context = self.clone();
-			let closure = closure.insert(Closure::classic(move |event| {
-				message_handler(&context, MessageEvent::new(event));
+			let old_message_handler = message_handler.take();
+			let message_handler = message_handler.insert(Closure::classic(move |event| {
+				new_message_handler(&context, MessageEvent::new(event));
 			}));
 
-			self.0.set_onmessage(Some(closure));
-		});
+			self.0.set_onmessage(Some(message_handler));
+
+			OldMessageHandler::new(old_message_handler)
+		})
 	}
 
 	pub fn set_message_handler_async<
@@ -96,18 +99,21 @@ impl WorkerContext {
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
-		mut message_handler: F1,
-	) {
-		Self::CLOSURE.with(|closure| {
-			let mut closure = closure.borrow_mut();
+		mut new_message_handler: F1,
+	) -> OldMessageHandler {
+		Self::MESSAGE_HANDLER.with(|message_handler| {
+			let mut message_handler = message_handler.borrow_mut();
 
 			let context = self.clone();
-			let closure = closure.insert(Closure::future(move |event| {
-				message_handler(&context, MessageEvent::new(event))
+			let old_message_handler = message_handler.take();
+			let message_handler = message_handler.insert(Closure::future(move |event| {
+				new_message_handler(&context, MessageEvent::new(event))
 			}));
 
-			self.0.set_onmessage(Some(closure));
-		});
+			self.0.set_onmessage(Some(message_handler));
+
+			OldMessageHandler::new(old_message_handler)
+		})
 	}
 
 	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {

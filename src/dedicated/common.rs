@@ -13,10 +13,34 @@ use web_sys::{DedicatedWorkerGlobalScope, Worker};
 use crate::Message;
 
 #[derive(Debug)]
+pub struct OldMessageHandler(Option<Rc<()>>);
+
+impl OldMessageHandler {
+	#[allow(clippy::missing_const_for_fn)]
+	pub(super) fn new(closure: Option<Closure>) -> Self {
+		if let Some(Closure::Future { running, .. }) = closure {
+			if Rc::strong_count(&running) != 1 {
+				return Self(Some(running));
+			}
+		}
+		Self(None)
+	}
+
+	#[must_use]
+	pub fn is_running(&self) -> bool {
+		if let Some(running) = &self.0 {
+			Rc::strong_count(running) != 1
+		} else {
+			false
+		}
+	}
+}
+
+#[derive(Debug)]
 pub(super) enum Closure {
 	Classic(JsClosure<dyn FnMut(web_sys::MessageEvent)>),
 	Future {
-		_aborted: Rc<()>,
+		running: Rc<()>,
 		closure: JsClosure<dyn FnMut(web_sys::MessageEvent) -> JsValue>,
 	},
 }
@@ -41,31 +65,32 @@ impl Closure {
 	pub(super) fn future<F: 'static + Future<Output = ()>>(
 		mut closure: impl 'static + FnMut(web_sys::MessageEvent) -> F,
 	) -> Self {
-		let aborted = Rc::new(());
+		let running = Rc::new(());
 
 		let closure = JsClosure::new({
-			let aborted = Rc::downgrade(&aborted);
+			let running = Rc::downgrade(&running);
 			move |event| {
-				let closure = &mut closure;
+				if let Some(running) = Weak::upgrade(&running) {
+					let closure = &mut closure;
 
-				wasm_bindgen_futures::future_to_promise(Abortable {
-					aborted: Weak::clone(&aborted),
-					future: closure(event),
-				})
-				.into()
+					wasm_bindgen_futures::future_to_promise(Abortable {
+						running,
+						future: closure(event),
+					})
+					.into()
+				} else {
+					JsValue::UNDEFINED
+				}
 			}
 		});
 
-		Self::Future {
-			_aborted: aborted,
-			closure,
-		}
+		Self::Future { running, closure }
 	}
 }
 
 pin_project! {
 	struct Abortable<F> {
-		aborted: Weak<()>,
+		running: Rc<()>,
 		#[pin]
 		future: F,
 	}
@@ -75,7 +100,7 @@ impl<F: 'static + Future<Output = ()>> Future for Abortable<F> {
 	type Output = Result<JsValue, JsValue>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		if self.aborted.upgrade().is_some() {
+		if Rc::strong_count(&self.running) != 1 {
 			ready!(self.project().future.poll(cx));
 		}
 

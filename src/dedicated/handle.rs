@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 
 use web_sys::Worker;
 
-use super::{Closure, WorkerOrContext};
+use super::{Closure, OldMessageHandler, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
@@ -55,18 +55,21 @@ impl WorkerHandle {
 	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
-	) {
+	) -> OldMessageHandler {
 		let handle = WorkerHandleRef {
 			worker: self.worker.clone(),
 			message_handler: Rc::downgrade(&self.message_handler),
 		};
 
 		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
+		let old_message_handler = message_handler.take();
 		let message_handler = message_handler.insert(Closure::classic(move |event| {
 			new_message_handler(&handle, MessageEvent::new(event));
 		}));
 
 		self.worker.set_onmessage(Some(message_handler));
+
+		OldMessageHandler::new(old_message_handler)
 	}
 
 	pub fn set_message_handler_async<
@@ -75,18 +78,21 @@ impl WorkerHandle {
 	>(
 		&self,
 		mut new_message_handler: F1,
-	) {
+	) -> OldMessageHandler {
 		let handle = WorkerHandleRef {
 			worker: self.worker.clone(),
 			message_handler: Rc::downgrade(&self.message_handler),
 		};
 
 		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
+		let old_message_handler = message_handler.take();
 		let message_handler = message_handler.insert(Closure::future(move |event| {
 			new_message_handler(&handle, MessageEvent::new(event))
 		}));
 
 		self.worker.set_onmessage(Some(message_handler));
+
+		OldMessageHandler::new(old_message_handler)
 	}
 
 	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
@@ -134,7 +140,7 @@ impl WorkerHandleRef {
 	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
-	) {
+	) -> OldMessageHandler {
 		if let Some(message_handler) = Weak::upgrade(&self.message_handler) {
 			let handle = Self {
 				worker: self.worker.clone(),
@@ -142,11 +148,16 @@ impl WorkerHandleRef {
 			};
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
+			let old_message_handler = message_handler.take();
 			let message_handler = message_handler.insert(Closure::classic(move |event| {
 				new_message_handler(&handle, MessageEvent::new(event));
 			}));
 
 			self.worker.set_onmessage(Some(message_handler));
+
+			OldMessageHandler::new(old_message_handler)
+		} else {
+			OldMessageHandler::new(None)
 		}
 	}
 
@@ -156,7 +167,7 @@ impl WorkerHandleRef {
 	>(
 		&self,
 		mut new_message_handler: F1,
-	) {
+	) -> OldMessageHandler {
 		if let Some(message_handler) = Weak::upgrade(&self.message_handler) {
 			let handle = Self {
 				worker: self.worker.clone(),
@@ -164,11 +175,16 @@ impl WorkerHandleRef {
 			};
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
+			let old_message_handler = message_handler.take();
 			let message_handler = message_handler.insert(Closure::future(move |event| {
 				new_message_handler(&handle, MessageEvent::new(event))
 			}));
 
 			self.worker.set_onmessage(Some(message_handler));
+
+			OldMessageHandler::new(old_message_handler)
+		} else {
+			OldMessageHandler::new(None)
 		}
 	}
 
