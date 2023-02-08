@@ -78,6 +78,30 @@ impl Iterator for MessageIter {
 			Inner::Single(value) => value.iter().size_hint(),
 		}
 	}
+
+	fn count(self) -> usize
+	where
+		Self: Sized,
+	{
+		self.size_hint().0
+	}
+
+	fn last(self) -> Option<Self::Item>
+	where
+		Self: Sized,
+	{
+		match self.0 {
+			Inner::Array { array, range } => range.last().map(|index| RawMessage(array.get(index))),
+			Inner::Single(value) => value.map(RawMessage),
+		}
+	}
+
+	fn nth(&mut self, n: usize) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => range.nth(n).map(|index| RawMessage(array.get(index))),
+			Inner::Single(value) => value.take().into_iter().nth(n).map(RawMessage),
+		}
+	}
 }
 
 impl ExactSizeIterator for MessageIter {}
@@ -88,10 +112,18 @@ impl DoubleEndedIterator for MessageIter {
 	fn next_back(&mut self) -> Option<Self::Item> {
 		match &mut self.0 {
 			Inner::Array { array, range } => {
-				let index = range.next_back()?;
-				Some(RawMessage(array.get(index)))
+				range.next_back().map(|index| RawMessage(array.get(index)))
 			}
 			Inner::Single(value) => value.take().map(RawMessage),
+		}
+	}
+
+	fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => {
+				range.nth_back(n).map(|index| RawMessage(array.get(index)))
+			}
+			Inner::Single(value) => value.take().into_iter().nth_back(n).map(RawMessage),
 		}
 	}
 }
