@@ -258,7 +258,7 @@ async fn keep_alive_async_message_handler() {
 	assert!(Message::has_array_buffer_support());
 
 	let mut received_1 = Flag::new();
-	let received_1_broken = Flag::new();
+	let received_1_old = Flag::new();
 	let start_2 = Flag::new();
 	let received_2 = Flag::new();
 
@@ -279,15 +279,15 @@ async fn keep_alive_async_message_handler() {
 
 	worker.set_message_handler_async({
 		let received_1 = received_1.clone();
-		let received_1_broken = received_1_broken.clone();
+		let received_1_old = received_1_old.clone();
 
 		move |_, _| {
 			let received_1 = received_1.clone();
-			let received_1_broken = received_1_broken.clone();
+			let received_1_old = received_1_old.clone();
 			async move {
 				received_1.signal();
 				util::sleep(Duration::from_millis(250)).await;
-				received_1_broken.signal();
+				received_1_old.signal();
 			}
 		}
 	});
@@ -309,7 +309,7 @@ async fn keep_alive_async_message_handler() {
 
 	assert!(old_message_handler.is_running());
 
-	received_1_broken.await;
+	received_1_old.await;
 
 	util::sleep(Duration::from_millis(250)).await;
 
