@@ -209,8 +209,8 @@ pub enum Task {
 #[wasm_bindgen]
 pub fn __wasm_worker_entry(task: *mut Task) -> JsValue {
 	// Unhooking the message handler has to happen in JS because loading the WASM
-	// module will actually yield and introduces a race condition where messages
-	// sent will still be handled by the starter message handler.
+	// module will actually yield and introduce a race condition where messages sent
+	// will still be handled by the entry message handler.
 
 	let context = WorkerContext(js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>());
 
