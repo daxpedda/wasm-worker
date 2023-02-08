@@ -70,11 +70,8 @@ impl Closure {
 		let closure = JsClosure::new({
 			let running = Rc::downgrade(&running);
 			move |event| {
-				let running = Weak::upgrade(&running).unwrap();
-				let closure = &mut closure;
-
 				wasm_bindgen_futures::future_to_promise(Abortable {
-					running,
+					running: Weak::upgrade(&running).unwrap(),
 					future: closure(event),
 				})
 				.into()
