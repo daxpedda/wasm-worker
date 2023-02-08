@@ -1,13 +1,5 @@
 let __wasm_worker_wasm;
 
-function __wasm_worker_try(__wasm_worker_f) {
-	try {
-		__wasm_worker_f();
-	} catch (__wasm_worker_e) {
-		return __wasm_worker_e;
-	}
-}
-
 function __wasm_worker_close() {
 	__wasm_worker_wasm.__wbindgen_thread_destroy();
 	self.close();
