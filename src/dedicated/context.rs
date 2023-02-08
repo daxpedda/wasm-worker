@@ -75,7 +75,7 @@ impl WorkerContext {
 		self.0.set_onmessage(None);
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(Self, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
 	) {
@@ -84,7 +84,7 @@ impl WorkerContext {
 
 			let context = self.clone();
 			let message_handler = message_handler.insert(Closure::classic(move |event| {
-				new_message_handler(context.clone(), MessageEvent::new(event));
+				new_message_handler(&context, MessageEvent::new(event));
 			}));
 
 			self.0.set_onmessage(Some(message_handler));
@@ -92,7 +92,7 @@ impl WorkerContext {
 	}
 
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(Self, MessageEvent) -> F2,
+		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
@@ -103,7 +103,7 @@ impl WorkerContext {
 
 			let context = self.clone();
 			let message_handler = message_handler.insert(Closure::future(move |event| {
-				new_message_handler(context.clone(), MessageEvent::new(event))
+				new_message_handler(&context, MessageEvent::new(event))
 			}));
 
 			self.0.set_onmessage(Some(message_handler));

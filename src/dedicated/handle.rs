@@ -53,7 +53,7 @@ impl WorkerHandle {
 		self.worker.set_onmessage(None);
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(WorkerHandleRef, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
 	) {
@@ -64,14 +64,14 @@ impl WorkerHandle {
 
 		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
 		let message_handler = message_handler.insert(Closure::classic(move |event| {
-			new_message_handler(handle.clone(), MessageEvent::new(event));
+			new_message_handler(&handle, MessageEvent::new(event));
 		}));
 
 		self.worker.set_onmessage(Some(message_handler));
 	}
 
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(WorkerHandleRef, MessageEvent) -> F2,
+		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
@@ -84,7 +84,7 @@ impl WorkerHandle {
 
 		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
 		let message_handler = message_handler.insert(Closure::future(move |event| {
-			new_message_handler(handle.clone(), MessageEvent::new(event))
+			new_message_handler(&handle, MessageEvent::new(event))
 		}));
 
 		self.worker.set_onmessage(Some(message_handler));
@@ -99,7 +99,7 @@ impl WorkerHandle {
 	}
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct WorkerHandleRef {
 	worker: Worker,
 	message_handler: Weak<RefCell<Option<Closure>>>,
@@ -118,13 +118,6 @@ impl WorkerHandleRef {
 		&self.worker
 	}
 
-	pub(super) fn clone(&self) -> Self {
-		Self {
-			worker: self.worker.clone(),
-			message_handler: Weak::clone(&self.message_handler),
-		}
-	}
-
 	#[must_use]
 	pub fn has_message_handler(&self) -> bool {
 		Weak::upgrade(&self.message_handler).map_or(false, |message_handler| {
@@ -140,7 +133,7 @@ impl WorkerHandleRef {
 		}
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(Self, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
 	) {
@@ -149,7 +142,7 @@ impl WorkerHandleRef {
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
 			let message_handler = message_handler.insert(Closure::classic(move |event| {
-				new_message_handler(handle.clone(), MessageEvent::new(event));
+				new_message_handler(&handle, MessageEvent::new(event));
 			}));
 
 			self.worker.set_onmessage(Some(message_handler));
@@ -157,7 +150,7 @@ impl WorkerHandleRef {
 	}
 
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(Self, MessageEvent) -> F2,
+		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
@@ -168,7 +161,7 @@ impl WorkerHandleRef {
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
 			let message_handler = message_handler.insert(Closure::future(move |event| {
-				new_message_handler(handle.clone(), MessageEvent::new(event))
+				new_message_handler(&handle, MessageEvent::new(event))
 			}));
 
 			self.worker.set_onmessage(Some(message_handler));

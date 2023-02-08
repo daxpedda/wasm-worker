@@ -82,7 +82,7 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(WorkerHandleRef, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
 		self,
 		mut message_handler: F,
 	) -> Self {
@@ -96,14 +96,14 @@ impl WorkerBuilder<'_> {
 						Weak::clone(&message_handler_holder),
 					)
 				});
-				message_handler(handle.clone(), MessageEvent::new(event));
+				message_handler(handle, MessageEvent::new(event));
 			}
 		}));
 		self
 	}
 
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(WorkerHandleRef, MessageEvent) -> F2,
+		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		self,
@@ -119,7 +119,7 @@ impl WorkerBuilder<'_> {
 						Weak::clone(&message_handler_holder),
 					)
 				});
-				message_handler(handle.clone(), MessageEvent::new(event))
+				message_handler(handle, MessageEvent::new(event))
 			}
 		}));
 		self
