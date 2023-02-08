@@ -1,11 +1,7 @@
 use std::future::Future;
 use std::ops::Deref;
-use std::pin::Pin;
-use std::rc::{Rc, Weak};
-use std::task::{ready, Context, Poll};
 
 use js_sys::{Array, Function};
-use pin_project_lite::pin_project;
 use wasm_bindgen::closure::Closure as JsClosure;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, Worker};
@@ -13,36 +9,9 @@ use web_sys::{DedicatedWorkerGlobalScope, Worker};
 use crate::Message;
 
 #[derive(Debug)]
-pub struct OldMessageHandler(Option<Rc<()>>);
-
-impl OldMessageHandler {
-	#[allow(clippy::missing_const_for_fn)]
-	pub(super) fn new(closure: Option<Closure>) -> Self {
-		if let Some(Closure::Future { running, .. }) = closure {
-			if Rc::strong_count(&running) != 1 {
-				return Self(Some(running));
-			}
-		}
-		Self(None)
-	}
-
-	#[must_use]
-	pub fn is_running(&self) -> bool {
-		if let Some(running) = &self.0 {
-			Rc::strong_count(running) != 1
-		} else {
-			false
-		}
-	}
-}
-
-#[derive(Debug)]
 pub(super) enum Closure {
 	Classic(JsClosure<dyn FnMut(web_sys::MessageEvent)>),
-	Future {
-		running: Rc<()>,
-		closure: JsClosure<dyn FnMut(web_sys::MessageEvent) -> JsValue>,
-	},
+	Future(JsClosure<dyn FnMut(web_sys::MessageEvent) -> JsValue>),
 }
 
 impl Deref for Closure {
@@ -51,7 +20,7 @@ impl Deref for Closure {
 	fn deref(&self) -> &Self::Target {
 		match self {
 			Self::Classic(closure) => closure.as_ref(),
-			Self::Future { closure, .. } => closure.as_ref(),
+			Self::Future(closure) => closure.as_ref(),
 		}
 		.unchecked_ref()
 	}
@@ -65,40 +34,18 @@ impl Closure {
 	pub(super) fn future<F: 'static + Future<Output = ()>>(
 		mut closure: impl 'static + FnMut(web_sys::MessageEvent) -> F,
 	) -> Self {
-		let running = Rc::new(());
-
 		let closure = JsClosure::new({
-			let running = Rc::downgrade(&running);
 			move |event| {
-				wasm_bindgen_futures::future_to_promise(Abortable {
-					running: Weak::upgrade(&running).unwrap(),
-					future: closure(event),
+				let closure = closure(event);
+				wasm_bindgen_futures::future_to_promise(async move {
+					closure.await;
+					Ok(JsValue::UNDEFINED)
 				})
 				.into()
 			}
 		});
 
-		Self::Future { running, closure }
-	}
-}
-
-pin_project! {
-	struct Abortable<F> {
-		running: Rc<()>,
-		#[pin]
-		future: F,
-	}
-}
-
-impl<F: 'static + Future<Output = ()>> Future for Abortable<F> {
-	type Output = Result<JsValue, JsValue>;
-
-	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		if Rc::strong_count(&self.running) != 1 {
-			ready!(self.project().future.poll(cx));
-		}
-
-		Poll::Ready(Ok(JsValue::UNDEFINED))
+		Self::Future(closure)
 	}
 }
 

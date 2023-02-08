@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 
 use web_sys::Worker;
 
-use super::{Closure, OldMessageHandler, WorkerOrContext};
+use super::{Closure, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
@@ -48,54 +48,46 @@ impl WorkerHandle {
 	}
 
 	#[allow(clippy::must_use_candidate)]
-	pub fn clear_message_handler(&self) -> OldMessageHandler {
-		let old_message_handler = RefCell::borrow_mut(&self.message_handler).take();
+	pub fn clear_message_handler(&self) {
+		RefCell::borrow_mut(&self.message_handler).take();
 		self.worker.set_onmessage(None);
-
-		OldMessageHandler::new(old_message_handler)
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(WorkerHandleRef, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
-	) -> OldMessageHandler {
+	) {
 		let handle = WorkerHandleRef {
 			worker: self.worker.clone(),
 			message_handler: Rc::downgrade(&self.message_handler),
 		};
 
 		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
-		let old_message_handler = message_handler.take();
 		let message_handler = message_handler.insert(Closure::classic(move |event| {
-			new_message_handler(&handle, MessageEvent::new(event));
+			new_message_handler(handle.clone(), MessageEvent::new(event));
 		}));
 
 		self.worker.set_onmessage(Some(message_handler));
-
-		OldMessageHandler::new(old_message_handler)
 	}
 
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
+		F1: 'static + FnMut(WorkerHandleRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
 		mut new_message_handler: F1,
-	) -> OldMessageHandler {
+	) {
 		let handle = WorkerHandleRef {
 			worker: self.worker.clone(),
 			message_handler: Rc::downgrade(&self.message_handler),
 		};
 
 		let mut message_handler = RefCell::borrow_mut(&self.message_handler);
-		let old_message_handler = message_handler.take();
 		let message_handler = message_handler.insert(Closure::future(move |event| {
-			new_message_handler(&handle, MessageEvent::new(event))
+			new_message_handler(handle.clone(), MessageEvent::new(event))
 		}));
 
 		self.worker.set_onmessage(Some(message_handler));
-
-		OldMessageHandler::new(old_message_handler)
 	}
 
 	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
@@ -126,6 +118,13 @@ impl WorkerHandleRef {
 		&self.worker
 	}
 
+	pub(super) fn clone(&self) -> Self {
+		Self {
+			worker: self.worker.clone(),
+			message_handler: Weak::clone(&self.message_handler),
+		}
+	}
+
 	#[must_use]
 	pub fn has_message_handler(&self) -> bool {
 		Weak::upgrade(&self.message_handler).map_or(false, |message_handler| {
@@ -134,65 +133,45 @@ impl WorkerHandleRef {
 	}
 
 	#[allow(clippy::must_use_candidate)]
-	pub fn clear_message_handler(&self) -> OldMessageHandler {
+	pub fn clear_message_handler(&self) {
 		if let Some(messange_handler) = Weak::upgrade(&self.message_handler) {
-			let old_message_handler = messange_handler.take();
+			messange_handler.take();
 			self.worker.set_onmessage(None);
-
-			OldMessageHandler::new(old_message_handler)
-		} else {
-			OldMessageHandler::new(None)
 		}
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(Self, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
-	) -> OldMessageHandler {
+	) {
 		if let Some(message_handler) = Weak::upgrade(&self.message_handler) {
-			let handle = Self {
-				worker: self.worker.clone(),
-				message_handler: Weak::clone(&self.message_handler),
-			};
+			let handle = self.clone();
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
-			let old_message_handler = message_handler.take();
 			let message_handler = message_handler.insert(Closure::classic(move |event| {
-				new_message_handler(&handle, MessageEvent::new(event));
+				new_message_handler(handle.clone(), MessageEvent::new(event));
 			}));
 
 			self.worker.set_onmessage(Some(message_handler));
-
-			OldMessageHandler::new(old_message_handler)
-		} else {
-			OldMessageHandler::new(None)
 		}
 	}
 
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
+		F1: 'static + FnMut(Self, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
 		mut new_message_handler: F1,
-	) -> OldMessageHandler {
+	) {
 		if let Some(message_handler) = Weak::upgrade(&self.message_handler) {
-			let handle = Self {
-				worker: self.worker.clone(),
-				message_handler: Weak::clone(&self.message_handler),
-			};
+			let handle = self.clone();
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
-			let old_message_handler = message_handler.take();
 			let message_handler = message_handler.insert(Closure::future(move |event| {
-				new_message_handler(&handle, MessageEvent::new(event))
+				new_message_handler(handle.clone(), MessageEvent::new(event))
 			}));
 
 			self.worker.set_onmessage(Some(message_handler));
-
-			OldMessageHandler::new(old_message_handler)
-		} else {
-			OldMessageHandler::new(None)
 		}
 	}
 

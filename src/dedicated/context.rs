@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::{Closure, OldMessageHandler, WorkerOrContext};
+use super::{Closure, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -70,53 +70,44 @@ impl WorkerContext {
 	}
 
 	#[allow(clippy::must_use_candidate)]
-	pub fn clear_message_handler(&self) -> OldMessageHandler {
-		let old_message_handler =
-			Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());
+	pub fn clear_message_handler(&self) {
+		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());
 		self.0.set_onmessage(None);
-
-		OldMessageHandler::new(old_message_handler)
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(Self, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
-	) -> OldMessageHandler {
+	) {
 		Self::MESSAGE_HANDLER.with(|message_handler| {
 			let mut message_handler = message_handler.borrow_mut();
 
 			let context = self.clone();
-			let old_message_handler = message_handler.take();
 			let message_handler = message_handler.insert(Closure::classic(move |event| {
-				new_message_handler(&context, MessageEvent::new(event));
+				new_message_handler(context.clone(), MessageEvent::new(event));
 			}));
 
 			self.0.set_onmessage(Some(message_handler));
-
-			OldMessageHandler::new(old_message_handler)
-		})
+		});
 	}
 
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
+		F1: 'static + FnMut(Self, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
 		mut new_message_handler: F1,
-	) -> OldMessageHandler {
+	) {
 		Self::MESSAGE_HANDLER.with(|message_handler| {
 			let mut message_handler = message_handler.borrow_mut();
 
 			let context = self.clone();
-			let old_message_handler = message_handler.take();
 			let message_handler = message_handler.insert(Closure::future(move |event| {
-				new_message_handler(&context, MessageEvent::new(event))
+				new_message_handler(context.clone(), MessageEvent::new(event))
 			}));
 
 			self.0.set_onmessage(Some(message_handler));
-
-			OldMessageHandler::new(old_message_handler)
-		})
+		});
 	}
 
 	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
