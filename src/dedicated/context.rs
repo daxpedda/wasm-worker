@@ -114,13 +114,7 @@ impl WorkerContext {
 		WorkerOrContext::Context(&self.0).transfer_messages(messages);
 	}
 
-	pub fn terminate(self) -> ! {
-		__wasm_worker_close();
-		unreachable!("continued after terminating");
+	pub fn close(self) {
+		self.0.close();
 	}
-}
-
-#[wasm_bindgen]
-extern "C" {
-	fn __wasm_worker_close();
 }
