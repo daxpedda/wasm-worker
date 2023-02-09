@@ -27,7 +27,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 	let flag_worker_received = Flag::new();
 
 	let worker = WorkerBuilder::new()?
-		.set_message_handler({
+		.message_handler({
 			let flag_received = flag_spawner_received.clone();
 			move |_, _| flag_received.signal()
 		})
@@ -74,7 +74,7 @@ async fn clear_message_handler() -> Result<(), JsValue> {
 #[wasm_bindgen_test]
 fn has_message_handler() -> Result<(), JsValue> {
 	let worker = WorkerBuilder::new()?
-		.set_message_handler(|_, _| ())
+		.message_handler(|_, _| ())
 		.spawn(|_| Close::Yes);
 	assert!(worker.has_message_handler());
 	worker.clear_message_handler();
@@ -98,7 +98,7 @@ async fn multi_messages() -> Result<(), JsValue> {
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()?
-		.set_message_handler(move |context, event| {
+		.message_handler(move |context, event| {
 			let messages: Vec<ArrayBuffer> = event
 				.messages()
 				.map(|message| message.serialize_as().unwrap())

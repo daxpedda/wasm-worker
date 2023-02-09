@@ -36,7 +36,7 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 	let flag_finish = Flag::new();
 
 	let worker = WorkerBuilder::new()?
-		.set_message_handler({
+		.message_handler({
 			let flag_finish = flag_finish.clone();
 			move |_, event| {
 				let value: T = event.messages().next().unwrap().serialize_as().unwrap();

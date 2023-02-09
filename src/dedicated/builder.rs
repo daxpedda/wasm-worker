@@ -82,18 +82,18 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
+	pub fn message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
 		self,
 		mut message_handler: F,
 	) -> Self {
-		let message_handler_holder = Rc::downgrade(&self.message_handler);
+		let message_handler_handle = Rc::downgrade(&self.message_handler);
 		RefCell::borrow_mut(&self.message_handler).replace(Closure::classic({
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
 					WorkerHandleRef::new(
 						event.target().unwrap().unchecked_into(),
-						Weak::clone(&message_handler_holder),
+						Weak::clone(&message_handler_handle),
 					)
 				});
 				message_handler(handle, MessageEvent::new(event));
@@ -102,21 +102,21 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn set_message_handler_async<
+	pub fn message_handler_async<
 		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		self,
 		mut message_handler: F1,
 	) -> Self {
-		let message_handler_holder = Rc::downgrade(&self.message_handler);
+		let message_handler_handle = Rc::downgrade(&self.message_handler);
 		RefCell::borrow_mut(&self.message_handler).replace(Closure::future({
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
 					WorkerHandleRef::new(
 						event.target().unwrap().unchecked_into(),
-						Weak::clone(&message_handler_holder),
+						Weak::clone(&message_handler_handle),
 					)
 				});
 				message_handler(handle, MessageEvent::new(event))
