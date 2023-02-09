@@ -14,6 +14,10 @@ use self::util::Flag;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
+/// Tests transfering `T`.
+///
+/// If `force` is `true` the test will fail if the type is not supported,
+/// otherwise the test will be skipped.
 async fn test_transfer<T: JsCast + Into<Message>>(
 	support: impl FnOnce() -> bool,
 	force: bool,
@@ -30,22 +34,22 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 
 	let value = init();
 
-	let flag_start = Flag::new();
-	let flag_finish = Flag::new();
+	let request = Flag::new();
+	let response = Flag::new();
 
 	let worker = WorkerBuilder::new()?
 		.message_handler({
-			let flag_finish = flag_finish.clone();
+			let response = response.clone();
 			move |_, event| {
 				let value: T = event.messages().next().unwrap().serialize_as().unwrap();
 
 				assert(&value);
 
-				flag_finish.signal();
+				response.signal();
 			}
 		})
 		.spawn({
-			let flag_start = flag_start.clone();
+			let request = request.clone();
 			move |context| {
 				context.set_message_handler(move |context, event| {
 					let value: T = event.messages().next().unwrap().serialize_as().unwrap();
@@ -55,15 +59,15 @@ async fn test_transfer<T: JsCast + Into<Message>>(
 					context.transfer_messages([value]);
 				});
 
-				flag_start.signal();
+				request.signal();
 
 				Close::No
 			}
 		});
 
-	flag_start.await;
+	request.await;
 	worker.transfer_messages([value]);
-	flag_finish.await;
+	response.await;
 
 	worker.terminate();
 
