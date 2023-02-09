@@ -13,12 +13,27 @@ use self::util::Flag;
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
-async fn basic() {
+async fn spawn() {
 	let flag = Flag::new();
 
 	wasm_worker::spawn({
 		let flag = flag.clone();
 		move |_| {
+			flag.signal();
+			Close::Yes
+		}
+	});
+
+	flag.await;
+}
+
+#[wasm_bindgen_test]
+async fn spawn_async() {
+	let flag = Flag::new();
+
+	wasm_worker::spawn_async({
+		let flag = flag.clone();
+		|_| async move {
 			flag.signal();
 			Close::Yes
 		}
@@ -125,6 +140,8 @@ async fn non_closing() {
 			Close::No
 		}
 	});
+
+	util::sleep(Duration::from_millis(250));
 
 	signal_flag.signal();
 	response_flag.await;
