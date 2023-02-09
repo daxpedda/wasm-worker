@@ -5,13 +5,13 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
 #[should_panic(expected = "ModuleSupportError")]
-fn fail() {
+fn spawn() {
 	wasm_worker::spawn(|_| unreachable!());
 }
 
 #[wasm_bindgen_test]
 #[should_panic(expected = "ModuleSupportError")]
-fn fail_async() {
+fn spawn_async() {
 	wasm_worker::spawn_async(|_| async { unreachable!() });
 }
 

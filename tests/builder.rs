@@ -11,12 +11,29 @@ use self::util::Flag;
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[wasm_bindgen_test]
-async fn basic() -> Result<(), JsValue> {
+async fn spawn() -> Result<(), JsValue> {
 	let flag = Flag::new();
 
 	WorkerBuilder::new()?.spawn({
 		let flag = flag.clone();
 		move |_| {
+			flag.signal();
+			Close::Yes
+		}
+	});
+
+	flag.await;
+
+	Ok(())
+}
+
+#[wasm_bindgen_test]
+async fn spawn_async() -> Result<(), JsValue> {
+	let flag = Flag::new();
+
+	WorkerBuilder::new()?.spawn_async({
+		let flag = flag.clone();
+		|_| async move {
 			flag.signal();
 			Close::Yes
 		}
