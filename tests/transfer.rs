@@ -1,5 +1,3 @@
-#![allow(unreachable_pub)]
-
 mod util;
 
 use js_sys::{ArrayBuffer, Uint8Array};

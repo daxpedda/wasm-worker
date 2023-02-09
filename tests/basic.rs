@@ -1,5 +1,3 @@
-#![allow(unreachable_pub)]
-
 mod util;
 
 use std::time::Duration;

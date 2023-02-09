@@ -1,4 +1,4 @@
-#![allow(dead_code)]
+#![allow(dead_code, unreachable_pub)]
 
 use std::future::Future;
 use std::pin::Pin;
