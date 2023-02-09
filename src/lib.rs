@@ -15,7 +15,6 @@
 
 mod dedicated;
 mod message;
-mod worklet;
 
 pub use self::dedicated::{
 	spawn, spawn_async, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder,
