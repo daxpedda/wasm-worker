@@ -43,16 +43,16 @@ pub fn sleep(duration: Duration) -> Sleep {
 		static GLOBAL: Global = {
 			#[wasm_bindgen]
 			extern "C" {
-				type JsGlobal;
+				type SleepGlobal;
 
 				#[wasm_bindgen(method, getter, js_name = Window)]
-				fn window(this: &JsGlobal) -> JsValue;
+				fn window(this: &SleepGlobal) -> JsValue;
 
 				#[wasm_bindgen(method, getter, js_name = DedicatedWorkerGlobalScope)]
-				fn worker(this: &JsGlobal) -> JsValue;
+				fn worker(this: &SleepGlobal) -> JsValue;
 			}
 
-			let global: JsGlobal = js_sys::global().unchecked_into();
+			let global: SleepGlobal = js_sys::global().unchecked_into();
 
 			if !global.window().is_undefined() {
 				Global::Window(global.unchecked_into())
