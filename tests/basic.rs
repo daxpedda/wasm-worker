@@ -10,6 +10,7 @@ use self::util::Flag;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
+/// [`wasm_worker::spawn()`].
 #[wasm_bindgen_test]
 async fn spawn() {
 	let flag = Flag::new();
@@ -25,6 +26,7 @@ async fn spawn() {
 	flag.await;
 }
 
+/// [`wasm_worker::spawn_async()`].
 #[wasm_bindgen_test]
 async fn spawn_async() {
 	let flag = Flag::new();
@@ -40,164 +42,210 @@ async fn spawn_async() {
 	flag.await;
 }
 
+/// Nested workers.
 #[wasm_bindgen_test]
 async fn nested() {
-	let inner_flag = Flag::new();
+	let inner = Flag::new();
 
 	wasm_worker::spawn_async({
-		let outer_flag = inner_flag.clone();
+		let outer = inner.clone();
 		|_| async move {
-			let inner_flag = Flag::new();
+			let inner = Flag::new();
 
 			wasm_worker::spawn({
-				let outer_flag = inner_flag.clone();
+				let outer = inner.clone();
 				move |_| {
-					outer_flag.signal();
+					outer.signal();
 					Close::Yes
 				}
 			});
 
-			inner_flag.await;
+			inner.await;
 
 			// Wait for nested worker to close.
 			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
 			util::sleep(Duration::from_millis(250)).await;
 
-			outer_flag.signal();
+			outer.signal();
 
 			Close::Yes
 		}
 	});
 
-	inner_flag.await;
+	inner.await;
 }
 
+/// Nested workers in nested workers.
 #[wasm_bindgen_test]
 async fn nested_nested() {
-	let inner_flag = Flag::new();
+	let inner = Flag::new();
 
 	wasm_worker::spawn_async({
-		let outer_flag = inner_flag.clone();
+		let outer = inner.clone();
 		|_| async move {
-			let inner_flag = Flag::new();
+			let inner = Flag::new();
 
 			wasm_worker::spawn_async({
-				let outer_flag = inner_flag.clone();
+				let outer = inner.clone();
 				|_| async move {
-					let inner_flag = Flag::new();
+					let inner = Flag::new();
 
 					wasm_worker::spawn({
-						let outer_flag = inner_flag.clone();
+						let outer = inner.clone();
 						move |_| {
-							outer_flag.signal();
+							outer.signal();
 							Close::Yes
 						}
 					});
 
-					inner_flag.await;
+					inner.await;
 
 					// Wait for nested worker to close.
 					// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
 					util::sleep(Duration::from_millis(250)).await;
 
-					outer_flag.signal();
+					outer.signal();
 
 					Close::Yes
 				}
 			});
 
-			inner_flag.await;
+			inner.await;
 
 			// Wait for nested worker to close.
 			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
 			util::sleep(Duration::from_millis(250)).await;
 
-			outer_flag.signal();
+			outer.signal();
 
 			Close::Yes
 		}
 	});
 
-	inner_flag.await;
+	inner.await;
 }
 
+/// Returning [`Close::Yes`].
 #[wasm_bindgen_test]
 async fn closing() {
-	let signal_flag = Flag::new();
-	let response_flag = Flag::new();
+	let request = Flag::new();
+	let response = Flag::new();
 
 	wasm_worker::spawn({
-		let signal_flag = signal_flag.clone();
-		let response_flag = response_flag.clone();
+		let request = request.clone();
+		let response = response.clone();
 
 		move |_| {
 			wasm_bindgen_futures::spawn_local(async move {
-				signal_flag.await;
-				response_flag.signal();
+				request.await;
+				response.signal();
 			});
 
 			Close::Yes
 		}
 	});
 
+	// Wait for the worker to close.
 	util::sleep(Duration::from_millis(250)).await;
 
-	signal_flag.signal();
+	request.signal();
 
-	let result = future::select(response_flag, util::sleep(Duration::from_millis(250))).await;
+	// The worker will never respond back if it was closed.
+	let result = future::select(response, util::sleep(Duration::from_millis(250))).await;
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
+/// Returning [`Close::No`].
 #[wasm_bindgen_test]
 async fn non_closing() {
-	let signal_flag = Flag::new();
-	let response_flag = Flag::new();
+	let request = Flag::new();
+	let response = Flag::new();
 
 	let worker = wasm_worker::spawn_async({
-		let signal_flag = signal_flag.clone();
-		let response_flag = response_flag.clone();
+		let request = request.clone();
+		let response = response.clone();
 
 		|_| async {
 			wasm_bindgen_futures::spawn_local(async move {
-				signal_flag.await;
-				response_flag.signal();
+				request.await;
+				response.signal();
 			});
 
 			Close::No
 		}
 	});
 
+	// Wait for the worker to potentially close.
 	util::sleep(Duration::from_millis(250));
 
-	signal_flag.signal();
-	response_flag.await;
+	request.signal();
+	response.await;
+
 	worker.terminate();
 }
 
+/// [`WorkerHandle::terminate()`](wasm_worker::WorkerHandle::terminate).
 #[wasm_bindgen_test]
 async fn terminate() {
-	let signal_flag = Flag::new();
-	let response_flag = Flag::new();
+	let request = Flag::new();
+	let response = Flag::new();
 
 	let worker = wasm_worker::spawn_async({
-		let signal_flag = signal_flag.clone();
-		let response_flag = response_flag.clone();
+		let request = request.clone();
+		let response = response.clone();
 
 		|_| async move {
-			signal_flag.await;
-			response_flag.signal();
+			// Worker will be terminated before the request signal is sent.
+			request.await;
+			response.signal();
 
 			Close::Yes
 		}
 	});
 
 	worker.terminate();
-	signal_flag.signal();
+	request.signal();
 
-	let result = future::select(response_flag, util::sleep(Duration::from_millis(250))).await;
+	// The worker will never respond if terminated.
+	let result = future::select(response, util::sleep(Duration::from_millis(250))).await;
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
+/// [`WorkerContext::close()`].
+#[wasm_bindgen_test]
+async fn close() {
+	let request = Flag::new();
+	let response = Flag::new();
+
+	wasm_worker::spawn_async({
+		let request = request.clone();
+		let response = response.clone();
+
+		|context| async move {
+			wasm_bindgen_futures::spawn_local(async move {
+				request.await;
+				response.signal();
+			});
+
+			context.close();
+
+			Close::No
+		}
+	});
+
+	// Wait for the worker to potentially stay alive.
+	// This delay is intentionally big because `close()` can unfortunately take very
+	// long.
+	util::sleep(Duration::from_millis(1000)).await;
+
+	request.signal();
+
+	// The worker will never respond if terminated.
+	let result = future::select(response, util::sleep(Duration::from_millis(250))).await;
+	assert!(matches!(result, Either::Right(((), _))));
+}
+
+/// [`WorkerContext::new()`].
 #[wasm_bindgen_test]
 async fn context() {
 	let flag = Flag::new();
@@ -206,6 +254,7 @@ async fn context() {
 		let flag = flag.clone();
 		|_| async move {
 			WorkerContext::new().unwrap();
+			// Flag will never signal if `WorkerContext::new` panics.
 			flag.signal();
 
 			Close::Yes
@@ -215,11 +264,13 @@ async fn context() {
 	flag.await;
 }
 
+/// [`WorkerContext::new()`] fails outside worker.
 #[wasm_bindgen_test]
 fn context_fail() {
 	assert!(WorkerContext::new().is_none());
 }
 
+/// [`WorkerContext::name()`].
 #[wasm_bindgen_test]
 async fn name() {
 	let flag = Flag::new();
@@ -228,6 +279,7 @@ async fn name() {
 		let flag = flag.clone();
 		|context| async move {
 			assert!(context.name().is_none());
+			// Flag will never signal if `assert!` panics.
 			flag.signal();
 
 			Close::Yes
