@@ -1,12 +1,10 @@
 mod util;
 
-use std::time::Duration;
-
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, WorkerContext};
 
-use self::util::Flag;
+use self::util::{Flag, CLOSE_DURATION, SIGNAL_DURATION};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
@@ -64,7 +62,7 @@ async fn nested() {
 
 			// Wait for nested worker to close.
 			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-			util::sleep(Duration::from_millis(250)).await;
+			util::sleep(SIGNAL_DURATION).await;
 
 			outer.signal();
 
@@ -102,7 +100,7 @@ async fn nested_nested() {
 
 					// Wait for nested worker to close.
 					// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-					util::sleep(Duration::from_millis(250)).await;
+					util::sleep(SIGNAL_DURATION).await;
 
 					outer.signal();
 
@@ -114,7 +112,7 @@ async fn nested_nested() {
 
 			// Wait for nested worker to close.
 			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-			util::sleep(Duration::from_millis(250)).await;
+			util::sleep(SIGNAL_DURATION).await;
 
 			outer.signal();
 
@@ -146,12 +144,12 @@ async fn closing() {
 	});
 
 	// Wait for the worker to close.
-	util::sleep(Duration::from_millis(250)).await;
+	util::sleep(SIGNAL_DURATION).await;
 
 	request.signal();
 
 	// The worker will never respond back if it was closed.
-	let result = future::select(response, util::sleep(Duration::from_millis(250))).await;
+	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
@@ -176,7 +174,7 @@ async fn non_closing() {
 	});
 
 	// Wait for the worker to potentially close.
-	util::sleep(Duration::from_millis(250));
+	util::sleep(SIGNAL_DURATION);
 
 	request.signal();
 	response.await;
@@ -207,7 +205,7 @@ async fn terminate() {
 	request.signal();
 
 	// The worker will never respond if terminated.
-	let result = future::select(response, util::sleep(Duration::from_millis(250))).await;
+	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
@@ -236,12 +234,12 @@ async fn close() {
 	// Wait for the worker to potentially stay alive.
 	// This delay is intentionally big because `close()` can unfortunately take very
 	// long.
-	util::sleep(Duration::from_millis(1000)).await;
+	util::sleep(CLOSE_DURATION).await;
 
 	request.signal();
 
 	// The worker will never respond if terminated.
-	let result = future::select(response, util::sleep(Duration::from_millis(250))).await;
+	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
