@@ -1,7 +1,16 @@
+use wasm_bindgen::ShimFormat;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{ModuleSupportError, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+
+#[wasm_bindgen_test]
+fn assert_target() {
+	assert!(matches!(
+		wasm_bindgen::shim_format(),
+		Some(ShimFormat::EsModule)
+	));
+}
 
 #[wasm_bindgen_test]
 #[should_panic(expected = "ModuleSupportError")]
