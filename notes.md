@@ -11,3 +11,4 @@
 `GECKODRIVER=geckodriver WASM_BINDGEN_USE_NO_MODULE=1 cargo test`
 `GECKODRIVER=geckodriver cargo test --test no_module_support`
 `NO_HEADLESS=1 WASM_BINDGEN_USE_NO_MODULE=1 cargo test`
+`NO_HEADLESS=1 cargo test --test no_module_support`
