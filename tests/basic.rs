@@ -124,6 +124,32 @@ async fn nested_nested() {
 }
 
 #[wasm_bindgen_test]
+async fn closing() {
+	let signal_flag = Flag::new();
+	let response_flag = Flag::new();
+
+	wasm_worker::spawn({
+		let signal_flag = signal_flag.clone();
+		let response_flag = response_flag.clone();
+		move |_| {
+			wasm_bindgen_futures::spawn_local(async move {
+				signal_flag.await;
+				response_flag.signal();
+			});
+
+			Close::Yes
+		}
+	});
+
+	util::sleep(Duration::from_millis(250)).await;
+
+	signal_flag.signal();
+
+	let result = future::select(response_flag, util::sleep(Duration::from_millis(250))).await;
+	assert!(matches!(result, Either::Right(((), _))));
+}
+
+#[wasm_bindgen_test]
 async fn non_closing() {
 	let signal_flag = Flag::new();
 	let response_flag = Flag::new();
