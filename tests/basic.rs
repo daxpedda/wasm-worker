@@ -131,6 +131,7 @@ async fn closing() {
 	wasm_worker::spawn({
 		let signal_flag = signal_flag.clone();
 		let response_flag = response_flag.clone();
+
 		move |_| {
 			wasm_bindgen_futures::spawn_local(async move {
 				signal_flag.await;
@@ -157,6 +158,7 @@ async fn non_closing() {
 	let worker = wasm_worker::spawn_async({
 		let signal_flag = signal_flag.clone();
 		let response_flag = response_flag.clone();
+
 		|_| async {
 			wasm_bindgen_futures::spawn_local(async move {
 				signal_flag.await;
@@ -182,6 +184,7 @@ async fn terminate() {
 	let worker = wasm_worker::spawn_async({
 		let signal_flag = signal_flag.clone();
 		let response_flag = response_flag.clone();
+
 		|_| async move {
 			signal_flag.await;
 			response_flag.signal();

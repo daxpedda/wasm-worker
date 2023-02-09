@@ -80,8 +80,8 @@ async fn name() -> Result<(), JsValue> {
 		let flag = flag.clone();
 		move |context| {
 			assert_eq!(context.name(), Some(String::from("test")));
-
 			flag.signal();
+
 			Close::Yes
 		}
 	});
