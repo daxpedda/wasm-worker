@@ -8,6 +8,7 @@ use self::util::Flag;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
+/// [`WorkerBuilder::spawn()`].
 #[wasm_bindgen_test]
 async fn spawn() -> Result<(), JsValue> {
 	let flag = Flag::new();
@@ -25,6 +26,7 @@ async fn spawn() -> Result<(), JsValue> {
 	Ok(())
 }
 
+/// [`WorkerBuilder::spawn_async()`].
 #[wasm_bindgen_test]
 async fn spawn_async() -> Result<(), JsValue> {
 	let flag = Flag::new();
@@ -42,10 +44,13 @@ async fn spawn_async() -> Result<(), JsValue> {
 	Ok(())
 }
 
+/// [`WorkerBuilder::new_with_url()`].
 #[wasm_bindgen_test]
 async fn url() -> Result<(), JsValue> {
 	let flag = Flag::new();
 
+	// Ideally we would built a custom JS that can receive an atomic.
+	// Instead we will just use the regular `WorkerUrl` but build it ourselves.
 	let url = WorkerUrl::new(
 		&wasm_bindgen::shim_url().unwrap(),
 		match &wasm_bindgen::shim_format().unwrap() {
@@ -70,6 +75,7 @@ async fn url() -> Result<(), JsValue> {
 	Ok(())
 }
 
+/// [`WorkerBuilder::name()`].
 #[wasm_bindgen_test]
 async fn name() -> Result<(), JsValue> {
 	let flag = Flag::new();
@@ -78,6 +84,7 @@ async fn name() -> Result<(), JsValue> {
 		let flag = flag.clone();
 		move |context| {
 			assert_eq!(context.name(), Some(String::from("test")));
+			// Flag will never signal if `assert!` panics.
 			flag.signal();
 
 			Close::Yes
