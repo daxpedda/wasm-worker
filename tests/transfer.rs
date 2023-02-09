@@ -1,3 +1,6 @@
+//! Test each transferable type to be sent and received successfully. This is
+//! important to assert that the support methods of [`Message`] are correct.
+
 mod util;
 
 use std::future::Future;
@@ -89,6 +92,7 @@ async fn test_transfer<T: Clone + Into<Message> + JsCast>(
 	Ok(())
 }
 
+/// [`ArrayBuffer`].
 #[wasm_bindgen_test]
 async fn array_buffer() -> Result<(), JsValue> {
 	test_transfer(
@@ -109,6 +113,7 @@ async fn array_buffer() -> Result<(), JsValue> {
 	.await
 }
 
+/// [`AudioData`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
 async fn audio_data() -> Result<(), JsValue> {
@@ -135,6 +140,7 @@ async fn audio_data() -> Result<(), JsValue> {
 	.await
 }
 
+/// [`ImageBitmap`].
 #[wasm_bindgen_test]
 async fn image_bitmap() -> Result<(), JsValue> {
 	test_transfer(
