@@ -20,13 +20,26 @@ use web_sys::{DedicatedWorkerGlobalScope, Window};
 pub const SIGNAL_DURATION: Duration = Duration::from_millis(250);
 pub const CLOSE_DURATION: Duration = Duration::from_millis(1000);
 
-enum Global {
-	Window(Window),
-	DedicatedWorker(DedicatedWorkerGlobalScope),
+pub struct Sleep(JsFuture);
+
+impl Future for Sleep {
+	type Output = ();
+
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		ready!(self.0.poll_unpin(cx)).unwrap();
+		Poll::Ready(())
+	}
 }
 
-fn global_with<F: FnOnce(&Global) -> R, R>(f: F) -> R {
+/// Sleeps for the given [`Duration`].
+pub fn sleep(duration: Duration) -> Sleep {
+	enum Global {
+		Window(Window),
+		DedicatedWorker(DedicatedWorkerGlobalScope),
+	}
+
 	thread_local! {
+		/// Cached [`Global`].
 		static GLOBAL: Global = {
 			#[wasm_bindgen]
 			extern "C" {
@@ -46,50 +59,36 @@ fn global_with<F: FnOnce(&Global) -> R, R>(f: F) -> R {
 			} else if !global.worker().is_undefined() {
 				Global::DedicatedWorker(global.unchecked_into())
 			} else {
-				panic!("only supported in a browser or web worker")
+				unreachable!("only supported in a browser or web worker")
 			}
 		}
 	}
 
-	GLOBAL.with(f)
-}
+	let future =
+		JsFuture::from(Promise::new(&mut |resolve, _| {
+			let duration = duration.as_millis().try_into().unwrap();
 
-pub struct Sleep(JsFuture);
-
-impl Future for Sleep {
-	type Output = ();
-
-	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		ready!(self.0.poll_unpin(cx)).unwrap();
-		Poll::Ready(())
-	}
-}
-
-pub fn sleep(duration: Duration) -> Sleep {
-	let future = JsFuture::from(Promise::new(&mut |resolve, _| {
-		let duration = duration.as_millis().try_into().unwrap();
-
-		global_with(|global| match global {
-			Global::Window(window) => {
-				window.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, duration)
-			}
-			Global::DedicatedWorker(worker) => {
-				worker.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, duration)
-			}
-		})
-		.unwrap();
-	}));
+			GLOBAL
+				.with(|global| match global {
+					Global::Window(window) => window
+						.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, duration),
+					Global::DedicatedWorker(worker) => worker
+						.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, duration),
+				})
+				.unwrap();
+		}));
 
 	Sleep(future)
 }
+
+/// Can be awaited to wake up thread when signaled.
+#[derive(Clone)]
+pub struct Flag(Arc<Inner>);
 
 struct Inner {
 	waker: AtomicWaker,
 	set: AtomicBool,
 }
-
-#[derive(Clone)]
-pub struct Flag(Arc<Inner>);
 
 impl Flag {
 	pub fn new() -> Self {
@@ -99,6 +98,10 @@ impl Flag {
 		}))
 	}
 
+	/// Will wake up any thread waiting on this [`Flag`].
+	///
+	/// This is permanent and any thread awaiting this [`Flag`] will wake up
+	/// immediately.
 	pub fn signal(&self) {
 		self.0.set.store(true, Ordering::Relaxed);
 		self.0.waker.wake();
@@ -109,6 +112,7 @@ impl Future for Flag {
 	type Output = ();
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<()> {
+		// Short-circuit.
 		if self.0.set.load(Ordering::Relaxed) {
 			return Poll::Ready(());
 		}
