@@ -192,7 +192,7 @@ impl Close {
 	unreachable_pub
 )]
 pub enum Task {
-	Classic(Box<dyn 'static + FnMut(WorkerContext) -> Close>),
+	Classic(Box<dyn 'static + FnMut(WorkerContext) -> Close + Send>),
 	Future(
 		Box<
 			dyn 'static
