@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::Close;
+use wasm_worker::{Close, WorkerContext};
 
 use self::util::Flag;
 
@@ -198,4 +198,43 @@ async fn terminate() {
 
 	let result = future::select(response_flag, util::sleep(Duration::from_millis(250))).await;
 	assert!(matches!(result, Either::Right(((), _))));
+}
+
+#[wasm_bindgen_test]
+async fn context() {
+	let flag = Flag::new();
+
+	wasm_worker::spawn_async({
+		let flag = flag.clone();
+		|_| async move {
+			WorkerContext::new().unwrap();
+			flag.signal();
+
+			Close::Yes
+		}
+	});
+
+	flag.await;
+}
+
+#[wasm_bindgen_test]
+fn context_fail() {
+	assert!(WorkerContext::new().is_none());
+}
+
+#[wasm_bindgen_test]
+async fn name() {
+	let flag = Flag::new();
+
+	wasm_worker::spawn_async({
+		let flag = flag.clone();
+		|context| async move {
+			assert!(context.name().is_none());
+			flag.signal();
+
+			Close::Yes
+		}
+	});
+
+	flag.await;
 }
