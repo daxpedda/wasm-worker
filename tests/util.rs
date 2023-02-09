@@ -1,3 +1,5 @@
+//! Utility functions for tests.
+
 #![allow(dead_code, unreachable_pub)]
 
 use std::future::Future;

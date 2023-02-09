@@ -1,3 +1,5 @@
+//! Tests functionality around [`WorkerBuilder`].
+
 mod util;
 
 use wasm_bindgen::{JsValue, ShimFormat};

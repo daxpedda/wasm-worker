@@ -1,3 +1,5 @@
+//! Tests basic functionality.
+
 mod util;
 
 use futures_util::future::{self, Either};

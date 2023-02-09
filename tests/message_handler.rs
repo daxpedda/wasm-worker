@@ -1,3 +1,7 @@
+//! Tests functionality around setting and clearing message handlers in
+//! [`WorkerBuilder`], [`WorkerHandle`](wasm_worker::WorkerHandle) and
+//! [`WorkerContext`](wasm_worker::WorkerContext).
+
 mod util;
 
 use futures_util::future::{self, Either};
