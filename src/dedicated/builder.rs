@@ -127,7 +127,7 @@ impl WorkerBuilder<'_> {
 
 	pub fn spawn<F>(self, f: F) -> WorkerHandle
 	where
-		F: 'static + FnMut(WorkerContext) -> Close + Send,
+		F: 'static + FnOnce(WorkerContext) -> Close + Send,
 	{
 		self.spawn_internal(Task::Classic(Box::new(f)))
 	}
@@ -192,7 +192,7 @@ impl Close {
 	unreachable_pub
 )]
 pub enum Task {
-	Classic(Box<dyn 'static + FnMut(WorkerContext) -> Close + Send>),
+	Classic(Box<dyn 'static + FnOnce(WorkerContext) -> Close + Send>),
 	Future(
 		Box<
 			dyn 'static
@@ -217,7 +217,7 @@ pub fn __wasm_worker_entry(task: *mut Task) -> JsValue {
 	// SAFETY: The argument is an address that has to be a valid pointer to a
 	// `Task`.
 	match *unsafe { Box::from_raw(task) } {
-		Task::Classic(mut classic) => classic(context).to_bool().into(),
+		Task::Classic(classic) => classic(context).to_bool().into(),
 		Task::Future(future) => wasm_bindgen_futures::future_to_promise(future(context)).into(),
 	}
 }

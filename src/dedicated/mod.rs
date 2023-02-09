@@ -16,7 +16,7 @@ pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 
 pub fn spawn<F>(f: F) -> WorkerHandle
 where
-	F: 'static + FnMut(WorkerContext) -> Close + Send,
+	F: 'static + FnOnce(WorkerContext) -> Close + Send,
 {
 	WorkerBuilder::new().unwrap().spawn(f)
 }
