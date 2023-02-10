@@ -54,6 +54,7 @@ test = false
 # https://github.com/rustwasm/wasm-bindgen/pull/3252
 # https://github.com/rustwasm/wasm-bindgen/pull/3279 (merged)
 # https://github.com/rustwasm/wasm-bindgen/pull/3293
+# https://github.com/rustwasm/wasm-bindgen/pull/3293
 js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
