@@ -16,26 +16,20 @@ enum Inner {
 
 impl HasSupportFuture {
 	pub(super) fn new(message: &Message) -> Self {
-		match message {
-			Message::ArrayBuffer(_) => {
-				Self(Some(Inner::Ready(Message::has_array_buffer_support())))
-			}
+		Self(Some(match message {
+			Message::ArrayBuffer(_) => Inner::Ready(Message::has_array_buffer_support()),
 			#[cfg(web_sys_unstable_apis)]
-			Message::AudioData(_) => Self(Some(Inner::Ready(Message::has_audio_data_support()))),
-			Message::ImageBitmap(_) => Self(Some(Inner::ImageBitmap(
-				Message::has_image_bitmap_support(),
-			))),
-			Message::MessagePort(_) => Self(Some(Inner::Ready(Err(SupportError::Undetermined)))),
-			Message::OffscreenCanvas(_) => {
-				Self(Some(Inner::Ready(Message::has_offscreen_canvas_support())))
-			}
+			Message::AudioData(_) => Inner::Ready(Message::has_audio_data_support()),
+			Message::ImageBitmap(_) => Inner::ImageBitmap(Message::has_image_bitmap_support()),
+			Message::MessagePort(_) => Inner::Ready(Err(SupportError::Undetermined)),
+			Message::OffscreenCanvas(_) => Inner::Ready(Message::has_offscreen_canvas_support()),
 			Message::ReadableStream(_) => todo!(),
 			Message::RtcDataChannel(_) => todo!(),
 			Message::TransformStream(_) => todo!(),
 			#[cfg(web_sys_unstable_apis)]
 			Message::VideoFrame(_) => todo!(),
 			Message::WritableStream(_) => todo!(),
-		}
+		}))
 	}
 
 	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
