@@ -1,17 +1,19 @@
+mod array_buffer;
+#[cfg(web_sys_unstable_apis)]
+mod audio_data;
+mod conversion;
 mod image_bitmap;
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 
-use js_sys::{Array, ArrayBuffer, Object};
-use once_cell::sync::Lazy;
-use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use js_sys::{ArrayBuffer, Object};
+use wasm_bindgen::{JsCast, JsValue};
 #[cfg(web_sys_unstable_apis)]
-use web_sys::{AudioData, AudioDataInit, AudioSampleFormat, VideoFrame};
+use web_sys::{AudioData, VideoFrame};
 use web_sys::{
 	ImageBitmap, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel, TransformStream,
-	Worker, WritableStream,
+	WritableStream,
 };
 
 pub use self::image_bitmap::ImageBitmapSupportFuture;
@@ -30,180 +32,6 @@ pub enum Message {
 	#[cfg(web_sys_unstable_apis)]
 	VideoFrame(VideoFrame),
 	WritableStream(WritableStream),
-}
-
-impl From<ArrayBuffer> for Message {
-	fn from(value: ArrayBuffer) -> Self {
-		Self::ArrayBuffer(value)
-	}
-}
-
-impl TryFrom<Message> for ArrayBuffer {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::ArrayBuffer(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-#[cfg(web_sys_unstable_apis)]
-impl From<AudioData> for Message {
-	fn from(value: AudioData) -> Self {
-		Self::AudioData(value)
-	}
-}
-
-#[cfg(web_sys_unstable_apis)]
-impl TryFrom<Message> for AudioData {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::AudioData(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-impl From<ImageBitmap> for Message {
-	fn from(value: ImageBitmap) -> Self {
-		Self::ImageBitmap(value)
-	}
-}
-
-impl TryFrom<Message> for ImageBitmap {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::ImageBitmap(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-impl From<MessagePort> for Message {
-	fn from(value: MessagePort) -> Self {
-		Self::MessagePort(value)
-	}
-}
-
-impl TryFrom<Message> for MessagePort {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::MessagePort(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-impl From<OffscreenCanvas> for Message {
-	fn from(value: OffscreenCanvas) -> Self {
-		Self::OffscreenCanvas(value)
-	}
-}
-
-impl TryFrom<Message> for OffscreenCanvas {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::OffscreenCanvas(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-impl From<ReadableStream> for Message {
-	fn from(value: ReadableStream) -> Self {
-		Self::ReadableStream(value)
-	}
-}
-
-impl TryFrom<Message> for ReadableStream {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::ReadableStream(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-impl From<RtcDataChannel> for Message {
-	fn from(value: RtcDataChannel) -> Self {
-		Self::RtcDataChannel(value)
-	}
-}
-
-impl TryFrom<Message> for RtcDataChannel {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::RtcDataChannel(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-impl From<TransformStream> for Message {
-	fn from(value: TransformStream) -> Self {
-		Self::TransformStream(value)
-	}
-}
-
-impl TryFrom<Message> for TransformStream {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::TransformStream(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-#[cfg(web_sys_unstable_apis)]
-impl From<VideoFrame> for Message {
-	fn from(value: VideoFrame) -> Self {
-		Self::VideoFrame(value)
-	}
-}
-
-#[cfg(web_sys_unstable_apis)]
-impl TryFrom<Message> for VideoFrame {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::VideoFrame(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
-}
-
-impl From<WritableStream> for Message {
-	fn from(value: WritableStream) -> Self {
-		Self::WritableStream(value)
-	}
-}
-
-impl TryFrom<Message> for WritableStream {
-	type Error = MessageError<Message>;
-
-	fn try_from(value: Message) -> Result<Self, Self::Error> {
-		match value {
-			Message::WritableStream(value) => Ok(value),
-			_ => Err(MessageError(value)),
-		}
-	}
 }
 
 impl Message {
@@ -226,53 +54,13 @@ impl Message {
 
 	#[must_use]
 	pub fn has_array_buffer_support() -> bool {
-		static SUPPORT: Lazy<bool> = Lazy::new(|| {
-			let buffer = ArrayBuffer::new(1);
-
-			let worker = Worker::new("data:,").unwrap_throw();
-			worker
-				.post_message_with_transfer(&buffer, &Array::of1(&buffer))
-				.unwrap_throw();
-			worker.terminate();
-
-			buffer.byte_length() == 0
-		});
-
-		*SUPPORT
+		array_buffer::has_array_buffer_support()
 	}
 
 	#[must_use]
 	#[cfg(web_sys_unstable_apis)]
 	pub fn has_audio_data_support() -> bool {
-		static SUPPORT: Lazy<bool> = Lazy::new(|| {
-			#[wasm_bindgen]
-			extern "C" {
-				type AudioDataGlobal;
-
-				#[wasm_bindgen(method, getter, js_name = AudioData)]
-				fn audio_data(this: &AudioDataGlobal) -> JsValue;
-			}
-
-			let global: AudioDataGlobal = js_sys::global().unchecked_into();
-
-			if global.audio_data().is_undefined() {
-				return false;
-			}
-
-			let init =
-				AudioDataInit::new(&ArrayBuffer::new(1), AudioSampleFormat::U8, 1, 1, 3000., 0.);
-			let data = AudioData::new(&init).unwrap_throw();
-
-			let worker = Worker::new("data:,").unwrap_throw();
-			worker
-				.post_message_with_transfer(&data, &Array::of1(&data))
-				.unwrap_throw();
-			worker.terminate();
-
-			data.format().is_none()
-		});
-
-		*SUPPORT
+		audio_data::has_audio_data_support()
 	}
 
 	#[must_use]

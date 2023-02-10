@@ -95,7 +95,7 @@ impl Future for ImageBitmapSupportFuture {
 				Inner::Unknown => {
 					let promise = GLOBAL.with(|global| {
 						if let Some(global) = global.deref() {
-							let image = ImageData::new_with_sw(1, 1).unwrap();
+							let image = ImageData::new_with_sw(1, 1).unwrap_throw();
 
 							match global {
 								Global::Window(window) => {
@@ -119,8 +119,9 @@ impl Future for ImageBitmapSupportFuture {
 					}
 				}
 				Inner::Create(future) => {
-					let bitmap: ImageBitmap =
-						ready!(Pin::new(future).poll(cx)).unwrap().unchecked_into();
+					let bitmap: ImageBitmap = ready!(Pin::new(future).poll(cx))
+						.unwrap_throw()
+						.unchecked_into();
 
 					let worker = Worker::new("data:,").unwrap_throw();
 					worker
