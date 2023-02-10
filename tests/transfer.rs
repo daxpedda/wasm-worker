@@ -11,16 +11,69 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, Message, WorkerBuilder};
-use web_sys::{ImageBitmap, ImageData};
+use web_sys::{
+	ImageBitmap, ImageData, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel,
+	TransformStream, WritableStream,
+};
 #[cfg(web_sys_unstable_apis)]
 use {
 	wasm_bindgen::UnwrapThrowExt,
-	web_sys::{AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat},
+	web_sys::{AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame},
 };
 
 use self::util::Flag;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+
+/// [`RawMessage::serialize()`](wasm_worker::RawMessage::serialize).
+#[wasm_bindgen_test]
+async fn serialize() -> Result<(), JsValue> {
+	assert!(Message::has_array_buffer_support());
+
+	let flag = Flag::new();
+
+	let _worker = WorkerBuilder::new()?
+		.message_handler({
+			let flag = flag.clone();
+			move |_, event| {
+				let mut message = event.messages().next().unwrap();
+
+				#[cfg(web_sys_unstable_apis)]
+				{
+					message = message.serialize_as::<AudioData>().unwrap_err().0;
+				}
+				message = message.serialize_as::<ImageBitmap>().unwrap_err().0;
+				message = message.serialize_as::<MessagePort>().unwrap_err().0;
+				message = message.serialize_as::<OffscreenCanvas>().unwrap_err().0;
+				message = message.serialize_as::<ReadableStream>().unwrap_err().0;
+				message = message.serialize_as::<RtcDataChannel>().unwrap_err().0;
+				message = message.serialize_as::<TransformStream>().unwrap_err().0;
+				#[cfg(web_sys_unstable_apis)]
+				{
+					message = message.serialize_as::<VideoFrame>().unwrap_err().0;
+				}
+				message = message.serialize_as::<WritableStream>().unwrap_err().0;
+
+				assert!(matches!(
+					message.serialize().unwrap(),
+					Message::ArrayBuffer(_)
+				));
+
+				flag.signal();
+			}
+		})
+		.spawn({
+			|context| {
+				context.transfer_messages([ArrayBuffer::new(1)]);
+
+				Close::Yes
+			}
+		});
+
+	flag.await;
+
+	Ok(())
+}
 
 /// Tests transfering `T`.
 ///
