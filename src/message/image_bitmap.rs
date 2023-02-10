@@ -14,6 +14,7 @@ use web_sys::{ImageBitmap, ImageData, Window, Worker, WorkerGlobalScope};
 static SUPPORT: OnceCell<bool> = OnceCell::new();
 
 #[derive(Debug)]
+#[must_use = "does nothing if not polled"]
 pub struct ImageBitmapSupportFuture(Option<Inner>);
 
 #[derive(Debug)]
@@ -88,7 +89,7 @@ impl Future for ImageBitmapSupportFuture {
 			match self_.0.as_mut().expect("polled after `Ready`") {
 				Inner::Ready(support) => {
 					let support = *support;
-					self_.0.take();
+					self.0.take();
 
 					return Poll::Ready(support);
 				}
@@ -129,7 +130,7 @@ impl Future for ImageBitmapSupportFuture {
 						.unwrap_throw();
 					worker.terminate();
 
-					self_.0.take();
+					self.0.take();
 
 					let support = bitmap.width() == 0;
 					SUPPORT.set(support).unwrap();

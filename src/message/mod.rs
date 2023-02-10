@@ -2,6 +2,7 @@ mod array_buffer;
 #[cfg(web_sys_unstable_apis)]
 mod audio_data;
 mod conversion;
+mod has_support;
 mod image_bitmap;
 
 use std::error::Error;
@@ -16,6 +17,7 @@ use web_sys::{
 	WritableStream,
 };
 
+pub use self::has_support::HasSupportFuture;
 pub use self::image_bitmap::ImageBitmapSupportFuture;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -52,6 +54,10 @@ impl Message {
 		}
 	}
 
+	pub fn has_support(&self) -> HasSupportFuture {
+		HasSupportFuture::new(self)
+	}
+
 	#[must_use]
 	pub fn has_array_buffer_support() -> bool {
 		array_buffer::has_array_buffer_support()
@@ -63,7 +69,6 @@ impl Message {
 		audio_data::has_audio_data_support()
 	}
 
-	#[must_use]
 	pub fn has_image_bitmap_support() -> ImageBitmapSupportFuture {
 		ImageBitmapSupportFuture::new()
 	}

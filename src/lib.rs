@@ -20,4 +20,6 @@ pub use self::dedicated::{
 	spawn, spawn_async, Close, MessageEvent, MessageIter, ModuleSupportError, WorkerBuilder,
 	WorkerContext, WorkerHandle, WorkerHandleRef, WorkerUrl, WorkerUrlFormat,
 };
-pub use self::message::{ImageBitmapSupportFuture, Message, MessageError, RawMessage};
+pub use self::message::{
+	HasSupportFuture, ImageBitmapSupportFuture, Message, MessageError, RawMessage,
+};

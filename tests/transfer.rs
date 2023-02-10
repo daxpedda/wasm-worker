@@ -53,12 +53,7 @@ async fn serialize() -> Result<(), JsValue> {
 				{
 					message = message.serialize_as::<VideoFrame>().unwrap_err().0;
 				}
-				message = message.serialize_as::<WritableStream>().unwrap_err().0;
-
-				assert!(matches!(
-					message.serialize().unwrap(),
-					Message::ArrayBuffer(_)
-				));
+				message.serialize_as::<WritableStream>().unwrap_err();
 
 				flag.signal();
 			}
@@ -150,6 +145,12 @@ where
 		});
 
 	request.await;
+
+	assert!(Message::from(init().await)
+		.has_support()
+		.into_inner()
+		.unwrap()
+		.unwrap());
 
 	let value_1 = init().await;
 	let value_2 = init().await;
