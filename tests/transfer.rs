@@ -252,3 +252,23 @@ async fn image_bitmap() -> Result<(), JsValue> {
 	)
 	.await
 }
+
+/// [`OffscreenCanvas`].
+#[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
+async fn offscreen_canvas() -> Result<(), JsValue> {
+	test_transfer(
+		Message::has_offscreen_canvas_support(),
+		false,
+		|| async { OffscreenCanvas::new(1, 1).unwrap_throw() },
+		|canvas| {
+			assert_eq!(canvas.width(), 0);
+			assert_eq!(canvas.height(), 0);
+		},
+		|canvas| {
+			assert_eq!(canvas.width(), 1);
+			assert_eq!(canvas.height(), 1);
+		},
+	)
+	.await
+}

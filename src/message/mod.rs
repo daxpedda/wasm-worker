@@ -4,6 +4,7 @@ mod audio_data;
 mod conversion;
 mod has_support;
 mod image_bitmap;
+mod offscreen_canvas;
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -69,6 +70,10 @@ impl Message {
 
 	pub fn has_image_bitmap_support() -> ImageBitmapSupportFuture {
 		ImageBitmapSupportFuture::new()
+	}
+
+	pub fn has_offscreen_canvas_support() -> Result<(), SupportError> {
+		offscreen_canvas::support()
 	}
 }
 

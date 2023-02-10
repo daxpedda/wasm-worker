@@ -26,7 +26,9 @@ impl HasSupportFuture {
 				Message::has_image_bitmap_support(),
 			))),
 			Message::MessagePort(_) => Self(Some(Inner::Ready(Err(SupportError::Undetermined)))),
-			Message::OffscreenCanvas(_) => todo!(),
+			Message::OffscreenCanvas(_) => {
+				Self(Some(Inner::Ready(Message::has_offscreen_canvas_support())))
+			}
 			Message::ReadableStream(_) => todo!(),
 			Message::RtcDataChannel(_) => todo!(),
 			Message::TransformStream(_) => todo!(),
