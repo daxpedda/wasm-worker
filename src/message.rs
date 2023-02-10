@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::Deref;
 
 use js_sys::{Array, ArrayBuffer, Object};
@@ -36,10 +36,33 @@ impl From<ArrayBuffer> for Message {
 	}
 }
 
+impl TryFrom<Message> for ArrayBuffer {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::ArrayBuffer(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
+	}
+}
+
 #[cfg(web_sys_unstable_apis)]
 impl From<AudioData> for Message {
 	fn from(value: AudioData) -> Self {
 		Self::AudioData(value)
+	}
+}
+
+#[cfg(web_sys_unstable_apis)]
+impl TryFrom<Message> for AudioData {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::AudioData(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
 	}
 }
 
@@ -49,9 +72,31 @@ impl From<ImageBitmap> for Message {
 	}
 }
 
+impl TryFrom<Message> for ImageBitmap {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::ImageBitmap(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
+	}
+}
+
 impl From<MessagePort> for Message {
 	fn from(value: MessagePort) -> Self {
 		Self::MessagePort(value)
+	}
+}
+
+impl TryFrom<Message> for MessagePort {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::MessagePort(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
 	}
 }
 
@@ -61,9 +106,31 @@ impl From<OffscreenCanvas> for Message {
 	}
 }
 
+impl TryFrom<Message> for OffscreenCanvas {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::OffscreenCanvas(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
+	}
+}
+
 impl From<ReadableStream> for Message {
 	fn from(value: ReadableStream) -> Self {
 		Self::ReadableStream(value)
+	}
+}
+
+impl TryFrom<Message> for ReadableStream {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::ReadableStream(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
 	}
 }
 
@@ -73,9 +140,31 @@ impl From<RtcDataChannel> for Message {
 	}
 }
 
+impl TryFrom<Message> for RtcDataChannel {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::RtcDataChannel(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
+	}
+}
+
 impl From<TransformStream> for Message {
 	fn from(value: TransformStream) -> Self {
 		Self::TransformStream(value)
+	}
+}
+
+impl TryFrom<Message> for TransformStream {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::TransformStream(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
 	}
 }
 
@@ -86,9 +175,32 @@ impl From<VideoFrame> for Message {
 	}
 }
 
+#[cfg(web_sys_unstable_apis)]
+impl TryFrom<Message> for VideoFrame {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::VideoFrame(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
+	}
+}
+
 impl From<WritableStream> for Message {
 	fn from(value: WritableStream) -> Self {
 		Self::WritableStream(value)
+	}
+}
+
+impl TryFrom<Message> for WritableStream {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::WritableStream(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
 	}
 }
 
@@ -234,7 +346,7 @@ impl RawMessage {
 		self.0
 	}
 
-	pub fn serialize(self) -> Result<Message, MessageError> {
+	pub fn serialize(self) -> Result<Message, MessageError<Self>> {
 		let data = self.0;
 
 		let object = if data.is_object() {
@@ -260,7 +372,11 @@ impl RawMessage {
 		})
 	}
 
-	pub fn serialize_as<T: JsCast + Into<Message>>(self) -> Result<T, MessageError> {
+	pub fn serialize_as<T>(self) -> Result<T, MessageError<Self>>
+	where
+		T: JsCast,
+		Message: From<T>,
+	{
 		if self.0.is_instance_of::<T>() {
 			Ok(self.0.unchecked_into::<T>())
 		} else {
@@ -270,12 +386,12 @@ impl RawMessage {
 }
 
 #[derive(Debug)]
-pub struct MessageError(pub RawMessage);
+pub struct MessageError<T: Debug>(pub T);
 
-impl Display for MessageError {
+impl<T: Debug> Display for MessageError<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "unexpected message: {:?}", self.0)
 	}
 }
 
-impl Error for MessageError {}
+impl<T: Debug> Error for MessageError<T> {}

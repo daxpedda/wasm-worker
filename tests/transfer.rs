@@ -3,6 +3,7 @@
 
 mod util;
 
+use std::fmt::Debug;
 use std::future::Future;
 
 use futures_util::FutureExt;
@@ -79,14 +80,21 @@ async fn serialize() -> Result<(), JsValue> {
 ///
 /// If `force` is `true` the test will fail if the type is not supported,
 /// otherwise the test will be skipped.
-async fn test_transfer<T: Clone + Into<Message> + JsCast>(
+async fn test_transfer<T, F>(
 	support: impl Into<Option<bool>>,
 	force: bool,
-	init: impl Future<Output = T>,
+	init: impl Fn() -> F,
 	assert_sent: impl 'static + Copy + Fn(&T) + Send,
 	assert_received: impl 'static + Copy + Fn(&T) + Send,
-) -> Result<(), JsValue> {
+) -> Result<(), JsValue>
+where
+	T: Clone + JsCast + TryFrom<Message>,
+	Message: From<T>,
+	<T as TryFrom<Message>>::Error: Debug,
+	F: Future<Output = T>,
+{
 	match support.into() {
+		Some(true) => (),
 		None | Some(false) => {
 			if force {
 				panic!("type unsupported in this browser")
@@ -94,10 +102,7 @@ async fn test_transfer<T: Clone + Into<Message> + JsCast>(
 				return Ok(());
 			}
 		}
-		Some(true) => (),
 	}
-
-	let value = init.await;
 
 	let request = Flag::new();
 	let response = Flag::new();
@@ -106,8 +111,14 @@ async fn test_transfer<T: Clone + Into<Message> + JsCast>(
 		.message_handler({
 			let response = response.clone();
 			move |_, event| {
-				let value: T = event.messages().next().unwrap().serialize_as().unwrap();
+				let mut messages = event.messages();
+				assert_eq!(messages.len(), 2);
 
+				let value: T = messages.next().unwrap().serialize_as().unwrap();
+				assert_received(&value);
+
+				let value = messages.next().unwrap().serialize().unwrap();
+				let value: T = value.try_into().unwrap();
 				assert_received(&value);
 
 				response.signal();
@@ -117,12 +128,18 @@ async fn test_transfer<T: Clone + Into<Message> + JsCast>(
 			let request = request.clone();
 			move |context| {
 				context.set_message_handler(move |context, event| {
-					let value: T = event.messages().next().unwrap().serialize_as().unwrap();
+					let mut messages = event.messages();
+					assert_eq!(messages.len(), 2);
 
-					assert_received(&value);
+					let value_1: T = messages.next().unwrap().serialize_as().unwrap();
+					assert_received(&value_1);
 
-					let old_value = value.clone();
-					context.transfer_messages([value]);
+					let value_2 = messages.next().unwrap().serialize().unwrap();
+					let value_2: T = value_2.try_into().unwrap();
+					assert_received(&value_2);
+
+					let old_value = value_1.clone();
+					context.transfer_messages([value_1, value_2]);
 					assert_sent(&old_value);
 				});
 
@@ -134,8 +151,11 @@ async fn test_transfer<T: Clone + Into<Message> + JsCast>(
 
 	request.await;
 
-	let old_value = value.clone();
-	worker.transfer_messages([value]);
+	let value_1 = init().await;
+	let value_2 = init().await;
+
+	let old_value = value_1.clone();
+	worker.transfer_messages([value_1, value_2]);
 	assert_sent(&old_value);
 
 	response.await;
@@ -151,7 +171,7 @@ async fn array_buffer() -> Result<(), JsValue> {
 	test_transfer(
 		Message::has_array_buffer_support(),
 		true,
-		async {
+		|| async {
 			let buffer = ArrayBuffer::new(1);
 			let array = Uint8Array::new(&buffer);
 			array.copy_from(&[42]);
@@ -173,7 +193,7 @@ async fn audio_data() -> Result<(), JsValue> {
 	test_transfer(
 		Message::has_audio_data_support(),
 		false,
-		async {
+		|| async {
 			let init = AudioDataInit::new(
 				&ArrayBuffer::new(42),
 				AudioSampleFormat::U8,
@@ -199,7 +219,7 @@ async fn image_bitmap() -> Result<(), JsValue> {
 	test_transfer(
 		Message::has_image_bitmap_support().await,
 		true,
-		{
+		|| {
 			let image = ImageData::new_with_sw(1, 1).unwrap();
 			let promise = web_sys::window()
 				.unwrap()
