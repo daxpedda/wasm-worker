@@ -59,12 +59,12 @@ impl Message {
 	}
 
 	pub fn has_array_buffer_support() -> Result<(), SupportError> {
-		array_buffer::has_array_buffer_support()
+		array_buffer::support()
 	}
 
 	#[cfg(web_sys_unstable_apis)]
 	pub fn has_audio_data_support() -> Result<(), SupportError> {
-		audio_data::has_audio_data_support()
+		audio_data::support()
 	}
 
 	pub fn has_image_bitmap_support() -> ImageBitmapSupportFuture {

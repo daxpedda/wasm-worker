@@ -5,7 +5,7 @@ use web_sys::Worker;
 
 use super::SupportError;
 
-pub(super) fn has_array_buffer_support() -> Result<(), SupportError> {
+pub(super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<bool> = Lazy::new(|| {
 		let buffer = ArrayBuffer::new(1);
 

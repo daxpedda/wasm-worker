@@ -6,7 +6,7 @@ use web_sys::{AudioData, AudioDataInit, AudioSampleFormat, Worker};
 
 use super::SupportError;
 
-pub(super) fn has_audio_data_support() -> Result<(), SupportError> {
+pub(super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<bool> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
