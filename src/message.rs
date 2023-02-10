@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 
-use js_sys::{Array, ArrayBuffer};
+use js_sys::{Array, ArrayBuffer, Object};
 use once_cell::sync::{Lazy, OnceCell};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
@@ -237,49 +237,27 @@ impl RawMessage {
 	pub fn serialize(self) -> Result<Message, MessageError> {
 		let data = self.0;
 
-		if data.is_instance_of::<ArrayBuffer>() {
-			return Ok(Message::ArrayBuffer(data.unchecked_into()));
-		}
+		let object = if data.is_object() {
+			Object::unchecked_from_js(data)
+		} else {
+			return Err(MessageError(Self(data)));
+		};
 
-		#[cfg(web_sys_unstable_apis)]
-		if data.is_instance_of::<AudioData>() {
-			return Ok(Message::AudioData(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<ImageBitmap>() {
-			return Ok(Message::ImageBitmap(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<MessagePort>() {
-			return Ok(Message::MessagePort(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<OffscreenCanvas>() {
-			return Ok(Message::OffscreenCanvas(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<ReadableStream>() {
-			return Ok(Message::ReadableStream(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<RtcDataChannel>() {
-			return Ok(Message::RtcDataChannel(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<TransformStream>() {
-			return Ok(Message::TransformStream(data.unchecked_into()));
-		}
-
-		#[cfg(web_sys_unstable_apis)]
-		if data.is_instance_of::<VideoFrame>() {
-			return Ok(Message::VideoFrame(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<WritableStream>() {
-			return Ok(Message::WritableStream(data.unchecked_into()));
-		}
-
-		Err(MessageError(Self(data)))
+		Ok(match String::from(object.constructor().name()).as_str() {
+			"ArrayBuffer" => Message::ArrayBuffer(object.unchecked_into()),
+			#[cfg(web_sys_unstable_apis)]
+			"AudioData" => Message::AudioData(object.unchecked_into()),
+			"ImageBitmap" => Message::ImageBitmap(object.unchecked_into()),
+			"MessagePort" => Message::MessagePort(object.unchecked_into()),
+			"OffscreenCanvas" => Message::OffscreenCanvas(object.unchecked_into()),
+			"ReadableStream" => Message::ReadableStream(object.unchecked_into()),
+			"RtcDataChannel" => Message::RtcDataChannel(object.unchecked_into()),
+			"TransformStream" => Message::TransformStream(object.unchecked_into()),
+			#[cfg(web_sys_unstable_apis)]
+			"VideoFrame" => Message::VideoFrame(object.unchecked_into()),
+			"WritableStream" => Message::WritableStream(object.unchecked_into()),
+			_ => return Err(MessageError(Self(object.into()))),
+		})
 	}
 
 	pub fn serialize_as<T: JsCast + Into<Message>>(self) -> Result<T, MessageError> {
