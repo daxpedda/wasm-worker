@@ -9,20 +9,20 @@ use crate::RawMessage;
 #[derive(Debug)]
 pub struct MessageEvent {
 	event: web_sys::MessageEvent,
-	message_taken: bool,
+	messages_taken: bool,
 }
 
 impl MessageEvent {
 	pub(super) const fn new(event: web_sys::MessageEvent) -> Self {
 		Self {
 			event,
-			message_taken: false,
+			messages_taken: false,
 		}
 	}
 
 	#[must_use]
 	pub fn messages(&self) -> MessageIter {
-		if self.message_taken {
+		if self.messages_taken {
 			return MessageIter(Inner::Single(None));
 		}
 
