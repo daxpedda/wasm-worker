@@ -213,11 +213,21 @@ async fn audio_data() -> Result<(), JsValue> {
 	.await
 }
 
-/// [`ImageBitmap`].
+/// [`ImageBitmap`] and
+/// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::ImageBitmapSupportFuture::into_inner).
 #[wasm_bindgen_test]
 async fn image_bitmap() -> Result<(), JsValue> {
+	let mut future = Message::has_image_bitmap_support();
+	assert_eq!(future.into_inner(), None);
+	assert_eq!(future.await, Some(true));
+
+	assert_eq!(
+		Message::has_image_bitmap_support().into_inner(),
+		Some(Some(true))
+	);
+
 	test_transfer(
-		Message::has_image_bitmap_support().await,
+		Message::has_image_bitmap_support().into_inner().unwrap(),
 		true,
 		|| {
 			let image = ImageData::new_with_sw(1, 1).unwrap();

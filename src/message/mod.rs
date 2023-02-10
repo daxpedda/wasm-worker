@@ -1,18 +1,20 @@
+mod image_bitmap;
+
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::ops::Deref;
 
 use js_sys::{Array, ArrayBuffer, Object};
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
-use wasm_bindgen_futures::JsFuture;
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{AudioData, AudioDataInit, AudioSampleFormat, VideoFrame};
 use web_sys::{
-	ImageBitmap, ImageData, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel,
-	TransformStream, Window, Worker, WorkerGlobalScope, WritableStream,
+	ImageBitmap, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel, TransformStream,
+	Worker, WritableStream,
 };
+
+pub use self::image_bitmap::ImageBitmapSupportFuture;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Message {
@@ -273,66 +275,9 @@ impl Message {
 		*SUPPORT
 	}
 
-	pub async fn has_image_bitmap_support() -> Option<bool> {
-		enum Global {
-			Window(Window),
-			Worker(WorkerGlobalScope),
-		}
-
-		static SUPPORT: OnceCell<bool> = OnceCell::new();
-
-		thread_local! {
-			static GLOBAL: Lazy<Option<Global>> = Lazy::new(|| {
-				#[wasm_bindgen]
-				extern "C" {
-					type ImageBitmapGlobal;
-
-					#[wasm_bindgen(method, getter, js_name = Window)]
-					fn window(this: &ImageBitmapGlobal) -> JsValue;
-
-					#[wasm_bindgen(method, getter, js_name = WorkerGlobalScope)]
-					fn worker(this: &ImageBitmapGlobal) -> JsValue;
-				}
-
-				let global: ImageBitmapGlobal = js_sys::global().unchecked_into();
-
-				if !global.window().is_undefined() {
-					Some(Global::Window(global.unchecked_into()))
-				} else if !global.worker().is_undefined() {
-					Some(Global::Worker(global.unchecked_into()))
-				} else {
-					None
-				}
-			});
-		}
-
-		if let Some(support) = SUPPORT.get() {
-			return Some(*support);
-		}
-
-		let promise = GLOBAL.with(|global| {
-			if let Some(global) = global.deref() {
-				let image = ImageData::new_with_sw(1, 1).unwrap();
-
-				match global {
-					Global::Window(window) => window.create_image_bitmap_with_image_data(&image),
-					Global::Worker(worker) => worker.create_image_bitmap_with_image_data(&image),
-				}
-				.ok()
-			} else {
-				None
-			}
-		})?;
-
-		let bitmap: ImageBitmap = JsFuture::from(promise).await.unwrap().unchecked_into();
-
-		let worker = Worker::new("data:,").unwrap_throw();
-		worker
-			.post_message_with_transfer(&bitmap, &Array::of1(&bitmap))
-			.unwrap_throw();
-		worker.terminate();
-
-		Some(bitmap.width() == 0)
+	#[must_use]
+	pub fn has_image_bitmap_support() -> ImageBitmapSupportFuture {
+		ImageBitmapSupportFuture::new()
 	}
 }
 

@@ -75,5 +75,4 @@ rustflags = [
 	"-Wunused_lifetimes",
 	"-Wunused_qualifications",
 	"-Wunused_tuple_struct_fields",
-	"-Wvariant_size_differences",
 ]
