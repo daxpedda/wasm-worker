@@ -18,7 +18,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// [`WorkerHandle::clear_message_handler()`](wasm_worker::WorkerHandle::clear_message_handler).
 #[wasm_bindgen_test]
 async fn builder_clear_message_handler() -> Result<(), JsValue> {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
@@ -54,7 +54,7 @@ async fn builder_clear_message_handler() -> Result<(), JsValue> {
 /// [`WorkerHandle::clear_message_handler()`](wasm_worker::WorkerHandle::clear_message_handler).
 #[wasm_bindgen_test]
 async fn handler_clear_message_handler() {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
@@ -87,7 +87,7 @@ async fn handler_clear_message_handler() {
 /// [`WorkerContext::clear_message_handler()`](wasm_worker::WorkerContext::clear_message_handler).
 #[wasm_bindgen_test]
 async fn context_clear_message_handler() {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
@@ -168,7 +168,7 @@ async fn context_has_message_handler() {
 /// [`WorkerBuilder::message_handler_async()`].
 #[wasm_bindgen_test]
 async fn builder_async_message_handler() -> Result<(), JsValue> {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
@@ -196,7 +196,7 @@ async fn builder_async_message_handler() -> Result<(), JsValue> {
 /// [`WorkerHandle::set_message_handler_async()`](wasm_worker::WorkerHandle::set_message_handler_async).
 #[wasm_bindgen_test]
 async fn handler_async_message_handler() {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
@@ -226,7 +226,7 @@ async fn handler_async_message_handler() {
 /// [`WorkerContext::set_message_handler_async()`](wasm_worker::WorkerContext::set_message_handler_async).
 #[wasm_bindgen_test]
 async fn context_async_message_handler() {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
@@ -257,7 +257,7 @@ async fn context_async_message_handler() {
 /// [`WorkerHandle::transfer_messages()`](wasm_worker::WorkerHandle::transfer_messages).
 #[wasm_bindgen_test]
 async fn handler_multi_message() {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
@@ -315,7 +315,7 @@ async fn handler_multi_message() {
 /// [`WorkerContext::transfer_messages()`](wasm_worker::WorkerContext::transfer_messages).
 #[wasm_bindgen_test]
 async fn context_multi_message() -> Result<(), JsValue> {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 

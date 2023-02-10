@@ -4,7 +4,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{AudioData, AudioDataInit, AudioSampleFormat, Worker};
 
-pub(super) fn has_audio_data_support() -> bool {
+use super::SupportError;
+
+pub(super) fn has_audio_data_support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<bool> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
@@ -32,5 +34,5 @@ pub(super) fn has_audio_data_support() -> bool {
 		data.format().is_none()
 	});
 
-	*SUPPORT
+	SUPPORT.then_some(()).ok_or(SupportError::Unsupported)
 }

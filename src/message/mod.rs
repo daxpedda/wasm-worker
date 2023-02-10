@@ -58,14 +58,12 @@ impl Message {
 		HasSupportFuture::new(self)
 	}
 
-	#[must_use]
-	pub fn has_array_buffer_support() -> bool {
+	pub fn has_array_buffer_support() -> Result<(), SupportError> {
 		array_buffer::has_array_buffer_support()
 	}
 
-	#[must_use]
 	#[cfg(web_sys_unstable_apis)]
-	pub fn has_audio_data_support() -> bool {
+	pub fn has_audio_data_support() -> Result<(), SupportError> {
 		audio_data::has_audio_data_support()
 	}
 
@@ -133,3 +131,20 @@ impl<T: Debug> Display for MessageError<T> {
 }
 
 impl<T: Debug> Error for MessageError<T> {}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SupportError {
+	Unsupported,
+	Undetermined,
+}
+
+impl Display for SupportError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Unsupported => write!(f, "type is not transferable"),
+			Self::Undetermined => write!(f, "type transfer support couldn't be determined"),
+		}
+	}
+}
+
+impl Error for SupportError {}

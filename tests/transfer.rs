@@ -11,7 +11,7 @@ use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{Close, Message, WorkerBuilder};
+use wasm_worker::{Close, Message, SupportError, WorkerBuilder};
 use web_sys::{
 	ImageBitmap, ImageData, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel,
 	TransformStream, WritableStream,
@@ -29,7 +29,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// [`RawMessage::serialize()`](wasm_worker::RawMessage::serialize).
 #[wasm_bindgen_test]
 async fn serialize() -> Result<(), JsValue> {
-	assert!(Message::has_array_buffer_support());
+	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
@@ -76,7 +76,7 @@ async fn serialize() -> Result<(), JsValue> {
 /// If `force` is `true` the test will fail if the type is not supported,
 /// otherwise the test will be skipped.
 async fn test_transfer<T, F>(
-	support: impl Into<Option<bool>>,
+	support: Result<(), SupportError>,
 	force: bool,
 	init: impl Fn() -> F,
 	assert_sent: impl 'static + Copy + Fn(&T) + Send,
@@ -88,9 +88,9 @@ where
 	<T as TryFrom<Message>>::Error: Debug,
 	F: Future<Output = T>,
 {
-	match support.into() {
-		Some(true) => (),
-		None | Some(false) => {
+	match support {
+		Ok(()) => (),
+		Err(_) => {
 			if force {
 				panic!("type unsupported in this browser")
 			} else {
@@ -150,7 +150,7 @@ where
 		.has_support()
 		.into_inner()
 		.unwrap()
-		.unwrap());
+		.is_ok());
 
 	let value_1 = init().await;
 	let value_2 = init().await;
@@ -220,12 +220,12 @@ async fn audio_data() -> Result<(), JsValue> {
 async fn image_bitmap() -> Result<(), JsValue> {
 	let mut future = Message::has_image_bitmap_support();
 	assert_eq!(future.into_inner(), None);
-	assert_eq!(future.await, Some(true));
+	assert!(future.await.is_ok());
 
-	assert_eq!(
-		Message::has_image_bitmap_support().into_inner(),
-		Some(Some(true))
-	);
+	assert!(Message::has_image_bitmap_support()
+		.into_inner()
+		.unwrap()
+		.is_ok());
 
 	test_transfer(
 		Message::has_image_bitmap_support().into_inner().unwrap(),

@@ -21,5 +21,5 @@ pub use self::dedicated::{
 	WorkerContext, WorkerHandle, WorkerHandleRef, WorkerUrl, WorkerUrlFormat,
 };
 pub use self::message::{
-	HasSupportFuture, ImageBitmapSupportFuture, Message, MessageError, RawMessage,
+	HasSupportFuture, ImageBitmapSupportFuture, Message, MessageError, RawMessage, SupportError,
 };

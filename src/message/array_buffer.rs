@@ -3,7 +3,9 @@ use once_cell::sync::Lazy;
 use wasm_bindgen::UnwrapThrowExt;
 use web_sys::Worker;
 
-pub(super) fn has_array_buffer_support() -> bool {
+use super::SupportError;
+
+pub(super) fn has_array_buffer_support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<bool> = Lazy::new(|| {
 		let buffer = ArrayBuffer::new(1);
 
@@ -16,5 +18,5 @@ pub(super) fn has_array_buffer_support() -> bool {
 		buffer.byte_length() == 0
 	});
 
-	*SUPPORT
+	SUPPORT.then_some(()).ok_or(SupportError::Unsupported)
 }

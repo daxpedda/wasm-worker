@@ -2,8 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-use super::Message;
-use crate::ImageBitmapSupportFuture;
+use super::{ImageBitmapSupportFuture, Message, SupportError};
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
@@ -11,7 +10,7 @@ pub struct HasSupportFuture(Option<Inner>);
 
 #[derive(Debug)]
 enum Inner {
-	Ready(bool),
+	Ready(Result<(), SupportError>),
 	ImageBitmap(ImageBitmapSupportFuture),
 }
 
@@ -37,13 +36,13 @@ impl HasSupportFuture {
 		}
 	}
 
-	pub fn into_inner(&mut self) -> Option<Option<bool>> {
+	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
 		match self.0.as_mut().expect("polled after `Ready`") {
 			Inner::Ready(support) => {
 				let support = *support;
 				self.0.take();
 
-				Some(Some(support))
+				Some(support)
 			}
 			Inner::ImageBitmap(future) => future.into_inner(),
 		}
@@ -51,7 +50,7 @@ impl HasSupportFuture {
 }
 
 impl Future for HasSupportFuture {
-	type Output = Option<bool>;
+	type Output = Result<(), SupportError>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let mut self_ = self.as_mut();
@@ -61,7 +60,7 @@ impl Future for HasSupportFuture {
 				let support = *support;
 				self.0.take();
 
-				Poll::Ready(Some(support))
+				Poll::Ready(support)
 			}
 			Inner::ImageBitmap(future) => {
 				let support = ready!(Pin::new(future).poll(cx));

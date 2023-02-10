@@ -11,6 +11,8 @@ use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{ImageBitmap, ImageData, Window, Worker, WorkerGlobalScope};
 
+use super::SupportError;
+
 static SUPPORT: OnceCell<bool> = OnceCell::new();
 
 #[derive(Debug)]
@@ -19,7 +21,7 @@ pub struct ImageBitmapSupportFuture(Option<Inner>);
 
 #[derive(Debug)]
 enum Inner {
-	Ready(Option<bool>),
+	Ready(Result<(), SupportError>),
 	Unknown,
 	Create(JsFuture),
 }
@@ -27,13 +29,15 @@ enum Inner {
 impl ImageBitmapSupportFuture {
 	pub(super) fn new() -> Self {
 		if let Some(support) = SUPPORT.get() {
-			Self(Some(Inner::Ready(Some(*support))))
+			Self(Some(Inner::Ready(
+				support.then_some(()).ok_or(SupportError::Unsupported),
+			)))
 		} else {
 			Self(Some(Inner::Unknown))
 		}
 	}
 
-	pub fn into_inner(&mut self) -> Option<Option<bool>> {
+	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
 		if let Inner::Ready(support) = self.0.as_ref().expect("polled after `Ready`") {
 			let support = *support;
 			self.0.take();
@@ -46,7 +50,7 @@ impl ImageBitmapSupportFuture {
 }
 
 impl Future for ImageBitmapSupportFuture {
-	type Output = Option<bool>;
+	type Output = Result<(), SupportError>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		enum Global {
@@ -80,7 +84,7 @@ impl Future for ImageBitmapSupportFuture {
 		}
 
 		if let Some(support) = SUPPORT.get() {
-			return Poll::Ready(Some(*support));
+			return Poll::Ready(support.then_some(()).ok_or(SupportError::Unsupported));
 		}
 
 		let mut self_ = self.as_mut();
@@ -116,7 +120,7 @@ impl Future for ImageBitmapSupportFuture {
 						self_.0 = Some(Inner::Create(JsFuture::from(promise)));
 					} else {
 						self.0.take();
-						return Poll::Ready(None);
+						return Poll::Ready(Err(SupportError::Undetermined));
 					}
 				}
 				Inner::Create(future) => {
@@ -134,7 +138,7 @@ impl Future for ImageBitmapSupportFuture {
 
 					let support = bitmap.width() == 0;
 					SUPPORT.set(support).unwrap();
-					return Poll::Ready(Some(support));
+					return Poll::Ready(support.then_some(()).ok_or(SupportError::Unsupported));
 				}
 			}
 		}
