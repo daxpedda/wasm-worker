@@ -5,6 +5,7 @@ mod conversion;
 mod has_support;
 mod image_bitmap;
 mod offscreen_canvas;
+mod readable_stream;
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -74,6 +75,10 @@ impl Message {
 
 	pub fn has_offscreen_canvas_support() -> Result<(), SupportError> {
 		offscreen_canvas::support()
+	}
+
+	pub fn has_readable_stream_support() -> Result<(), SupportError> {
+		readable_stream::support()
 	}
 }
 

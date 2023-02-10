@@ -255,7 +255,6 @@ async fn image_bitmap() -> Result<(), JsValue> {
 
 /// [`OffscreenCanvas`].
 #[wasm_bindgen_test]
-#[cfg(web_sys_unstable_apis)]
 async fn offscreen_canvas() -> Result<(), JsValue> {
 	test_transfer(
 		Message::has_offscreen_canvas_support(),
@@ -269,6 +268,19 @@ async fn offscreen_canvas() -> Result<(), JsValue> {
 			assert_eq!(canvas.width(), 1);
 			assert_eq!(canvas.height(), 1);
 		},
+	)
+	.await
+}
+
+/// [`ReadableStream`].
+#[wasm_bindgen_test]
+async fn readable_stream() -> Result<(), JsValue> {
+	test_transfer(
+		Message::has_readable_stream_support(),
+		false,
+		|| async { ReadableStream::new().unwrap_throw() },
+		|stream| assert!(stream.locked()),
+		|stream| assert!(!stream.locked()),
 	)
 	.await
 }

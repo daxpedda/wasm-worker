@@ -23,7 +23,7 @@ impl HasSupportFuture {
 			Message::ImageBitmap(_) => Inner::ImageBitmap(Message::has_image_bitmap_support()),
 			Message::MessagePort(_) => Inner::Ready(Err(SupportError::Undetermined)),
 			Message::OffscreenCanvas(_) => Inner::Ready(Message::has_offscreen_canvas_support()),
-			Message::ReadableStream(_) => todo!(),
+			Message::ReadableStream(_) => Inner::Ready(Message::has_readable_stream_support()),
 			Message::RtcDataChannel(_) => todo!(),
 			Message::TransformStream(_) => todo!(),
 			#[cfg(web_sys_unstable_apis)]
