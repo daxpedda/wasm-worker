@@ -14,7 +14,7 @@ use web_sys::{
 	TransformStream, Window, Worker, WorkerGlobalScope, WritableStream,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum Message {
 	ArrayBuffer(ArrayBuffer),
 	#[cfg(web_sys_unstable_apis)]
@@ -49,53 +49,50 @@ impl From<ImageBitmap> for Message {
 	}
 }
 
-impl Message {
-	pub(crate) fn from_js_value(data: JsValue) -> Result<Self, MessageError> {
-		if data.is_instance_of::<ArrayBuffer>() {
-			return Ok(Self::ArrayBuffer(data.unchecked_into()));
-		}
-
-		#[cfg(web_sys_unstable_apis)]
-		if data.is_instance_of::<AudioData>() {
-			return Ok(Self::AudioData(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<ImageBitmap>() {
-			return Ok(Self::ImageBitmap(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<MessagePort>() {
-			return Ok(Self::MessagePort(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<OffscreenCanvas>() {
-			return Ok(Self::OffscreenCanvas(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<ReadableStream>() {
-			return Ok(Self::ReadableStream(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<RtcDataChannel>() {
-			return Ok(Self::RtcDataChannel(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<TransformStream>() {
-			return Ok(Self::TransformStream(data.unchecked_into()));
-		}
-
-		#[cfg(web_sys_unstable_apis)]
-		if data.is_instance_of::<VideoFrame>() {
-			return Ok(Self::VideoFrame(data.unchecked_into()));
-		}
-
-		if data.is_instance_of::<WritableStream>() {
-			return Ok(Self::WritableStream(data.unchecked_into()));
-		}
-
-		Err(MessageError(data))
+impl From<MessagePort> for Message {
+	fn from(value: MessagePort) -> Self {
+		Self::MessagePort(value)
 	}
+}
 
+impl From<OffscreenCanvas> for Message {
+	fn from(value: OffscreenCanvas) -> Self {
+		Self::OffscreenCanvas(value)
+	}
+}
+
+impl From<ReadableStream> for Message {
+	fn from(value: ReadableStream) -> Self {
+		Self::ReadableStream(value)
+	}
+}
+
+impl From<RtcDataChannel> for Message {
+	fn from(value: RtcDataChannel) -> Self {
+		Self::RtcDataChannel(value)
+	}
+}
+
+impl From<TransformStream> for Message {
+	fn from(value: TransformStream) -> Self {
+		Self::TransformStream(value)
+	}
+}
+
+#[cfg(web_sys_unstable_apis)]
+impl From<VideoFrame> for Message {
+	fn from(value: VideoFrame) -> Self {
+		Self::VideoFrame(value)
+	}
+}
+
+impl From<WritableStream> for Message {
+	fn from(value: WritableStream) -> Self {
+		Self::WritableStream(value)
+	}
+}
+
+impl Message {
 	pub(crate) fn into_js_value(self) -> JsValue {
 		match self {
 			Self::ArrayBuffer(value) => value.into(),
@@ -238,20 +235,64 @@ impl RawMessage {
 	}
 
 	pub fn serialize(self) -> Result<Message, MessageError> {
-		Message::from_js_value(self.0)
+		let data = self.0;
+
+		if data.is_instance_of::<ArrayBuffer>() {
+			return Ok(Message::ArrayBuffer(data.unchecked_into()));
+		}
+
+		#[cfg(web_sys_unstable_apis)]
+		if data.is_instance_of::<AudioData>() {
+			return Ok(Message::AudioData(data.unchecked_into()));
+		}
+
+		if data.is_instance_of::<ImageBitmap>() {
+			return Ok(Message::ImageBitmap(data.unchecked_into()));
+		}
+
+		if data.is_instance_of::<MessagePort>() {
+			return Ok(Message::MessagePort(data.unchecked_into()));
+		}
+
+		if data.is_instance_of::<OffscreenCanvas>() {
+			return Ok(Message::OffscreenCanvas(data.unchecked_into()));
+		}
+
+		if data.is_instance_of::<ReadableStream>() {
+			return Ok(Message::ReadableStream(data.unchecked_into()));
+		}
+
+		if data.is_instance_of::<RtcDataChannel>() {
+			return Ok(Message::RtcDataChannel(data.unchecked_into()));
+		}
+
+		if data.is_instance_of::<TransformStream>() {
+			return Ok(Message::TransformStream(data.unchecked_into()));
+		}
+
+		#[cfg(web_sys_unstable_apis)]
+		if data.is_instance_of::<VideoFrame>() {
+			return Ok(Message::VideoFrame(data.unchecked_into()));
+		}
+
+		if data.is_instance_of::<WritableStream>() {
+			return Ok(Message::WritableStream(data.unchecked_into()));
+		}
+
+		Err(MessageError(Self(data)))
 	}
 
 	pub fn serialize_as<T: JsCast + Into<Message>>(self) -> Result<T, MessageError> {
 		if self.0.is_instance_of::<T>() {
 			Ok(self.0.unchecked_into::<T>())
 		} else {
-			Err(MessageError(self.0))
+			Err(MessageError(self))
 		}
 	}
 }
 
 #[derive(Debug)]
-pub struct MessageError(JsValue);
+pub struct MessageError(pub RawMessage);
 
 impl Display for MessageError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -260,17 +301,3 @@ impl Display for MessageError {
 }
 
 impl Error for MessageError {}
-
-impl From<MessageError> for JsValue {
-	fn from(value: MessageError) -> Self {
-		value.to_string().into()
-	}
-}
-
-impl MessageError {
-	#[must_use]
-	#[allow(clippy::missing_const_for_fn)]
-	pub fn into_raw(self) -> JsValue {
-		self.0
-	}
-}
