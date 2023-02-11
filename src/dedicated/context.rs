@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::{Closure, WorkerOrContext};
+use super::{Closure, TransferError, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -110,8 +110,11 @@ impl WorkerContext {
 		});
 	}
 
-	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
-		WorkerOrContext::Context(&self.0).transfer_messages(messages);
+	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
+		&self,
+		messages: M,
+	) -> Result<(), TransferError> {
+		WorkerOrContext::Context(&self.0).transfer_messages(messages)
 	}
 
 	pub fn close(self) {

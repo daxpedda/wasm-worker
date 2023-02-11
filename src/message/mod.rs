@@ -2,6 +2,7 @@ mod array_buffer;
 #[cfg(web_sys_unstable_apis)]
 mod audio_data;
 mod conversion;
+mod event;
 mod has_support;
 mod image_bitmap;
 mod message_port;
@@ -22,6 +23,7 @@ use web_sys::{
 	WritableStream,
 };
 
+pub use self::event::{MessageEvent, MessageIter};
 pub use self::has_support::HasSupportFuture;
 pub use self::image_bitmap::ImageBitmapSupportFuture;
 

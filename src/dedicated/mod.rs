@@ -1,16 +1,15 @@
 mod builder;
 mod common;
 mod context;
-mod event;
 mod handle;
 mod worker_url;
 
 use std::future::Future;
 
 pub use self::builder::{Close, ModuleSupportError, WorkerBuilder};
+pub use self::common::TransferError;
 use self::common::{Closure, WorkerOrContext};
 pub use self::context::WorkerContext;
-pub use self::event::{MessageEvent, MessageIter};
 pub use self::handle::{WorkerHandle, WorkerHandleRef};
 pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 

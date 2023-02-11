@@ -13,7 +13,7 @@ pub struct MessageEvent {
 }
 
 impl MessageEvent {
-	pub(super) const fn new(event: web_sys::MessageEvent) -> Self {
+	pub(crate) const fn new(event: web_sys::MessageEvent) -> Self {
 		Self {
 			event,
 			messages_taken: false,

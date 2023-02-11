@@ -10,7 +10,7 @@ pub(super) fn has_support(data: &JsValue) -> Result<(), SupportError> {
 	worker.terminate();
 
 	if let Err(error) = result {
-		let error: DomException = error.dyn_into().map_err(|_| SupportError::Undetermined)?;
+		let error: DomException = error.unchecked_into();
 
 		if error.code() == DomException::DATA_CLONE_ERR {
 			Err(SupportError::Unsupported)

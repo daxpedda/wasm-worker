@@ -32,7 +32,7 @@ async fn builder_clear_message_handler() -> Result<(), JsValue> {
 			let request = request.clone();
 			|context| async move {
 				request.await;
-				context.transfer_messages([ArrayBuffer::new(1)]);
+				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
 				Close::No
 			}
@@ -63,7 +63,7 @@ async fn handler_clear_message_handler() {
 		let request = request.clone();
 		|context| async move {
 			request.await;
-			context.transfer_messages([ArrayBuffer::new(1)]);
+			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
 			Close::No
 		}
@@ -105,7 +105,7 @@ async fn context_clear_message_handler() {
 	});
 
 	request.await;
-	worker.transfer_messages([ArrayBuffer::new(1)]);
+	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
 	// The message handler will never respond if cleared.
 	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
@@ -182,7 +182,7 @@ async fn builder_async_message_handler() -> Result<(), JsValue> {
 		})
 		.spawn({
 			|context| {
-				context.transfer_messages([ArrayBuffer::new(1)]);
+				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
 				Close::Yes
 			}
@@ -205,7 +205,7 @@ async fn handler_async_message_handler() {
 		let request = request.clone();
 		|context| async move {
 			request.await;
-			context.transfer_messages([ArrayBuffer::new(1)]);
+			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
 			Close::Yes
 		}
@@ -246,7 +246,7 @@ async fn context_async_message_handler() {
 	});
 
 	request.await;
-	worker.transfer_messages([ArrayBuffer::new(1)]);
+	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
 	response.await;
 
@@ -304,7 +304,9 @@ async fn handler_multi_message() {
 	let array = Uint8Array::new(&buffer_3);
 	array.copy_from(&[3; 3]);
 
-	worker.transfer_messages([buffer_1, buffer_2, buffer_3]);
+	worker
+		.transfer_messages([buffer_1, buffer_2, buffer_3])
+		.unwrap();
 
 	response.await;
 
@@ -353,7 +355,9 @@ async fn context_multi_message() -> Result<(), JsValue> {
 			let array = Uint8Array::new(&buffer_3);
 			array.copy_from(&[3; 3]);
 
-			context.transfer_messages([buffer_1, buffer_2, buffer_3]);
+			context
+				.transfer_messages([buffer_1, buffer_2, buffer_3])
+				.unwrap();
 
 			Close::Yes
 		});

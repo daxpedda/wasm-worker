@@ -4,7 +4,7 @@ use std::rc::{Rc, Weak};
 
 use web_sys::Worker;
 
-use super::{Closure, WorkerOrContext};
+use super::{Closure, TransferError, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
@@ -90,8 +90,11 @@ impl WorkerHandle {
 		self.worker.set_onmessage(Some(message_handler));
 	}
 
-	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
-		WorkerOrContext::Worker(&self.worker).transfer_messages(messages);
+	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
+		&self,
+		messages: M,
+	) -> Result<(), TransferError> {
+		WorkerOrContext::Worker(&self.worker).transfer_messages(messages)
 	}
 
 	pub fn terminate(self) {
@@ -168,8 +171,11 @@ impl WorkerHandleRef {
 		}
 	}
 
-	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(&self, messages: M) {
-		WorkerOrContext::Worker(&self.worker).transfer_messages(messages);
+	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
+		&self,
+		messages: M,
+	) -> Result<(), TransferError> {
+		WorkerOrContext::Worker(&self.worker).transfer_messages(messages)
 	}
 
 	pub fn terminate(self) {

@@ -1,10 +1,12 @@
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
 use std::future::Future;
 use std::ops::Deref;
 
 use js_sys::{Array, Function};
 use wasm_bindgen::closure::Closure as JsClosure;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
-use web_sys::{DedicatedWorkerGlobalScope, Worker};
+use wasm_bindgen::{JsCast, JsValue};
+use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
 use crate::Message;
 
@@ -71,7 +73,7 @@ impl WorkerOrContext<'_> {
 	pub(super) fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
 		self,
 		messages: M,
-	) {
+	) -> Result<(), TransferError> {
 		let mut messages = messages
 			.into_iter()
 			.map(Into::into)
@@ -79,13 +81,13 @@ impl WorkerOrContext<'_> {
 
 		let array = 'array: {
 			let Some(message_1) = messages.next() else {
-				return
+				return Ok(())
 			};
 
 			let Some(message_2) = messages.next() else {
 				return self
 					.post_message_with_transfer(&message_1, &Array::of1(&message_1))
-					.unwrap_throw();
+					.map_err(TransferError::from_js);
 			};
 
 			let Some(message_3) = messages.next() else {
@@ -110,6 +112,29 @@ impl WorkerOrContext<'_> {
 		};
 
 		self.post_message_with_transfer(&array, &array)
-			.unwrap_throw();
+			.map_err(TransferError::from_js)
+	}
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TransferError(DomException);
+
+impl TransferError {
+	fn from_js(value: JsValue) -> Self {
+		Self(value.into())
+	}
+}
+
+impl Display for TransferError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "error transferring type: {:?}", self.0)
+	}
+}
+
+impl Error for TransferError {}
+
+impl From<TransferError> for JsValue {
+	fn from(value: TransferError) -> Self {
+		value.to_string().into()
 	}
 }

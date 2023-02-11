@@ -62,7 +62,7 @@ async fn serialize() -> Result<(), JsValue> {
 		})
 		.spawn({
 			|context| {
-				context.transfer_messages([ArrayBuffer::new(1)]);
+				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
 				Close::Yes
 			}
@@ -148,7 +148,7 @@ where
 						assert_received(&value_2).await;
 
 						let old_value = value_1.clone();
-						context.transfer_messages([value_1, value_2]);
+						context.transfer_messages([value_1, value_2]).unwrap();
 						assert_sent(&old_value);
 					}
 				});
@@ -171,7 +171,7 @@ where
 	let value_2 = init().await;
 
 	let old_value = value_1.clone();
-	worker.transfer_messages([value_1, value_2]);
+	worker.transfer_messages([value_1, value_2]).unwrap();
 	assert_sent(&old_value);
 
 	response.await;
