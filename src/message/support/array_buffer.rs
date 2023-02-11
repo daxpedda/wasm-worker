@@ -1,14 +1,13 @@
+use js_sys::ArrayBuffer;
 use once_cell::sync::Lazy;
-use wasm_bindgen::UnwrapThrowExt;
-use web_sys::WritableStream;
 
 use super::super::SupportError;
 
 pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
-		let stream = WritableStream::new().unwrap_throw();
+		let buffer = ArrayBuffer::new(1);
 
-		super::has_support(&stream)
+		super::test_support(&buffer)
 	});
 
 	*SUPPORT

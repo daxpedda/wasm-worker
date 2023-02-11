@@ -268,7 +268,7 @@ async fn handler_multi_message() {
 
 		|context| async move {
 			context.set_message_handler(move |_, event| {
-				let messages = event.messages();
+				let messages = event.messages().unwrap().into_iter();
 				assert_eq!(messages.len(), 3);
 
 				for (index, message) in (1_u8..).zip(messages) {
@@ -325,7 +325,7 @@ async fn context_multi_message() -> Result<()> {
 		.message_handler({
 			let flag = flag.clone();
 			move |_, event| {
-				let messages = event.messages();
+				let messages = event.messages().unwrap().into_iter();
 
 				assert_eq!(messages.len(), 3);
 

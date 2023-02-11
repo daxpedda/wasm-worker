@@ -127,7 +127,7 @@ impl Future for ImageBitmapSupportFuture {
 						.unwrap_throw()
 						.unchecked_into();
 
-					let support = super::has_support(&bitmap);
+					let support = super::test_support(&bitmap);
 
 					self.0.take();
 					SUPPORT.set(support).unwrap();

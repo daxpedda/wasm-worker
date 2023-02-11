@@ -5,7 +5,14 @@ use std::task::{ready, Context, Poll};
 #[cfg(feature = "futures")]
 use futures_util::future::FusedFuture;
 
-use super::{ImageBitmapSupportFuture, Message, SupportError};
+use super::super::Message;
+use super::{ImageBitmapSupportFuture, SupportError};
+
+impl Message {
+	pub fn has_support(&self) -> HasSupportFuture {
+		HasSupportFuture::new(self)
+	}
+}
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
@@ -18,7 +25,7 @@ enum Inner {
 }
 
 impl HasSupportFuture {
-	pub(super) fn new(message: &Message) -> Self {
+	fn new(message: &Message) -> Self {
 		Self(Some(match message {
 			Message::ArrayBuffer(_) => Inner::Ready(Message::has_array_buffer_support()),
 			#[cfg(web_sys_unstable_apis)]

@@ -8,7 +8,7 @@ use wasm_bindgen::closure::Closure as JsClosure;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
-use crate::Message;
+use crate::{Message, Messages, RawMessages};
 
 #[derive(Debug)]
 pub(super) enum Closure {
@@ -85,13 +85,17 @@ impl WorkerOrContext<'_> {
 			};
 
 			let Some(message_2) = messages.next() else {
+				let array = Array::of1(&message_1);
 				return self
-					.post_message_with_transfer(&message_1, &Array::of1(&message_1))
-					.map_err(TransferError::from_js);
+					.post_message_with_transfer(&message_1, &array)
+					.map_err(|error| TransferError {
+						error: error.into(),
+						messages: Messages(RawMessages::Single(message_1)),
+					});
 			};
 
 			let Some(message_3) = messages.next() else {
-				break 'array  Array::of2(&message_1, &message_2);
+				break 'array Array::of2(&message_1, &message_2);
 			};
 
 			let Some(message_4) = messages.next() else {
@@ -112,22 +116,22 @@ impl WorkerOrContext<'_> {
 		};
 
 		self.post_message_with_transfer(&array, &array)
-			.map_err(TransferError::from_js)
+			.map_err(|error| TransferError {
+				error: error.into(),
+				messages: Messages(RawMessages::Array(array)),
+			})
 	}
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TransferError(DomException);
-
-impl TransferError {
-	fn from_js(value: JsValue) -> Self {
-		Self(value.into())
-	}
+#[derive(Debug)]
+pub struct TransferError {
+	pub error: DomException,
+	pub messages: Messages,
 }
 
 impl Display for TransferError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "error transferring type: {:?}", self.0)
+		write!(f, "error transferring type: {:?}", self.error)
 	}
 }
 

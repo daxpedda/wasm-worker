@@ -40,7 +40,7 @@ async fn serialize() -> Result<()> {
 		.message_handler({
 			let flag = flag.clone();
 			move |_, event| {
-				let mut message = event.messages().next().unwrap();
+				let mut message = event.messages().unwrap().into_iter().next().unwrap();
 
 				#[cfg(web_sys_unstable_apis)]
 				{
@@ -116,7 +116,7 @@ where
 				let response = response.clone();
 
 				async move {
-					let mut messages = event.messages();
+					let mut messages = event.messages().unwrap().into_iter();
 					assert_eq!(messages.len(), 2);
 
 					let value: T = messages.next().unwrap().serialize_as().unwrap();
@@ -138,7 +138,7 @@ where
 					let context = context.clone();
 
 					async move {
-						let mut messages = event.messages();
+						let mut messages = event.messages().unwrap().into_iter();
 						assert_eq!(messages.len(), 2);
 
 						let value_1: T = messages.next().unwrap().serialize_as().unwrap();

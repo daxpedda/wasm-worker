@@ -27,7 +27,7 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 		)
 		.unwrap_throw();
 
-		super::has_support(&frame)
+		super::test_support(&frame)
 	});
 
 	*SUPPORT

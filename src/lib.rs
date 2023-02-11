@@ -22,5 +22,5 @@ pub use self::dedicated::{
 };
 pub use self::message::{
 	HasSupportFuture, ImageBitmapSupportFuture, Message, MessageError, MessageEvent, MessageIter,
-	RawMessage, SupportError,
+	Messages, RawMessage, RawMessages, SupportError,
 };

@@ -1,13 +1,14 @@
 mod conversion;
 mod event;
-mod has_support;
-mod r#type;
+mod raw;
+mod support;
 
-use std::error::Error;
-use std::fmt::{self, Debug, Display, Formatter};
+use std::fmt::Debug;
+use std::iter::FusedIterator;
+use std::ops::Range;
 
-use js_sys::{ArrayBuffer, Object};
-use wasm_bindgen::{JsCast, JsValue};
+use js_sys::{Array, ArrayBuffer};
+use wasm_bindgen::JsValue;
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{AudioData, VideoFrame};
 use web_sys::{
@@ -15,15 +16,9 @@ use web_sys::{
 	WritableStream,
 };
 
-pub use self::event::{MessageEvent, MessageIter};
-pub use self::has_support::HasSupportFuture;
-pub use self::image_bitmap::ImageBitmapSupportFuture;
-use self::r#type::{
-	array_buffer, image_bitmap, message_port, offscreen_canvas, readable_stream, rtc_data_channel,
-	transform_stream, writable_stream,
-};
-#[cfg(web_sys_unstable_apis)]
-use self::r#type::{audio_data, video_frame};
+pub use self::event::MessageEvent;
+pub use self::raw::{MessageError, RawMessage, RawMessages};
+pub use self::support::{HasSupportFuture, ImageBitmapSupportFuture, SupportError};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Message {
@@ -58,127 +53,129 @@ impl Message {
 			Self::WritableStream(value) => value.into(),
 		}
 	}
-
-	pub fn has_support(&self) -> HasSupportFuture {
-		HasSupportFuture::new(self)
-	}
-
-	pub fn has_array_buffer_support() -> Result<(), SupportError> {
-		array_buffer::support()
-	}
-
-	#[cfg(web_sys_unstable_apis)]
-	pub fn has_audio_data_support() -> Result<(), SupportError> {
-		audio_data::support()
-	}
-
-	pub fn has_image_bitmap_support() -> ImageBitmapSupportFuture {
-		ImageBitmapSupportFuture::new()
-	}
-
-	pub fn has_message_port_support() -> Result<(), SupportError> {
-		message_port::support()
-	}
-
-	pub fn has_offscreen_canvas_support() -> Result<(), SupportError> {
-		offscreen_canvas::support()
-	}
-
-	pub fn has_readable_stream_support() -> Result<(), SupportError> {
-		readable_stream::support()
-	}
-
-	pub fn has_rtc_data_channel_support() -> Result<(), SupportError> {
-		rtc_data_channel::support()
-	}
-
-	pub fn has_transform_stream_support() -> Result<(), SupportError> {
-		transform_stream::support()
-	}
-
-	#[cfg(web_sys_unstable_apis)]
-	pub fn has_video_frame_support() -> Result<(), SupportError> {
-		video_frame::support()
-	}
-
-	pub fn has_writable_stream_support() -> Result<(), SupportError> {
-		writable_stream::support()
-	}
 }
 
 #[derive(Debug)]
-pub struct RawMessage(pub(crate) JsValue);
+pub struct Messages(pub(crate) RawMessages);
 
-impl RawMessage {
+impl Messages {
 	#[must_use]
 	#[allow(clippy::missing_const_for_fn)]
-	pub fn into_raw(self) -> JsValue {
+	pub fn into_raw(self) -> RawMessages {
 		self.0
 	}
+}
 
-	pub fn serialize(self) -> Result<Message, MessageError<Self>> {
-		let data = self.0;
+impl IntoIterator for Messages {
+	type Item = RawMessage;
 
-		let object = if data.is_object() {
-			Object::unchecked_from_js(data)
-		} else {
-			return Err(MessageError(Self(data)));
-		};
+	type IntoIter = MessageIter;
 
-		Ok(match String::from(object.constructor().name()).as_str() {
-			"ArrayBuffer" => Message::ArrayBuffer(object.unchecked_into()),
-			#[cfg(web_sys_unstable_apis)]
-			"AudioData" => Message::AudioData(object.unchecked_into()),
-			"ImageBitmap" => Message::ImageBitmap(object.unchecked_into()),
-			"MessagePort" => Message::MessagePort(object.unchecked_into()),
-			"OffscreenCanvas" => Message::OffscreenCanvas(object.unchecked_into()),
-			"ReadableStream" => Message::ReadableStream(object.unchecked_into()),
-			"RTCDataChannel" => Message::RtcDataChannel(object.unchecked_into()),
-			"TransformStream" => Message::TransformStream(object.unchecked_into()),
-			#[cfg(web_sys_unstable_apis)]
-			"VideoFrame" => Message::VideoFrame(object.unchecked_into()),
-			"WritableStream" => Message::WritableStream(object.unchecked_into()),
-			_ => return Err(MessageError(Self(object.into()))),
-		})
-	}
-
-	pub fn serialize_as<T>(self) -> Result<T, MessageError<Self>>
-	where
-		T: JsCast,
-		Message: From<T>,
-	{
-		if self.0.is_instance_of::<T>() {
-			Ok(self.0.unchecked_into::<T>())
-		} else {
-			Err(MessageError(self))
+	fn into_iter(self) -> Self::IntoIter {
+		match self.0 {
+			RawMessages::Single(value) => MessageIter(Inner::Single(Some(value))),
+			RawMessages::Array(array) => MessageIter(Inner::Array {
+				range: 0..array.length(),
+				array,
+			}),
 		}
 	}
 }
 
 #[derive(Debug)]
-pub struct MessageError<T: Debug>(pub T);
+pub struct MessageIter(Inner);
 
-impl<T: Debug> Display for MessageError<T> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "unexpected message: {:?}", self.0)
-	}
+#[derive(Debug)]
+enum Inner {
+	Single(Option<JsValue>),
+	Array { array: Array, range: Range<u32> },
 }
 
-impl<T: Debug> Error for MessageError<T> {}
+impl MessageIter {
+	#[must_use]
+	pub fn into_raw(self) -> Option<RawMessages> {
+		match self.0 {
+			Inner::Single(value) => Some(RawMessages::Single(value?)),
+			Inner::Array { array, range } => {
+				let real_range = 0..array.length();
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SupportError {
-	Unsupported,
-	Undetermined,
-}
-
-impl Display for SupportError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::Unsupported => write!(f, "type is not transferable"),
-			Self::Undetermined => write!(f, "type transfer support couldn't be determined"),
+				if range.is_empty() {
+					None
+				} else if real_range == range {
+					Some(RawMessages::Array(array))
+				} else {
+					Some(RawMessages::Array(array.slice(range.start, range.end)))
+				}
+			}
 		}
 	}
 }
 
-impl Error for SupportError {}
+impl Iterator for MessageIter {
+	type Item = RawMessage;
+
+	fn next(&mut self) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => {
+				let index = range.next()?;
+				Some(RawMessage(array.get(index)))
+			}
+			Inner::Single(value) => value.take().map(RawMessage),
+		}
+	}
+
+	fn size_hint(&self) -> (usize, Option<usize>) {
+		match &self.0 {
+			Inner::Array { range, .. } => range.size_hint(),
+			Inner::Single(value) => value.iter().size_hint(),
+		}
+	}
+
+	fn count(self) -> usize
+	where
+		Self: Sized,
+	{
+		self.size_hint().0
+	}
+
+	fn last(self) -> Option<Self::Item>
+	where
+		Self: Sized,
+	{
+		match self.0 {
+			Inner::Array { array, range } => range.last().map(|index| RawMessage(array.get(index))),
+			Inner::Single(value) => value.map(RawMessage),
+		}
+	}
+
+	fn nth(&mut self, n: usize) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => range.nth(n).map(|index| RawMessage(array.get(index))),
+			Inner::Single(value) => value.take().into_iter().nth(n).map(RawMessage),
+		}
+	}
+}
+
+impl ExactSizeIterator for MessageIter {}
+
+impl FusedIterator for MessageIter {}
+
+impl DoubleEndedIterator for MessageIter {
+	fn next_back(&mut self) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => {
+				range.next_back().map(|index| RawMessage(array.get(index)))
+			}
+			Inner::Single(value) => value.take().map(RawMessage),
+		}
+	}
+
+	fn nth_back(&mut self, n: usize) -> Option<Self::Item> {
+		match &mut self.0 {
+			Inner::Array { array, range } => {
+				range.nth_back(n).map(|index| RawMessage(array.get(index)))
+			}
+			Inner::Single(value) => value.take().into_iter().nth_back(n).map(RawMessage),
+		}
+	}
+}

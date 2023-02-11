@@ -23,7 +23,7 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 
 		let canvas = OffscreenCanvas::new(1, 0).unwrap_throw();
 
-		super::has_support(&canvas)
+		super::test_support(&canvas)
 	});
 
 	*SUPPORT

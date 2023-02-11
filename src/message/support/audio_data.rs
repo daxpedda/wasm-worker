@@ -25,7 +25,7 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 		let init = AudioDataInit::new(&ArrayBuffer::new(1), AudioSampleFormat::U8, 1, 1, 3000., 0.);
 		let data = AudioData::new(&init).unwrap_throw();
 
-		super::has_support(&data)
+		super::test_support(&data)
 	});
 
 	*SUPPORT
