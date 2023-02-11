@@ -28,7 +28,7 @@ impl HasSupportFuture {
 			Message::OffscreenCanvas(_) => Inner::Ready(Message::has_offscreen_canvas_support()),
 			Message::ReadableStream(_) => Inner::Ready(Message::has_readable_stream_support()),
 			Message::RtcDataChannel(_) => Inner::Ready(Message::has_rtc_data_channel_support()),
-			Message::TransformStream(_) => todo!(),
+			Message::TransformStream(_) => Inner::Ready(Message::has_transform_stream_support()),
 			#[cfg(web_sys_unstable_apis)]
 			Message::VideoFrame(_) => todo!(),
 			Message::WritableStream(_) => todo!(),

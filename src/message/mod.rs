@@ -9,6 +9,7 @@ mod message_port;
 mod offscreen_canvas;
 mod readable_stream;
 mod rtc_data_channel;
+mod transform_stream;
 mod util;
 
 use std::error::Error;
@@ -92,6 +93,10 @@ impl Message {
 
 	pub fn has_rtc_data_channel_support() -> Result<(), SupportError> {
 		rtc_data_channel::support()
+	}
+
+	pub fn has_transform_stream_support() -> Result<(), SupportError> {
+		transform_stream::support()
 	}
 }
 

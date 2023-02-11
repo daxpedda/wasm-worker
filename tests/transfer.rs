@@ -371,3 +371,24 @@ async fn rtc_data_channel() -> Result<(), JsValue> {
 	)
 	.await
 }
+
+/// [`TransformStream`].
+#[wasm_bindgen_test]
+async fn transform_stream() -> Result<(), JsValue> {
+	test_transfer(
+		Message::has_transform_stream_support(),
+		false,
+		|| async { TransformStream::new().unwrap_throw() },
+		|stream| {
+			assert!(stream.readable().locked());
+			assert!(stream.writable().locked());
+		},
+		|stream| {
+			assert!(!stream.readable().locked());
+			assert!(!stream.writable().locked());
+
+			async {}
+		},
+	)
+	.await
+}
