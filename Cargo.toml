@@ -33,6 +33,8 @@ web-sys = { version = "0.3", features = [
 	"TransformStream",
 	"Url",
 	"VideoFrame",
+	"VideoFrameBufferInit",
+	"VideoPixelFormat",
 	"Window",
 	"Worker",
 	"WorkerGlobalScope",

@@ -11,6 +11,8 @@ mod readable_stream;
 mod rtc_data_channel;
 mod transform_stream;
 mod util;
+#[cfg(web_sys_unstable_apis)]
+mod video_frame;
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -97,6 +99,11 @@ impl Message {
 
 	pub fn has_transform_stream_support() -> Result<(), SupportError> {
 		transform_stream::support()
+	}
+
+	#[cfg(web_sys_unstable_apis)]
+	pub fn has_video_frame_support() -> Result<(), SupportError> {
+		video_frame::support()
 	}
 }
 

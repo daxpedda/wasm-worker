@@ -10,18 +10,18 @@ use futures_util::future::Either;
 use futures_util::{future, FutureExt};
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::closure::Closure;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, Message, SupportError, WorkerBuilder};
+#[cfg(web_sys_unstable_apis)]
+use web_sys::{
+	AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame,
+	VideoFrameBufferInit, VideoPixelFormat,
+};
 use web_sys::{
 	ImageBitmap, ImageData, MessageChannel, MessagePort, OffscreenCanvas, ReadableStream,
 	RtcDataChannel, RtcDataChannelState, RtcPeerConnection, TransformStream, WritableStream,
-};
-#[cfg(web_sys_unstable_apis)]
-use {
-	wasm_bindgen::UnwrapThrowExt,
-	web_sys::{AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame},
 };
 
 use self::util::{Flag, SIGNAL_DURATION};
@@ -386,6 +386,36 @@ async fn transform_stream() -> Result<(), JsValue> {
 		|stream| {
 			assert!(!stream.readable().locked());
 			assert!(!stream.writable().locked());
+
+			async {}
+		},
+	)
+	.await
+}
+
+/// [`VideoFrame`].
+#[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
+async fn video_frame() -> Result<(), JsValue> {
+	test_transfer(
+		Message::has_video_frame_support(),
+		false,
+		|| async {
+			VideoFrame::new_with_u8_array_and_video_frame_buffer_init(
+				&mut [0; 4],
+				&VideoFrameBufferInit::new(1, 1, VideoPixelFormat::Rgba, 0.),
+			)
+			.unwrap_throw()
+		},
+		|frame| {
+			assert_eq!(frame.coded_width(), 0);
+			assert_eq!(frame.coded_height(), 0);
+			assert_eq!(frame.format(), None);
+		},
+		|frame| {
+			assert_eq!(frame.coded_width(), 1);
+			assert_eq!(frame.coded_height(), 1);
+			assert_eq!(frame.format(), Some(VideoPixelFormat::Rgba));
 
 			async {}
 		},

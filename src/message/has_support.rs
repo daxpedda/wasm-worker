@@ -30,7 +30,7 @@ impl HasSupportFuture {
 			Message::RtcDataChannel(_) => Inner::Ready(Message::has_rtc_data_channel_support()),
 			Message::TransformStream(_) => Inner::Ready(Message::has_transform_stream_support()),
 			#[cfg(web_sys_unstable_apis)]
-			Message::VideoFrame(_) => todo!(),
+			Message::VideoFrame(_) => Inner::Ready(Message::has_video_frame_support()),
 			Message::WritableStream(_) => todo!(),
 		}))
 	}
