@@ -4,9 +4,9 @@
 
 mod util;
 
+use anyhow::Result;
 use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
-use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, Message, WorkerBuilder};
 
@@ -17,7 +17,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// [`WorkerBuilder::message_handler()`] with
 /// [`WorkerHandle::clear_message_handler()`](wasm_worker::WorkerHandle::clear_message_handler).
 #[wasm_bindgen_test]
-async fn builder_clear_message_handler() -> Result<(), JsValue> {
+async fn builder_clear_message_handler() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
@@ -117,7 +117,7 @@ async fn context_clear_message_handler() {
 /// [`WorkerBuilder::message_handler()`] with
 /// [`WorkerHandle::builder_has_message_handler()`](wasm_worker::WorkerHandle::builder_has_message_handler).
 #[wasm_bindgen_test]
-fn builder_has_message_handler() -> Result<(), JsValue> {
+fn builder_has_message_handler() -> Result<()> {
 	let worker = WorkerBuilder::new()?
 		.message_handler(|_, _| ())
 		.spawn(|_| Close::Yes);
@@ -167,7 +167,7 @@ async fn context_has_message_handler() {
 
 /// [`WorkerBuilder::message_handler_async()`].
 #[wasm_bindgen_test]
-async fn builder_async_message_handler() -> Result<(), JsValue> {
+async fn builder_async_message_handler() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
@@ -316,7 +316,7 @@ async fn handler_multi_message() {
 /// Multiple messages in
 /// [`WorkerContext::transfer_messages()`](wasm_worker::WorkerContext::transfer_messages).
 #[wasm_bindgen_test]
-async fn context_multi_message() -> Result<(), JsValue> {
+async fn context_multi_message() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();

@@ -132,9 +132,3 @@ impl Display for TransferError {
 }
 
 impl Error for TransferError {}
-
-impl From<TransferError> for JsValue {
-	fn from(value: TransferError) -> Self {
-		value.to_string().into()
-	}
-}

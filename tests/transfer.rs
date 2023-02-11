@@ -6,6 +6,7 @@ mod util;
 use std::fmt::Debug;
 use std::future::Future;
 
+use anyhow::Result;
 use futures_util::future::Either;
 use futures_util::{future, FutureExt};
 use js_sys::{ArrayBuffer, Uint8Array};
@@ -30,7 +31,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 /// [`RawMessage::serialize()`](wasm_worker::RawMessage::serialize).
 #[wasm_bindgen_test]
-async fn serialize() -> Result<(), JsValue> {
+async fn serialize() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
@@ -83,7 +84,7 @@ async fn test_transfer<T, F1, F2>(
 	init: impl Fn() -> F1,
 	assert_sent: impl 'static + Copy + Fn(&T) + Send,
 	assert_received: impl 'static + Clone + Fn(&T) -> F2 + Send,
-) -> Result<(), JsValue>
+) -> Result<()>
 where
 	T: Clone + JsCast + TryFrom<Message>,
 	Message: From<T>,
@@ -183,7 +184,7 @@ where
 
 /// [`ArrayBuffer`].
 #[wasm_bindgen_test]
-async fn array_buffer() -> Result<(), JsValue> {
+async fn array_buffer() -> Result<()> {
 	test_transfer(
 		Message::has_array_buffer_support(),
 		true,
@@ -207,7 +208,7 @@ async fn array_buffer() -> Result<(), JsValue> {
 /// [`AudioData`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
-async fn audio_data() -> Result<(), JsValue> {
+async fn audio_data() -> Result<()> {
 	test_transfer(
 		Message::has_audio_data_support(),
 		false,
@@ -236,7 +237,7 @@ async fn audio_data() -> Result<(), JsValue> {
 /// [`ImageBitmap`] and
 /// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::ImageBitmapSupportFuture::into_inner).
 #[wasm_bindgen_test]
-async fn image_bitmap() -> Result<(), JsValue> {
+async fn image_bitmap() -> Result<()> {
 	let mut future = Message::has_image_bitmap_support();
 	assert_eq!(future.into_inner(), None);
 	assert!(future.await.is_ok());
@@ -276,7 +277,7 @@ async fn image_bitmap() -> Result<(), JsValue> {
 
 /// [`MessagePort`](web_sys::MessagePort).
 #[wasm_bindgen_test]
-async fn message_port() -> Result<(), JsValue> {
+async fn message_port() -> Result<()> {
 	let flag = Flag::new();
 	let closure: Closure<dyn Fn()> = Closure::new({
 		let flag = flag.clone();
@@ -316,7 +317,7 @@ async fn message_port() -> Result<(), JsValue> {
 
 /// [`OffscreenCanvas`].
 #[wasm_bindgen_test]
-async fn offscreen_canvas() -> Result<(), JsValue> {
+async fn offscreen_canvas() -> Result<()> {
 	test_transfer(
 		Message::has_offscreen_canvas_support(),
 		false,
@@ -337,7 +338,7 @@ async fn offscreen_canvas() -> Result<(), JsValue> {
 
 /// [`ReadableStream`].
 #[wasm_bindgen_test]
-async fn readable_stream() -> Result<(), JsValue> {
+async fn readable_stream() -> Result<()> {
 	test_transfer(
 		Message::has_readable_stream_support(),
 		false,
@@ -354,7 +355,7 @@ async fn readable_stream() -> Result<(), JsValue> {
 
 /// [`RtcDataChannel`](web_sys::RtcDataChannel).
 #[wasm_bindgen_test]
-async fn rtc_data_channel() -> Result<(), JsValue> {
+async fn rtc_data_channel() -> Result<()> {
 	test_transfer(
 		Message::has_rtc_data_channel_support(),
 		false,
@@ -374,7 +375,7 @@ async fn rtc_data_channel() -> Result<(), JsValue> {
 
 /// [`TransformStream`].
 #[wasm_bindgen_test]
-async fn transform_stream() -> Result<(), JsValue> {
+async fn transform_stream() -> Result<()> {
 	test_transfer(
 		Message::has_transform_stream_support(),
 		false,
@@ -396,7 +397,7 @@ async fn transform_stream() -> Result<(), JsValue> {
 /// [`VideoFrame`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
-async fn video_frame() -> Result<(), JsValue> {
+async fn video_frame() -> Result<()> {
 	test_transfer(
 		Message::has_video_frame_support(),
 		false,
@@ -425,7 +426,7 @@ async fn video_frame() -> Result<(), JsValue> {
 
 /// [`WritableStream`].
 #[wasm_bindgen_test]
-async fn writable_stream() -> Result<(), JsValue> {
+async fn writable_stream() -> Result<()> {
 	test_transfer(
 		Message::has_writable_stream_support(),
 		false,

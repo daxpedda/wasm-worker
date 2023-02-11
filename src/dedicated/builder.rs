@@ -232,9 +232,3 @@ impl Display for ModuleSupportError {
 }
 
 impl Error for ModuleSupportError {}
-
-impl From<ModuleSupportError> for JsValue {
-	fn from(value: ModuleSupportError) -> Self {
-		value.to_string().into()
-	}
-}

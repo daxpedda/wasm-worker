@@ -2,7 +2,8 @@
 
 mod util;
 
-use wasm_bindgen::{JsValue, ShimFormat};
+use anyhow::Result;
+use wasm_bindgen::ShimFormat;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
 
@@ -12,7 +13,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 /// [`WorkerBuilder::spawn()`].
 #[wasm_bindgen_test]
-async fn spawn() -> Result<(), JsValue> {
+async fn spawn() -> Result<()> {
 	let flag = Flag::new();
 
 	WorkerBuilder::new()?.spawn({
@@ -30,7 +31,7 @@ async fn spawn() -> Result<(), JsValue> {
 
 /// [`WorkerBuilder::spawn_async()`].
 #[wasm_bindgen_test]
-async fn spawn_async() -> Result<(), JsValue> {
+async fn spawn_async() -> Result<()> {
 	let flag = Flag::new();
 
 	WorkerBuilder::new()?.spawn_async({
@@ -48,7 +49,7 @@ async fn spawn_async() -> Result<(), JsValue> {
 
 /// [`WorkerBuilder::new_with_url()`].
 #[wasm_bindgen_test]
-async fn url() -> Result<(), JsValue> {
+async fn url() -> Result<()> {
 	let flag = Flag::new();
 
 	// Ideally we would built a custom JS that can receive an atomic.
@@ -79,7 +80,7 @@ async fn url() -> Result<(), JsValue> {
 
 /// [`WorkerBuilder::name()`].
 #[wasm_bindgen_test]
-async fn name() -> Result<(), JsValue> {
+async fn name() -> Result<()> {
 	let flag = Flag::new();
 
 	WorkerBuilder::new()?.name("test").spawn({
