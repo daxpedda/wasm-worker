@@ -1,13 +1,13 @@
-use js_sys::{Array, ArrayBuffer};
+use js_sys::ArrayBuffer;
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
-use web_sys::{AudioData, AudioDataInit, AudioSampleFormat, Worker};
+use web_sys::{AudioData, AudioDataInit, AudioSampleFormat};
 
-use super::SupportError;
+use super::{util, SupportError};
 
 pub(super) fn support() -> Result<(), SupportError> {
-	static SUPPORT: Lazy<bool> = Lazy::new(|| {
+	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
 			type AudioDataGlobal;
@@ -19,20 +19,14 @@ pub(super) fn support() -> Result<(), SupportError> {
 		let global: AudioDataGlobal = js_sys::global().unchecked_into();
 
 		if global.audio_data().is_undefined() {
-			return false;
+			return Err(SupportError::Unsupported);
 		}
 
 		let init = AudioDataInit::new(&ArrayBuffer::new(1), AudioSampleFormat::U8, 1, 1, 3000., 0.);
 		let data = AudioData::new(&init).unwrap_throw();
 
-		let worker = Worker::new("data:,").unwrap_throw();
-		worker
-			.post_message_with_transfer(&data, &Array::of1(&data))
-			.unwrap_throw();
-		worker.terminate();
-
-		data.format().is_none()
+		util::has_support(&data)
 	});
 
-	SUPPORT.then_some(()).ok_or(SupportError::Unsupported)
+	*SUPPORT
 }

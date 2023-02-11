@@ -14,7 +14,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::{Close, Message, SupportError, WorkerBuilder};
 use web_sys::{
 	ImageBitmap, ImageData, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel,
-	TransformStream, WritableStream,
+	RtcDataChannelState, RtcPeerConnection, TransformStream, WritableStream,
 };
 #[cfg(web_sys_unstable_apis)]
 use {
@@ -281,6 +281,22 @@ async fn readable_stream() -> Result<(), JsValue> {
 		|| async { ReadableStream::new().unwrap_throw() },
 		|stream| assert!(stream.locked()),
 		|stream| assert!(!stream.locked()),
+	)
+	.await
+}
+
+/// [`RtcDataChannel`](web_sys::RtcDataChannel).
+#[wasm_bindgen_test]
+async fn rtc_data_channel() -> Result<(), JsValue> {
+	test_transfer(
+		Message::has_rtc_data_channel_support(),
+		false,
+		|| async {
+			let connection = RtcPeerConnection::new().unwrap_throw();
+			connection.create_data_channel("")
+		},
+		|channel| assert_eq!(channel.ready_state(), RtcDataChannelState::Closed),
+		|channel| assert_eq!(channel.ready_state(), RtcDataChannelState::Connecting),
 	)
 	.await
 }

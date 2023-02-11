@@ -3,17 +3,16 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
-use js_sys::Array;
 use once_cell::sync::OnceCell;
 use once_cell::unsync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{ImageBitmap, ImageData, Window, Worker, WorkerGlobalScope};
+use web_sys::{ImageBitmap, ImageData, Window, WorkerGlobalScope};
 
-use super::SupportError;
+use super::{util, SupportError};
 
-static SUPPORT: OnceCell<bool> = OnceCell::new();
+static SUPPORT: OnceCell<Result<(), SupportError>> = OnceCell::new();
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
@@ -29,9 +28,7 @@ enum Inner {
 impl ImageBitmapSupportFuture {
 	pub(super) fn new() -> Self {
 		if let Some(support) = SUPPORT.get() {
-			Self(Some(Inner::Ready(
-				support.then_some(()).ok_or(SupportError::Unsupported),
-			)))
+			Self(Some(Inner::Ready(*support)))
 		} else {
 			Self(Some(Inner::Unknown))
 		}
@@ -84,7 +81,7 @@ impl Future for ImageBitmapSupportFuture {
 		}
 
 		if let Some(support) = SUPPORT.get() {
-			return Poll::Ready(support.then_some(()).ok_or(SupportError::Unsupported));
+			return Poll::Ready(*support);
 		}
 
 		let mut self_ = self.as_mut();
@@ -128,17 +125,11 @@ impl Future for ImageBitmapSupportFuture {
 						.unwrap_throw()
 						.unchecked_into();
 
-					let worker = Worker::new("data:,").unwrap_throw();
-					worker
-						.post_message_with_transfer(&bitmap, &Array::of1(&bitmap))
-						.unwrap_throw();
-					worker.terminate();
+					let support = util::has_support(&bitmap);
 
 					self.0.take();
-
-					let support = bitmap.width() == 0;
 					SUPPORT.set(support).unwrap();
-					return Poll::Ready(support.then_some(()).ok_or(SupportError::Unsupported));
+					return Poll::Ready(support);
 				}
 			}
 		}

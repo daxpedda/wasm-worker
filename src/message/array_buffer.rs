@@ -1,22 +1,14 @@
-use js_sys::{Array, ArrayBuffer};
+use js_sys::ArrayBuffer;
 use once_cell::sync::Lazy;
-use wasm_bindgen::UnwrapThrowExt;
-use web_sys::Worker;
 
-use super::SupportError;
+use super::{util, SupportError};
 
 pub(super) fn support() -> Result<(), SupportError> {
-	static SUPPORT: Lazy<bool> = Lazy::new(|| {
+	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		let buffer = ArrayBuffer::new(1);
 
-		let worker = Worker::new("data:,").unwrap_throw();
-		worker
-			.post_message_with_transfer(&buffer, &Array::of1(&buffer))
-			.unwrap_throw();
-		worker.terminate();
-
-		buffer.byte_length() == 0
+		util::has_support(&buffer)
 	});
 
-	SUPPORT.then_some(()).ok_or(SupportError::Unsupported)
+	*SUPPORT
 }

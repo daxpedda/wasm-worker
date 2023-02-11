@@ -6,6 +6,8 @@ mod has_support;
 mod image_bitmap;
 mod offscreen_canvas;
 mod readable_stream;
+mod rtc_data_channel;
+mod util;
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -80,6 +82,10 @@ impl Message {
 	pub fn has_readable_stream_support() -> Result<(), SupportError> {
 		readable_stream::support()
 	}
+
+	pub fn has_rtc_data_channel_support() -> Result<(), SupportError> {
+		rtc_data_channel::support()
+	}
 }
 
 #[derive(Debug)]
@@ -109,7 +115,7 @@ impl RawMessage {
 			"MessagePort" => Message::MessagePort(object.unchecked_into()),
 			"OffscreenCanvas" => Message::OffscreenCanvas(object.unchecked_into()),
 			"ReadableStream" => Message::ReadableStream(object.unchecked_into()),
-			"RtcDataChannel" => Message::RtcDataChannel(object.unchecked_into()),
+			"RTCDataChannel" => Message::RtcDataChannel(object.unchecked_into()),
 			"TransformStream" => Message::TransformStream(object.unchecked_into()),
 			#[cfg(web_sys_unstable_apis)]
 			"VideoFrame" => Message::VideoFrame(object.unchecked_into()),
