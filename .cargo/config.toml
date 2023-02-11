@@ -1,4 +1,8 @@
 [build]
+rustdocflags = [
+	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
+	"--cfg=web_sys_unstable_apis",
+]
 target = "wasm32-unknown-unknown"
 
 [unstable]
