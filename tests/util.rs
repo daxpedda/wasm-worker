@@ -100,11 +100,15 @@ impl Flag {
 
 	/// Will wake up any thread waiting on this [`Flag`].
 	///
-	/// This is permanent and any thread awaiting this [`Flag`] will wake up
-	/// immediately.
+	/// Any thread awaiting this [`Flag`] will wake up immediately.
 	pub fn signal(&self) {
 		self.0.set.store(true, Ordering::Relaxed);
 		self.0.waker.wake();
+	}
+
+	/// Resets the flag.
+	pub fn reset(&self) {
+		self.0.set.store(false, Ordering::SeqCst);
 	}
 }
 

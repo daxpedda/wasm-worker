@@ -21,7 +21,7 @@ impl HasSupportFuture {
 			#[cfg(web_sys_unstable_apis)]
 			Message::AudioData(_) => Inner::Ready(Message::has_audio_data_support()),
 			Message::ImageBitmap(_) => Inner::ImageBitmap(Message::has_image_bitmap_support()),
-			Message::MessagePort(_) => Inner::Ready(Err(SupportError::Undetermined)),
+			Message::MessagePort(_) => Inner::Ready(Message::has_message_port_support()),
 			Message::OffscreenCanvas(_) => Inner::Ready(Message::has_offscreen_canvas_support()),
 			Message::ReadableStream(_) => Inner::Ready(Message::has_readable_stream_support()),
 			Message::RtcDataChannel(_) => Inner::Ready(Message::has_rtc_data_channel_support()),

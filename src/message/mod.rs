@@ -4,6 +4,7 @@ mod audio_data;
 mod conversion;
 mod has_support;
 mod image_bitmap;
+mod message_port;
 mod offscreen_canvas;
 mod readable_stream;
 mod rtc_data_channel;
@@ -73,6 +74,10 @@ impl Message {
 
 	pub fn has_image_bitmap_support() -> ImageBitmapSupportFuture {
 		ImageBitmapSupportFuture::new()
+	}
+
+	pub fn has_message_port_support() -> Result<(), SupportError> {
+		message_port::support()
 	}
 
 	pub fn has_offscreen_canvas_support() -> Result<(), SupportError> {
