@@ -3,9 +3,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{VideoFrame, VideoFrameBufferInit, VideoPixelFormat};
 
-use super::{util, SupportError};
+use super::super::SupportError;
 
-pub(super) fn support() -> Result<(), SupportError> {
+pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
@@ -27,7 +27,7 @@ pub(super) fn support() -> Result<(), SupportError> {
 		)
 		.unwrap_throw();
 
-		util::has_support(&frame)
+		super::has_support(&frame)
 	});
 
 	*SUPPORT

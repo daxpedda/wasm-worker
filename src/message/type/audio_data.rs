@@ -4,9 +4,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{AudioData, AudioDataInit, AudioSampleFormat};
 
-use super::{util, SupportError};
+use super::super::SupportError;
 
-pub(super) fn support() -> Result<(), SupportError> {
+pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
@@ -25,7 +25,7 @@ pub(super) fn support() -> Result<(), SupportError> {
 		let init = AudioDataInit::new(&ArrayBuffer::new(1), AudioSampleFormat::U8, 1, 1, 3000., 0.);
 		let data = AudioData::new(&init).unwrap_throw();
 
-		util::has_support(&data)
+		super::has_support(&data)
 	});
 
 	*SUPPORT

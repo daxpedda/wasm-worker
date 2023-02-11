@@ -3,9 +3,9 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::OffscreenCanvas;
 
-use super::{util, SupportError};
+use super::super::SupportError;
 
-pub(super) fn support() -> Result<(), SupportError> {
+pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
@@ -23,7 +23,7 @@ pub(super) fn support() -> Result<(), SupportError> {
 
 		let canvas = OffscreenCanvas::new(1, 0).unwrap_throw();
 
-		util::has_support(&canvas)
+		super::has_support(&canvas)
 	});
 
 	*SUPPORT

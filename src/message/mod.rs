@@ -1,19 +1,7 @@
-mod array_buffer;
-#[cfg(web_sys_unstable_apis)]
-mod audio_data;
 mod conversion;
 mod event;
 mod has_support;
-mod image_bitmap;
-mod message_port;
-mod offscreen_canvas;
-mod readable_stream;
-mod rtc_data_channel;
-mod transform_stream;
-mod util;
-#[cfg(web_sys_unstable_apis)]
-mod video_frame;
-mod writable_stream;
+mod r#type;
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -30,6 +18,12 @@ use web_sys::{
 pub use self::event::{MessageEvent, MessageIter};
 pub use self::has_support::HasSupportFuture;
 pub use self::image_bitmap::ImageBitmapSupportFuture;
+use self::r#type::{
+	array_buffer, image_bitmap, message_port, offscreen_canvas, readable_stream, rtc_data_channel,
+	transform_stream, writable_stream,
+};
+#[cfg(web_sys_unstable_apis)]
+use self::r#type::{audio_data, video_frame};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Message {

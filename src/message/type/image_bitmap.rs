@@ -12,7 +12,7 @@ use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{ImageBitmap, ImageData, Window, WorkerGlobalScope};
 
-use super::{util, SupportError};
+use super::super::SupportError;
 
 static SUPPORT: OnceCell<Result<(), SupportError>> = OnceCell::new();
 
@@ -28,7 +28,7 @@ enum Inner {
 }
 
 impl ImageBitmapSupportFuture {
-	pub(super) fn new() -> Self {
+	pub(in super::super) fn new() -> Self {
 		if let Some(support) = SUPPORT.get() {
 			Self(Some(Inner::Ready(*support)))
 		} else {
@@ -127,7 +127,7 @@ impl Future for ImageBitmapSupportFuture {
 						.unwrap_throw()
 						.unchecked_into();
 
-					let support = util::has_support(&bitmap);
+					let support = super::has_support(&bitmap);
 
 					self.0.take();
 					SUPPORT.set(support).unwrap();
