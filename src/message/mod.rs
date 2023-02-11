@@ -13,6 +13,7 @@ mod transform_stream;
 mod util;
 #[cfg(web_sys_unstable_apis)]
 mod video_frame;
+mod writable_stream;
 
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
@@ -104,6 +105,10 @@ impl Message {
 	#[cfg(web_sys_unstable_apis)]
 	pub fn has_video_frame_support() -> Result<(), SupportError> {
 		video_frame::support()
+	}
+
+	pub fn has_writable_stream_support() -> Result<(), SupportError> {
+		writable_stream::support()
 	}
 }
 

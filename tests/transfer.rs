@@ -422,3 +422,20 @@ async fn video_frame() -> Result<(), JsValue> {
 	)
 	.await
 }
+
+/// [`WritableStream`].
+#[wasm_bindgen_test]
+async fn writable_stream() -> Result<(), JsValue> {
+	test_transfer(
+		Message::has_writable_stream_support(),
+		false,
+		|| async { WritableStream::new().unwrap_throw() },
+		|stream| assert!(stream.locked()),
+		|stream| {
+			assert!(!stream.locked());
+
+			async {}
+		},
+	)
+	.await
+}

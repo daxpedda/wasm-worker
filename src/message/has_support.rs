@@ -31,7 +31,7 @@ impl HasSupportFuture {
 			Message::TransformStream(_) => Inner::Ready(Message::has_transform_stream_support()),
 			#[cfg(web_sys_unstable_apis)]
 			Message::VideoFrame(_) => Inner::Ready(Message::has_video_frame_support()),
-			Message::WritableStream(_) => todo!(),
+			Message::WritableStream(_) => Inner::Ready(Message::has_writable_stream_support()),
 		}))
 	}
 
