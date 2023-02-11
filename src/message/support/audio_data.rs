@@ -10,13 +10,14 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
-			type AudioDataGlobal;
+			#[allow(non_camel_case_types)]
+			type __wasm_worker_AudioDataGlobal;
 
 			#[wasm_bindgen(method, getter, js_name = AudioData)]
-			fn audio_data(this: &AudioDataGlobal) -> JsValue;
+			fn audio_data(this: &__wasm_worker_AudioDataGlobal) -> JsValue;
 		}
 
-		let global: AudioDataGlobal = js_sys::global().unchecked_into();
+		let global: __wasm_worker_AudioDataGlobal = js_sys::global().unchecked_into();
 
 		if global.audio_data().is_undefined() {
 			return Err(SupportError::Unsupported);

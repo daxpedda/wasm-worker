@@ -23,13 +23,14 @@ impl WorkerContext {
 			static GLOBAL: Option<DedicatedWorkerGlobalScope> = {
 				#[wasm_bindgen]
 				extern "C" {
-					type WorkerContextGlobal;
+					#[allow(non_camel_case_types)]
+					type __wasm_worker_WorkerContextGlobal;
 
 					#[wasm_bindgen(method, getter, js_name = DedicatedWorkerGlobalScope)]
-					fn worker(this: &WorkerContextGlobal) -> JsValue;
+					fn worker(this: &__wasm_worker_WorkerContextGlobal) -> JsValue;
 				}
 
-				let global: WorkerContextGlobal = js_sys::global().unchecked_into();
+				let global: __wasm_worker_WorkerContextGlobal = js_sys::global().unchecked_into();
 
 				if global.worker().is_undefined() {
 					None

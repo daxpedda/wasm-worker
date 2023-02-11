@@ -9,13 +9,14 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
-			type OffscreenCanvasGlobal;
+			#[allow(non_camel_case_types)]
+			type __wasm_worker_OffscreenCanvasGlobal;
 
 			#[wasm_bindgen(method, getter, js_name = OffscreenCanvas)]
-			fn offscreen_canvas(this: &OffscreenCanvasGlobal) -> JsValue;
+			fn offscreen_canvas(this: &__wasm_worker_OffscreenCanvasGlobal) -> JsValue;
 		}
 
-		let global: OffscreenCanvasGlobal = js_sys::global().unchecked_into();
+		let global: __wasm_worker_OffscreenCanvasGlobal = js_sys::global().unchecked_into();
 
 		if global.offscreen_canvas().is_undefined() {
 			return Err(SupportError::Unsupported);

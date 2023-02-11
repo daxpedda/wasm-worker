@@ -53,10 +53,11 @@ impl WorkerBuilder<'_> {
 	pub fn has_module_support() -> bool {
 		static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
 			#[wasm_bindgen]
-			struct Tester(Rc<Cell<bool>>);
+			#[allow(non_camel_case_types)]
+			struct __wasm_worker_Tester(Rc<Cell<bool>>);
 
 			#[wasm_bindgen]
-			impl Tester {
+			impl __wasm_worker_Tester {
 				#[allow(unreachable_pub)]
 				#[wasm_bindgen(getter = type)]
 				pub fn type_(&self) {
@@ -65,7 +66,8 @@ impl WorkerBuilder<'_> {
 			}
 
 			let tester = Rc::new(Cell::new(false));
-			let worker_options = WorkerOptions::from(JsValue::from(Tester(Rc::clone(&tester))));
+			let worker_options =
+				WorkerOptions::from(JsValue::from(__wasm_worker_Tester(Rc::clone(&tester))));
 			let worker = Worker::new_with_options("data:,", &worker_options).unwrap_throw();
 			worker.terminate();
 

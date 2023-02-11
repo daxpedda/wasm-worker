@@ -9,13 +9,14 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
 		#[wasm_bindgen]
 		extern "C" {
-			type VideoFrameGlobal;
+			#[allow(non_camel_case_types)]
+			type __wasm_worker_VideoFrameGlobal;
 
 			#[wasm_bindgen(method, getter, js_name = VideoFrame)]
-			fn video_frame(this: &VideoFrameGlobal) -> JsValue;
+			fn video_frame(this: &__wasm_worker_VideoFrameGlobal) -> JsValue;
 		}
 
-		let global: VideoFrameGlobal = js_sys::global().unchecked_into();
+		let global: __wasm_worker_VideoFrameGlobal = js_sys::global().unchecked_into();
 
 		if global.video_frame().is_undefined() {
 			return Err(SupportError::Unsupported);

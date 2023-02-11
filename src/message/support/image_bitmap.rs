@@ -61,16 +61,17 @@ impl Future for ImageBitmapSupportFuture {
 			static GLOBAL: Lazy<Option<Global>> = Lazy::new(|| {
 				#[wasm_bindgen]
 				extern "C" {
-					type ImageBitmapGlobal;
+					#[allow(non_camel_case_types)]
+					type __wasm_worker_ImageBitmapGlobal;
 
 					#[wasm_bindgen(method, getter, js_name = Window)]
-					fn window(this: &ImageBitmapGlobal) -> JsValue;
+					fn window(this: &__wasm_worker_ImageBitmapGlobal) -> JsValue;
 
 					#[wasm_bindgen(method, getter, js_name = WorkerGlobalScope)]
-					fn worker(this: &ImageBitmapGlobal) -> JsValue;
+					fn worker(this: &__wasm_worker_ImageBitmapGlobal) -> JsValue;
 				}
 
-				let global: ImageBitmapGlobal = js_sys::global().unchecked_into();
+				let global: __wasm_worker_ImageBitmapGlobal = js_sys::global().unchecked_into();
 
 				if !global.window().is_undefined() {
 					Some(Global::Window(global.unchecked_into()))
