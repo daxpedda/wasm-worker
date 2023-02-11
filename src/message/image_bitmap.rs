@@ -3,6 +3,8 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
+#[cfg(feature = "futures")]
+use futures_util::future::FusedFuture;
 use once_cell::sync::OnceCell;
 use once_cell::unsync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -133,5 +135,12 @@ impl Future for ImageBitmapSupportFuture {
 				}
 			}
 		}
+	}
+}
+
+#[cfg(feature = "futures")]
+impl FusedFuture for ImageBitmapSupportFuture {
+	fn is_terminated(&self) -> bool {
+		self.0.is_none()
 	}
 }

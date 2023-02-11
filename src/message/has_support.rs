@@ -2,6 +2,9 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
+#[cfg(feature = "futures")]
+use futures_util::future::FusedFuture;
+
 use super::{ImageBitmapSupportFuture, Message, SupportError};
 
 #[derive(Debug)]
@@ -40,7 +43,12 @@ impl HasSupportFuture {
 
 				Some(support)
 			}
-			Inner::ImageBitmap(future) => future.into_inner(),
+			Inner::ImageBitmap(future) => {
+				let support = future.into_inner()?;
+				self.0.take();
+
+				Some(support)
+			}
 		}
 	}
 }
@@ -65,5 +73,12 @@ impl Future for HasSupportFuture {
 				Poll::Ready(support)
 			}
 		}
+	}
+}
+
+#[cfg(feature = "futures")]
+impl FusedFuture for HasSupportFuture {
+	fn is_terminated(&self) -> bool {
+		self.0.is_none()
 	}
 }
