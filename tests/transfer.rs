@@ -285,7 +285,7 @@ async fn message_port() -> Result<()> {
 	});
 
 	test_transfer(
-		Message::has_offscreen_canvas_support(),
+		Message::has_message_port_support(),
 		true,
 		|| async {
 			let channel = MessageChannel::new().unwrap_throw();
