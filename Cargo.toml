@@ -44,7 +44,6 @@ web-sys = { version = "0.3", features = [
 	"AudioDataCopyToOptions",
 	"console",
 	"RtcDataChannelState",
-	"Window",
 ] }
 
 [[test]]
