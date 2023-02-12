@@ -129,7 +129,7 @@ impl WorkerBuilder<'_> {
 
 	pub fn spawn<F>(self, f: F) -> WorkerHandle
 	where
-		F: 'static + FnOnce(WorkerContext) -> Close + Send,
+		F: 'static + FnOnce(WorkerContext) + Send,
 	{
 		self.spawn_internal(Task::Classic(Box::new(f)))
 	}
@@ -137,10 +137,13 @@ impl WorkerBuilder<'_> {
 	pub fn spawn_async<F1, F2>(self, f: F1) -> WorkerHandle
 	where
 		F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
-		F2: 'static + Future<Output = Close>,
+		F2: 'static + Future<Output = ()>,
 	{
 		let task = Task::Future(Box::new(move |context| {
-			Box::pin(async move { Ok(f(context).await.to_bool().into()) })
+			Box::pin(async move {
+				f(context).await;
+				Ok(JsValue::UNDEFINED)
+			})
 		}));
 
 		self.spawn_internal(task)
@@ -172,21 +175,6 @@ impl WorkerBuilder<'_> {
 	}
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum Close {
-	Yes,
-	No,
-}
-
-impl Close {
-	const fn to_bool(self) -> bool {
-		match self {
-			Self::Yes => true,
-			Self::No => false,
-		}
-	}
-}
-
 #[doc(hidden)]
 #[allow(
 	clippy::type_complexity,
@@ -194,7 +182,7 @@ impl Close {
 	unreachable_pub
 )]
 pub enum Task {
-	Classic(Box<dyn 'static + FnOnce(WorkerContext) -> Close + Send>),
+	Classic(Box<dyn 'static + FnOnce(WorkerContext) + Send>),
 	Future(
 		Box<
 			dyn 'static
@@ -219,7 +207,10 @@ pub fn __wasm_worker_entry(task: *mut Task) -> JsValue {
 	// SAFETY: The argument is an address that has to be a valid pointer to a
 	// `Task`.
 	match *unsafe { Box::from_raw(task) } {
-		Task::Classic(classic) => classic(context).to_bool().into(),
+		Task::Classic(classic) => {
+			classic(context);
+			JsValue::UNDEFINED
+		}
 		Task::Future(future) => wasm_bindgen_futures::future_to_promise(future(context)).into(),
 	}
 }

@@ -6,7 +6,7 @@ mod worker_url;
 
 use std::future::Future;
 
-pub use self::builder::{Close, ModuleSupportError, WorkerBuilder};
+pub use self::builder::{ModuleSupportError, WorkerBuilder};
 pub use self::common::TransferError;
 use self::common::{Closure, Exports, WorkerOrContext};
 pub use self::context::{Tls, WorkerContext};
@@ -15,7 +15,7 @@ pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 
 pub fn spawn<F>(f: F) -> WorkerHandle
 where
-	F: 'static + FnOnce(WorkerContext) -> Close + Send,
+	F: 'static + FnOnce(WorkerContext) + Send,
 {
 	WorkerBuilder::new().unwrap().spawn(f)
 }
@@ -23,7 +23,7 @@ where
 pub fn spawn_async<F1, F2>(f: F1) -> WorkerHandle
 where
 	F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
-	F2: 'static + Future<Output = Close>,
+	F2: 'static + Future<Output = ()>,
 {
 	WorkerBuilder::new().unwrap().spawn_async(f)
 }

@@ -14,7 +14,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{Close, Message, SupportError, WorkerBuilder};
+use wasm_worker::{Message, SupportError, WorkerBuilder};
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{
 	AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame,
@@ -65,7 +65,7 @@ async fn serialize() -> Result<()> {
 			|context| {
 				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 
-				Close::Yes
+				context.close();
 			}
 		});
 
@@ -155,8 +155,6 @@ where
 				});
 
 				request.signal();
-
-				Close::No
 			}
 		});
 

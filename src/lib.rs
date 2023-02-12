@@ -17,8 +17,8 @@ mod dedicated;
 mod message;
 
 pub use self::dedicated::{
-	spawn, spawn_async, Close, ModuleSupportError, Tls, TransferError, WorkerBuilder,
-	WorkerContext, WorkerHandle, WorkerHandleRef, WorkerUrl, WorkerUrlFormat,
+	spawn, spawn_async, ModuleSupportError, Tls, TransferError, WorkerBuilder, WorkerContext,
+	WorkerHandle, WorkerHandleRef, WorkerUrl, WorkerUrlFormat,
 };
 pub use self::message::{
 	HasSupportFuture, ImageBitmapSupportFuture, Message, MessageError, MessageEvent, MessageIter,

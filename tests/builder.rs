@@ -5,7 +5,7 @@ mod util;
 use anyhow::Result;
 use wasm_bindgen::ShimFormat;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{Close, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
+use wasm_worker::{WorkerBuilder, WorkerUrl, WorkerUrlFormat};
 
 use self::util::Flag;
 
@@ -18,9 +18,9 @@ async fn spawn() -> Result<()> {
 
 	WorkerBuilder::new()?.spawn({
 		let flag = flag.clone();
-		move |_| {
+		move |context| {
 			flag.signal();
-			Close::Yes
+			context.close();
 		}
 	});
 
@@ -36,9 +36,9 @@ async fn spawn_async() -> Result<()> {
 
 	WorkerBuilder::new()?.spawn_async({
 		let flag = flag.clone();
-		|_| async move {
+		|context| async move {
 			flag.signal();
-			Close::Yes
+			context.close();
 		}
 	});
 
@@ -67,9 +67,9 @@ async fn url() -> Result<()> {
 
 	WorkerBuilder::new_with_url(&url)?.spawn({
 		let flag = flag.clone();
-		move |_| {
+		move |context| {
 			flag.signal();
-			Close::Yes
+			context.close();
 		}
 	});
 
@@ -90,7 +90,7 @@ async fn name() -> Result<()> {
 			// Flag will never signal if `assert!` panics.
 			flag.signal();
 
-			Close::Yes
+			context.close();
 		}
 	});
 

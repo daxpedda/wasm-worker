@@ -4,7 +4,7 @@ mod util;
 
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{Close, WorkerContext};
+use wasm_worker::WorkerContext;
 
 use self::util::{Flag, CLOSE_DURATION, SIGNAL_DURATION};
 
@@ -17,9 +17,9 @@ async fn spawn() {
 
 	wasm_worker::spawn({
 		let flag = flag.clone();
-		move |_| {
+		move |context| {
 			flag.signal();
-			Close::Yes
+			context.close();
 		}
 	});
 
@@ -33,9 +33,9 @@ async fn spawn_async() {
 
 	wasm_worker::spawn_async({
 		let flag = flag.clone();
-		|_| async move {
+		|context| async move {
 			flag.signal();
-			Close::Yes
+			context.close();
 		}
 	});
 
@@ -49,14 +49,14 @@ async fn nested() {
 
 	wasm_worker::spawn_async({
 		let outer = inner.clone();
-		|_| async move {
+		|context| async move {
 			let inner = Flag::new();
 
 			wasm_worker::spawn({
 				let outer = inner.clone();
-				move |_| {
+				move |context| {
 					outer.signal();
-					Close::Yes
+					context.close();
 				}
 			});
 
@@ -68,7 +68,7 @@ async fn nested() {
 
 			outer.signal();
 
-			Close::Yes
+			context.close();
 		}
 	});
 
@@ -82,19 +82,19 @@ async fn nested_nested() {
 
 	wasm_worker::spawn_async({
 		let outer = inner.clone();
-		|_| async move {
+		|context| async move {
 			let inner = Flag::new();
 
 			wasm_worker::spawn_async({
 				let outer = inner.clone();
-				|_| async move {
+				|context| async move {
 					let inner = Flag::new();
 
 					wasm_worker::spawn({
 						let outer = inner.clone();
-						move |_| {
+						move |context| {
 							outer.signal();
-							Close::Yes
+							context.close();
 						}
 					});
 
@@ -106,7 +106,7 @@ async fn nested_nested() {
 
 					outer.signal();
 
-					Close::Yes
+					context.close();
 				}
 			});
 
@@ -118,70 +118,11 @@ async fn nested_nested() {
 
 			outer.signal();
 
-			Close::Yes
+			context.close();
 		}
 	});
 
 	inner.await;
-}
-
-/// Returning [`Close::Yes`].
-#[wasm_bindgen_test]
-async fn closing() {
-	let request = Flag::new();
-	let response = Flag::new();
-
-	wasm_worker::spawn({
-		let request = request.clone();
-		let response = response.clone();
-
-		move |_| {
-			wasm_bindgen_futures::spawn_local(async move {
-				request.await;
-				response.signal();
-			});
-
-			Close::Yes
-		}
-	});
-
-	// Wait for the worker to close.
-	util::sleep(SIGNAL_DURATION).await;
-
-	request.signal();
-
-	// The worker will never respond back if it was closed.
-	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
-	assert!(matches!(result, Either::Right(((), _))));
-}
-
-/// Returning [`Close::No`].
-#[wasm_bindgen_test]
-async fn non_closing() {
-	let request = Flag::new();
-	let response = Flag::new();
-
-	let worker = wasm_worker::spawn_async({
-		let request = request.clone();
-		let response = response.clone();
-
-		|_| async {
-			wasm_bindgen_futures::spawn_local(async move {
-				request.await;
-				response.signal();
-			});
-
-			Close::No
-		}
-	});
-
-	// Wait for the worker to potentially close.
-	util::sleep(SIGNAL_DURATION);
-
-	request.signal();
-	response.await;
-
-	worker.terminate();
 }
 
 /// [`WorkerHandle::terminate()`](wasm_worker::WorkerHandle::terminate).
@@ -198,8 +139,6 @@ async fn terminate() {
 			// Worker will be terminated before the request signal is sent.
 			request.await;
 			response.signal();
-
-			Close::Yes
 		}
 	});
 
@@ -228,8 +167,6 @@ async fn close() {
 			});
 
 			context.close();
-
-			Close::No
 		}
 	});
 
@@ -252,12 +189,12 @@ async fn context() {
 
 	wasm_worker::spawn_async({
 		let flag = flag.clone();
-		|_| async move {
+		|context| async move {
 			WorkerContext::new().unwrap();
 			// Flag will never signal if `WorkerContext::new` panics.
 			flag.signal();
 
-			Close::Yes
+			context.close();
 		}
 	});
 
@@ -282,7 +219,7 @@ async fn name() {
 			// Flag will never signal if `assert!` panics.
 			flag.signal();
 
-			Close::Yes
+			context.close();
 		}
 	});
 
