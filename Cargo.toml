@@ -65,11 +65,10 @@ test = false
 # Waiting for PR's to be merged and a new version to be released.
 # https://github.com/rustwasm/wasm-bindgen/pull/3168
 # https://github.com/rustwasm/wasm-bindgen/pull/3247
-# https://github.com/rustwasm/wasm-bindgen/pull/3252
 # https://github.com/rustwasm/wasm-bindgen/pull/3279 (merged)
 # https://github.com/rustwasm/wasm-bindgen/pull/3293
-# https://github.com/rustwasm/wasm-bindgen/pull/3293
 # https://github.com/rustwasm/wasm-bindgen/pull/3296
+# https://github.com/rustwasm/wasm-bindgen/pull/3299
 js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
