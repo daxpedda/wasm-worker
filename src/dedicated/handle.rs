@@ -2,9 +2,10 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::rc::{Rc, Weak};
 
+use wasm_bindgen::JsCast;
 use web_sys::Worker;
 
-use super::{Closure, TransferError, WorkerOrContext};
+use super::{Closure, Exports, Tls, TransferError, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
@@ -100,6 +101,16 @@ impl WorkerHandle {
 	pub fn terminate(self) {
 		self.worker.terminate();
 	}
+
+	/// # Safety
+	/// TODO
+	#[allow(clippy::needless_pass_by_value)]
+	pub unsafe fn destroy(self, tls: Tls) {
+		self.terminate();
+
+		let exports: Exports = wasm_bindgen::exports().unchecked_into();
+		exports.thread_destroy(tls.tls_base, tls.stack_alloc);
+	}
 }
 
 #[derive(Clone, Debug)]
@@ -180,5 +191,21 @@ impl WorkerHandleRef {
 
 	pub fn terminate(self) {
 		self.worker.terminate();
+	}
+
+	/// # Safety
+	/// TODO
+	///
+	/// Passing a [`Tls`], that is unrelated to the worker of this handle, will
+	/// still cause this worker to be terminated, but the worker the [`Tls`]
+	/// actually belongs to will exhibit UB on any subsequent execution in it.
+	#[allow(clippy::needless_pass_by_value)]
+	pub unsafe fn destroy(self, tls: Tls) {
+		if Weak::strong_count(&self.message_handler) != 0 {
+			self.terminate();
+
+			let exports: Exports = wasm_bindgen::exports().unchecked_into();
+			exports.thread_destroy(tls.tls_base, tls.stack_alloc);
+		}
 	}
 }

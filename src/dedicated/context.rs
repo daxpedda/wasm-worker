@@ -5,7 +5,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::{Closure, TransferError, WorkerOrContext};
+use super::{Closure, Exports, TransferError, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -118,7 +118,32 @@ impl WorkerContext {
 		WorkerOrContext::Context(&self.0).transfer_messages(messages)
 	}
 
+	#[must_use]
+	pub fn tls(&self) -> Tls {
+		let exports: Exports = wasm_bindgen::exports().unchecked_into();
+
+		Tls {
+			tls_base: exports.tls_base(),
+			stack_alloc: exports.stack_alloc(),
+		}
+	}
+
 	pub fn close(self) {
 		self.0.close();
 	}
 }
+
+#[derive(Debug)]
+pub struct Tls {
+	pub(super) tls_base: *const (),
+	pub(super) stack_alloc: *const (),
+}
+
+// SAFETY: This is safe, these pointers are specifically accessible to be able
+// to destroy the TLS from a different thread.
+//
+// See <https://github.com/rustwasm/wasm-bindgen/blob/0.2.84/crates/threads-xform/src/lib.rs#L165-L180>.
+unsafe impl Send for Tls {}
+
+// SAFETY: See `Send`.
+unsafe impl Sync for Tls {}

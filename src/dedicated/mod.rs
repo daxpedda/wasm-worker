@@ -8,8 +8,8 @@ use std::future::Future;
 
 pub use self::builder::{Close, ModuleSupportError, WorkerBuilder};
 pub use self::common::TransferError;
-use self::common::{Closure, WorkerOrContext};
-pub use self::context::WorkerContext;
+use self::common::{Closure, Exports, WorkerOrContext};
+pub use self::context::{Tls, WorkerContext};
 pub use self::handle::{WorkerHandle, WorkerHandleRef};
 pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 

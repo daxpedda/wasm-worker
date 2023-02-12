@@ -5,6 +5,7 @@ use std::ops::Deref;
 
 use js_sys::{Array, Function};
 use wasm_bindgen::closure::Closure as JsClosure;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
@@ -121,6 +122,27 @@ impl WorkerOrContext<'_> {
 				messages: Messages(RawMessages::Array(array)),
 			})
 	}
+}
+
+pub(super) type Exports = __wasm_worker_Exports;
+
+#[wasm_bindgen]
+extern "C" {
+	#[allow(non_camel_case_types)]
+	pub(super) type __wasm_worker_Exports;
+
+	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
+	pub(super) fn thread_destroy(
+		this: &__wasm_worker_Exports,
+		tls_base: *const (),
+		stack_alloc: *const (),
+	);
+
+	#[wasm_bindgen(method, getter, js_name = __tls_base)]
+	pub(super) fn tls_base(this: &__wasm_worker_Exports) -> *const ();
+
+	#[wasm_bindgen(method, getter, js_name = __stack_alloc)]
+	pub(super) fn stack_alloc(this: &__wasm_worker_Exports) -> *const ();
 }
 
 #[derive(Debug)]
