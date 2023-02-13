@@ -51,7 +51,7 @@ async fn builder_clear_message_handler() -> Result<()> {
 /// [`WorkerHandle::set_message_handler()`](wasm_worker::WorkerHandle::set_message_handler) with
 /// [`WorkerHandle::clear_message_handler()`](wasm_worker::WorkerHandle::clear_message_handler).
 #[wasm_bindgen_test]
-async fn handler_clear_message_handler() {
+async fn handle_clear_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
@@ -125,7 +125,7 @@ fn builder_has_message_handler() -> Result<()> {
 /// [`WorkerHandle::set_message_handler()`](wasm_worker::WorkerHandle::set_message_handler) with
 /// [`WorkerHandle::has_message_handler()`](wasm_worker::WorkerHandle::has_message_handler).
 #[wasm_bindgen_test]
-fn handler_has_message_handler() {
+fn handle_has_message_handler() {
 	let worker = wasm_worker::spawn(WorkerContext::close);
 
 	assert!(!worker.has_message_handler());
@@ -189,7 +189,7 @@ async fn builder_async_message_handler() -> Result<()> {
 
 /// [`WorkerHandle::set_message_handler_async()`](wasm_worker::WorkerHandle::set_message_handler_async).
 #[wasm_bindgen_test]
-async fn handler_async_message_handler() {
+async fn handle_async_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
@@ -248,7 +248,7 @@ async fn context_async_message_handler() {
 /// Multiple messages in
 /// [`WorkerHandle::transfer_messages()`](wasm_worker::WorkerHandle::transfer_messages).
 #[wasm_bindgen_test]
-async fn handler_multi_message() {
+async fn handle_multi_message() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
