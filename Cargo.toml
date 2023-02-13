@@ -67,7 +67,7 @@ test = false
 # https://github.com/rustwasm/wasm-bindgen/pull/3168
 # https://github.com/rustwasm/wasm-bindgen/pull/3247
 # https://github.com/rustwasm/wasm-bindgen/pull/3279 (merged)
-# https://github.com/rustwasm/wasm-bindgen/pull/3293
+# https://github.com/rustwasm/wasm-bindgen/pull/3293 (merged)
 # https://github.com/rustwasm/wasm-bindgen/pull/3296
 # https://github.com/rustwasm/wasm-bindgen/pull/3299
 # https://github.com/rustwasm/wasm-bindgen/pull/3302
