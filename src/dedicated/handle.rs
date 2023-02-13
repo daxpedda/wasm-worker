@@ -4,10 +4,9 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::rc::{Rc, Weak};
 
-use wasm_bindgen::JsCast;
 use web_sys::Worker;
 
-use super::{Closure, Exports, Tls, TransferError, WorkerOrContext};
+use super::{Closure, Tls, TransferError, WorkerOrContext, EXPORTS};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
@@ -118,16 +117,17 @@ impl WorkerHandle {
 				self.id.take();
 				self.terminate();
 
-				let exports: Exports = wasm_bindgen::exports().unchecked_into();
-				// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
-				// through an `AtomicUsize` counter. It then is saved here and sent to the
-				// worker and used in generating `Tls`. The ids are then compared above and if
-				// they match, the state is change to `None` preventing any subsequent calls.
-				unsafe { exports.thread_destroy(tls.tls_base, tls.stack_alloc) };
+				EXPORTS.with(|exports| {
+					// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
+					// through an `AtomicUsize` counter. It then is saved here and sent to the
+					// worker and used in generating `Tls`. The ids are then compared above and if
+					// they match, the state is change to `None` preventing any subsequent calls.
+					unsafe { exports.thread_destroy(&tls.tls_base(), &tls.stack_alloc()) };
+				});
 
 				Ok(())
 			} else {
-				Err(DestroyError::Id { handle: self, tls })
+				Err(DestroyError::Match { handle: self, tls })
 			}
 		} else {
 			Err(DestroyError::Already(tls))
@@ -227,16 +227,17 @@ impl WorkerHandleRef {
 				self.id.take();
 				self.terminate();
 
-				let exports: Exports = wasm_bindgen::exports().unchecked_into();
-				// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
-				// through an `AtomicUsize` counter. It then is saved here and sent to the
-				// worker and used in generating `Tls`. The ids are then compared above and if
-				// they match, the state is change to `None` preventing any subsequent calls.
-				unsafe { exports.thread_destroy(tls.tls_base, tls.stack_alloc) };
+				EXPORTS.with(|exports| {
+					// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
+					// through an `AtomicUsize` counter. It then is saved here and sent to the
+					// worker and used in generating `Tls`. The ids are then compared above and if
+					// they match, the state is change to `None` preventing any subsequent calls.
+					unsafe { exports.thread_destroy(&tls.tls_base(), &tls.stack_alloc()) };
+				});
 
 				Ok(())
 			} else {
-				Err(DestroyError::Id { handle: self, tls })
+				Err(DestroyError::Match { handle: self, tls })
 			}
 		} else {
 			Err(DestroyError::Already(tls))
@@ -247,14 +248,14 @@ impl WorkerHandleRef {
 #[derive(Debug)]
 pub enum DestroyError<T: Debug> {
 	Already(Tls),
-	Id { handle: T, tls: Tls },
+	Match { handle: T, tls: Tls },
 }
 
 impl<T: Debug> Display for DestroyError<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Already(_) => write!(f, "this worker was already destroyed"),
-			Self::Id { .. } => {
+			Self::Match { .. } => {
 				write!(f, "`Tls` value given does not belong to this worker")
 			}
 		}

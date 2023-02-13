@@ -7,9 +7,9 @@ mod worker_url;
 use std::future::Future;
 
 pub use self::builder::{ModuleSupportError, WorkerBuilder};
-pub use self::common::TransferError;
-use self::common::{Closure, Exports, WorkerOrContext};
-pub use self::context::{Tls, WorkerContext};
+use self::common::{Closure, WorkerOrContext, EXPORTS};
+pub use self::common::{Tls, TransferError};
+pub use self::context::WorkerContext;
 pub use self::handle::{DestroyError, WorkerHandle, WorkerHandleRef};
 pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 

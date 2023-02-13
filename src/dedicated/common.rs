@@ -3,10 +3,12 @@ use std::fmt::{self, Display, Formatter};
 use std::future::Future;
 use std::ops::Deref;
 
-use js_sys::{Array, Function};
+use js_sys::WebAssembly::Global;
+use js_sys::{Array, Function, Object, Reflect};
+use once_cell::unsync::Lazy;
 use wasm_bindgen::closure::Closure as JsClosure;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
 use crate::{Message, Messages, RawMessages};
@@ -124,6 +126,10 @@ impl WorkerOrContext<'_> {
 	}
 }
 
+thread_local! {
+	pub(super) static EXPORTS: Lazy<Exports> = Lazy::new(|| wasm_bindgen::exports().unchecked_into());
+}
+
 pub(super) type Exports = __wasm_worker_Exports;
 
 #[wasm_bindgen]
@@ -134,15 +140,54 @@ extern "C" {
 	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
 	pub(super) unsafe fn thread_destroy(
 		this: &__wasm_worker_Exports,
-		tls_base: *const (),
-		stack_alloc: *const (),
+		tls_base: &Global,
+		stack_alloc: &Global,
 	);
 
 	#[wasm_bindgen(method, getter, js_name = __tls_base)]
-	pub(super) fn tls_base(this: &__wasm_worker_Exports) -> *const ();
+	pub(super) fn tls_base(this: &__wasm_worker_Exports) -> Global;
 
 	#[wasm_bindgen(method, getter, js_name = __stack_alloc)]
-	pub(super) fn stack_alloc(this: &__wasm_worker_Exports) -> *const ();
+	pub(super) fn stack_alloc(this: &__wasm_worker_Exports) -> Global;
+}
+
+#[derive(Debug)]
+#[allow(missing_copy_implementations)]
+pub struct Tls {
+	pub(super) id: usize,
+	tls_base: f64,
+	stack_alloc: f64,
+}
+
+impl Tls {
+	thread_local! {
+		static DESCRIPTOR: Lazy<Object> = Lazy::new(|| {
+			let descriptor = Object::new();
+			Reflect::set(&descriptor, &"value".into(), &"i32".into()).unwrap_throw();
+			descriptor
+		});
+	}
+
+	pub(super) fn new(id: usize, tls_base: &Global, stack_alloc: &Global) -> Self {
+		let tls_base = tls_base.value().as_f64().unwrap();
+		let stack_alloc = stack_alloc.value().as_f64().unwrap();
+
+		Self {
+			id,
+			tls_base,
+			stack_alloc,
+		}
+	}
+
+	pub(super) fn tls_base(&self) -> Global {
+		Self::DESCRIPTOR
+			.with(|descriptor| Global::new(descriptor, &self.tls_base.into()).unwrap_throw())
+	}
+
+	pub(super) fn stack_alloc(&self) -> Global {
+		Self::DESCRIPTOR
+			.with(|descriptor| Global::new(descriptor, &self.stack_alloc.into()).unwrap_throw())
+	}
 }
 
 #[derive(Debug)]
