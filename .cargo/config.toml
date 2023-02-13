@@ -34,7 +34,6 @@ rustflags = [
 	"-Wclippy::as_conversions",
 	"-Wclippy::clone_on_ref_ptr",
 	"-Wclippy::empty_structs_with_brackets",
-	"-Wclippy::if_then_some_else_none",
 	"-Wclippy::lossy_float_literal",
 	"-Wclippy::missing_docs_in_private_items",
 	"-Wclippy::rest_pat_in_fully_bound_structs",

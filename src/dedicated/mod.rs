@@ -10,7 +10,7 @@ pub use self::builder::{ModuleSupportError, WorkerBuilder};
 pub use self::common::TransferError;
 use self::common::{Closure, Exports, WorkerOrContext};
 pub use self::context::{Tls, WorkerContext};
-pub use self::handle::{WorkerHandle, WorkerHandleRef};
+pub use self::handle::{DestroyError, WorkerHandle, WorkerHandleRef};
 pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 
 pub fn spawn<F>(f: F) -> WorkerHandle

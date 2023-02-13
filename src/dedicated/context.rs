@@ -1,62 +1,53 @@
 use std::cell::RefCell;
 use std::future::Future;
 
-use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue};
+use once_cell::unsync::OnceCell;
+use wasm_bindgen::JsCast;
 use web_sys::DedicatedWorkerGlobalScope;
 
 use super::{Closure, Exports, TransferError, WorkerOrContext};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WorkerContext(pub(super) DedicatedWorkerGlobalScope);
+pub struct WorkerContext {
+	context: DedicatedWorkerGlobalScope,
+	id: usize,
+}
 
 impl WorkerContext {
 	thread_local! {
-		#[allow(clippy::type_complexity)]
 		static MESSAGE_HANDLER: RefCell<Option<Closure>> = RefCell::new(None);
+		#[allow(clippy::use_self)]
+		static BACKUP: OnceCell<WorkerContext> = OnceCell::new();
+	}
+
+	pub(super) fn init(context: DedicatedWorkerGlobalScope, id: usize) -> Self {
+		let context = Self { context, id };
+
+		Self::BACKUP.with(|once| once.set(context.clone())).unwrap();
+
+		context
 	}
 
 	#[must_use]
 	pub fn new() -> Option<Self> {
-		thread_local! {
-			static GLOBAL: Option<DedicatedWorkerGlobalScope> = {
-				#[wasm_bindgen]
-				extern "C" {
-					#[allow(non_camel_case_types)]
-					type __wasm_worker_WorkerContextGlobal;
-
-					#[wasm_bindgen(method, getter, js_name = DedicatedWorkerGlobalScope)]
-					fn worker(this: &__wasm_worker_WorkerContextGlobal) -> JsValue;
-				}
-
-				let global: __wasm_worker_WorkerContextGlobal = js_sys::global().unchecked_into();
-
-				if global.worker().is_undefined() {
-					None
-				} else {
-					Some(global.unchecked_into())
-				}
-			}
-		}
-
-		GLOBAL.with(|global| global.as_ref().cloned()).map(Self)
+		Self::BACKUP.with(|once| once.get().cloned())
 	}
 
 	#[must_use]
 	pub const fn raw(&self) -> &DedicatedWorkerGlobalScope {
-		&self.0
+		&self.context
 	}
 
 	#[allow(clippy::missing_const_for_fn)]
 	#[must_use]
 	pub fn into_raw(self) -> DedicatedWorkerGlobalScope {
-		self.0
+		self.context
 	}
 
 	#[must_use]
 	pub fn name(&self) -> Option<String> {
-		let name = self.0.name();
+		let name = self.context.name();
 
 		if name.is_empty() {
 			None
@@ -73,7 +64,7 @@ impl WorkerContext {
 	#[allow(clippy::must_use_candidate)]
 	pub fn clear_message_handler(&self) {
 		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());
-		self.0.set_onmessage(None);
+		self.context.set_onmessage(None);
 	}
 
 	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
@@ -88,7 +79,7 @@ impl WorkerContext {
 				new_message_handler(&context, MessageEvent::new(event));
 			}));
 
-			self.0.set_onmessage(Some(message_handler));
+			self.context.set_onmessage(Some(message_handler));
 		});
 	}
 
@@ -107,7 +98,7 @@ impl WorkerContext {
 				new_message_handler(&context, MessageEvent::new(event))
 			}));
 
-			self.0.set_onmessage(Some(message_handler));
+			self.context.set_onmessage(Some(message_handler));
 		});
 	}
 
@@ -115,7 +106,7 @@ impl WorkerContext {
 		&self,
 		messages: M,
 	) -> Result<(), TransferError> {
-		WorkerOrContext::Context(&self.0).transfer_messages(messages)
+		WorkerOrContext::Context(&self.context).transfer_messages(messages)
 	}
 
 	#[must_use]
@@ -123,24 +114,26 @@ impl WorkerContext {
 		let exports: Exports = wasm_bindgen::exports().unchecked_into();
 
 		Tls {
+			id: self.id,
 			tls_base: exports.tls_base(),
 			stack_alloc: exports.stack_alloc(),
 		}
 	}
 
 	pub fn close(self) {
-		self.0.close();
+		self.context.close();
 	}
 }
 
 #[derive(Debug)]
 pub struct Tls {
+	pub(super) id: usize,
 	pub(super) tls_base: *const (),
 	pub(super) stack_alloc: *const (),
 }
 
 // SAFETY: This is safe, these pointers are specifically accessible to be able
-// to destroy the TLS from a different thread.
+// to destroy the TLS from a different worker.
 //
 // See <https://github.com/rustwasm/wasm-bindgen/blob/0.2.84/crates/threads-xform/src/lib.rs#L165-L180>.
 unsafe impl Send for Tls {}

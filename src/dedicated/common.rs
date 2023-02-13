@@ -132,7 +132,7 @@ extern "C" {
 	pub(super) type __wasm_worker_Exports;
 
 	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
-	pub(super) fn thread_destroy(
+	pub(super) unsafe fn thread_destroy(
 		this: &__wasm_worker_Exports,
 		tls_base: *const (),
 		stack_alloc: *const (),

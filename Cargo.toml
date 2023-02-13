@@ -45,6 +45,7 @@ web-sys = { version = "0.3", features = [
 
 [dev-dependencies]
 anyhow = "1"
+futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 wasm-bindgen-test = "0.3"
 web-sys = { version = "0.3", features = [
@@ -69,6 +70,7 @@ test = false
 # https://github.com/rustwasm/wasm-bindgen/pull/3293
 # https://github.com/rustwasm/wasm-bindgen/pull/3296
 # https://github.com/rustwasm/wasm-bindgen/pull/3299
+# https://github.com/rustwasm/wasm-bindgen/pull/3302
 js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }

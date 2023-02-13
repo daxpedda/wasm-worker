@@ -5,6 +5,7 @@ use std::future::Future;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::rc::{Rc, Weak};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use js_sys::Array;
 use once_cell::sync::Lazy;
@@ -20,6 +21,7 @@ use crate::{MessageEvent, WorkerUrl};
 pub struct WorkerBuilder<'url> {
 	url: &'url WorkerUrl,
 	options: Option<WorkerOptions>,
+	id: Rc<Cell<Option<usize>>>,
 	message_handler: Rc<RefCell<Option<Closure>>>,
 }
 
@@ -45,6 +47,7 @@ impl WorkerBuilder<'_> {
 		Ok(WorkerBuilder {
 			url,
 			options,
+			id: Rc::new(Cell::new(None)),
 			message_handler: Rc::new(RefCell::new(None)),
 		})
 	}
@@ -88,6 +91,7 @@ impl WorkerBuilder<'_> {
 		self,
 		mut message_handler: F,
 	) -> Self {
+		let id_handle = Rc::clone(&self.id);
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
 		RefCell::borrow_mut(&self.message_handler).replace(Closure::classic({
 			let mut handle = None;
@@ -95,6 +99,7 @@ impl WorkerBuilder<'_> {
 				let handle = handle.get_or_insert_with(|| {
 					WorkerHandleRef::new(
 						event.target().unwrap().unchecked_into(),
+						Rc::clone(&id_handle),
 						Weak::clone(&message_handler_handle),
 					)
 				});
@@ -113,11 +118,13 @@ impl WorkerBuilder<'_> {
 	) -> Self {
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
 		RefCell::borrow_mut(&self.message_handler).replace(Closure::future({
+			let id_handle = Rc::clone(&self.id);
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
 					WorkerHandleRef::new(
 						event.target().unwrap().unchecked_into(),
+						Rc::clone(&id_handle),
 						Weak::clone(&message_handler_handle),
 					)
 				});
@@ -150,7 +157,12 @@ impl WorkerBuilder<'_> {
 	}
 
 	fn spawn_internal(self, task: Task) -> WorkerHandle {
-		let task = Box::into_raw(Box::new(task));
+		static COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+		let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+		self.id.set(Some(id));
+
+		let data = Box::into_raw(Box::new(Data { id, task }));
 
 		let worker = if let Some(options) = self.options {
 			Worker::new_with_options(&self.url.url, &options)
@@ -166,22 +178,24 @@ impl WorkerBuilder<'_> {
 		let init = Array::of3(
 			&wasm_bindgen::module(),
 			&wasm_bindgen::memory(),
-			&task.into(),
+			&data.into(),
 		);
 
 		worker.post_message(&init).unwrap_throw();
 
-		WorkerHandle::new(worker, self.message_handler)
+		WorkerHandle::new(worker, self.id, self.message_handler)
 	}
 }
 
 #[doc(hidden)]
-#[allow(
-	clippy::type_complexity,
-	missing_debug_implementations,
-	unreachable_pub
-)]
-pub enum Task {
+#[allow(unreachable_pub)]
+pub struct Data {
+	id: usize,
+	task: Task,
+}
+
+#[allow(clippy::type_complexity)]
+enum Task {
 	Classic(Box<dyn 'static + FnOnce(WorkerContext) + Send>),
 	Future(
 		Box<
@@ -197,16 +211,20 @@ pub enum Task {
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 #[wasm_bindgen]
-pub fn __wasm_worker_entry(task: *mut Task) -> JsValue {
+pub fn __wasm_worker_entry(data: *mut Data) -> JsValue {
 	// Unhooking the message handler has to happen in JS because loading the WASM
 	// module will actually yield and introduce a race condition where messages sent
 	// will still be handled by the entry message handler.
 
-	let context = WorkerContext(js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>());
+	// SAFETY: Has to be a valid pointer to `Data`. We only call
+	// `__wasm_worker_entry` from `worker.js`. The data sent to it should only come
+	// from `WorkerBuilder::spawn_internal()`.
+	let data = *unsafe { Box::from_raw(data) };
 
-	// SAFETY: The argument is an address that has to be a valid pointer to a
-	// `Task`.
-	match *unsafe { Box::from_raw(task) } {
+	let context = js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>();
+	let context = WorkerContext::init(context, data.id);
+
+	match data.task {
 		Task::Classic(classic) => {
 			classic(context);
 			JsValue::UNDEFINED

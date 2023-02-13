@@ -1,4 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::error::Error;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::rc::{Rc, Weak};
 
@@ -11,6 +13,7 @@ use crate::{Message, MessageEvent};
 #[derive(Clone, Debug)]
 pub struct WorkerHandle {
 	worker: Worker,
+	id: Rc<Cell<Option<usize>>>,
 	message_handler: Rc<RefCell<Option<Closure>>>,
 }
 
@@ -31,9 +34,14 @@ impl PartialEq for WorkerHandle {
 }
 
 impl WorkerHandle {
-	pub(super) fn new(worker: Worker, message_handler: Rc<RefCell<Option<Closure>>>) -> Self {
+	pub(super) fn new(
+		worker: Worker,
+		id: Rc<Cell<Option<usize>>>,
+		message_handler: Rc<RefCell<Option<Closure>>>,
+	) -> Self {
 		Self {
 			worker,
+			id,
 			message_handler,
 		}
 	}
@@ -60,6 +68,7 @@ impl WorkerHandle {
 	) {
 		let handle = WorkerHandleRef {
 			worker: self.worker.clone(),
+			id: Rc::clone(&self.id),
 			message_handler: Rc::downgrade(&self.message_handler),
 		};
 
@@ -80,6 +89,7 @@ impl WorkerHandle {
 	) {
 		let handle = WorkerHandleRef {
 			worker: self.worker.clone(),
+			id: Rc::clone(&self.id),
 			message_handler: Rc::downgrade(&self.message_handler),
 		};
 
@@ -98,31 +108,49 @@ impl WorkerHandle {
 		WorkerOrContext::Worker(&self.worker).transfer_messages(messages)
 	}
 
-	pub fn terminate(self) {
+	pub fn terminate(&self) {
 		self.worker.terminate();
 	}
 
-	/// # Safety
-	/// TODO
-	#[allow(clippy::needless_pass_by_value)]
-	pub unsafe fn destroy(self, tls: Tls) {
-		self.terminate();
+	pub fn destroy(self, tls: Tls) -> Result<(), DestroyError<Self>> {
+		if let Some(id) = self.id.get() {
+			if id == tls.id {
+				self.id.take();
+				self.terminate();
 
-		let exports: Exports = wasm_bindgen::exports().unchecked_into();
-		exports.thread_destroy(tls.tls_base, tls.stack_alloc);
+				let exports: Exports = wasm_bindgen::exports().unchecked_into();
+				// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
+				// through an `AtomicUsize` counter. It then is saved here and sent to the
+				// worker and used in generating `Tls`. The ids are then compared above and if
+				// they match, the state is change to `None` preventing any subsequent calls.
+				unsafe { exports.thread_destroy(tls.tls_base, tls.stack_alloc) };
+
+				Ok(())
+			} else {
+				Err(DestroyError::Id { handle: self, tls })
+			}
+		} else {
+			Err(DestroyError::Already(tls))
+		}
 	}
 }
 
 #[derive(Clone, Debug)]
 pub struct WorkerHandleRef {
 	worker: Worker,
+	id: Rc<Cell<Option<usize>>>,
 	message_handler: Weak<RefCell<Option<Closure>>>,
 }
 
 impl WorkerHandleRef {
-	pub(super) fn new(worker: Worker, message_handler: Weak<RefCell<Option<Closure>>>) -> Self {
+	pub(super) fn new(
+		worker: Worker,
+		id: Rc<Cell<Option<usize>>>,
+		message_handler: Weak<RefCell<Option<Closure>>>,
+	) -> Self {
 		Self {
 			worker,
+			id,
 			message_handler,
 		}
 	}
@@ -189,23 +217,48 @@ impl WorkerHandleRef {
 		WorkerOrContext::Worker(&self.worker).transfer_messages(messages)
 	}
 
-	pub fn terminate(self) {
+	pub fn terminate(&self) {
 		self.worker.terminate();
 	}
 
-	/// # Safety
-	/// TODO
-	///
-	/// Passing a [`Tls`], that is unrelated to the worker of this handle, will
-	/// still cause this worker to be terminated, but the worker the [`Tls`]
-	/// actually belongs to will exhibit UB on any subsequent execution in it.
-	#[allow(clippy::needless_pass_by_value)]
-	pub unsafe fn destroy(self, tls: Tls) {
-		if Weak::strong_count(&self.message_handler) != 0 {
-			self.terminate();
+	pub fn destroy(self, tls: Tls) -> Result<(), DestroyError<Self>> {
+		if let Some(id) = self.id.get() {
+			if id == tls.id {
+				self.id.take();
+				self.terminate();
 
-			let exports: Exports = wasm_bindgen::exports().unchecked_into();
-			exports.thread_destroy(tls.tls_base, tls.stack_alloc);
+				let exports: Exports = wasm_bindgen::exports().unchecked_into();
+				// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
+				// through an `AtomicUsize` counter. It then is saved here and sent to the
+				// worker and used in generating `Tls`. The ids are then compared above and if
+				// they match, the state is change to `None` preventing any subsequent calls.
+				unsafe { exports.thread_destroy(tls.tls_base, tls.stack_alloc) };
+
+				Ok(())
+			} else {
+				Err(DestroyError::Id { handle: self, tls })
+			}
+		} else {
+			Err(DestroyError::Already(tls))
 		}
 	}
 }
+
+#[derive(Debug)]
+pub enum DestroyError<T: Debug> {
+	Already(Tls),
+	Id { handle: T, tls: Tls },
+}
+
+impl<T: Debug> Display for DestroyError<T> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Already(_) => write!(f, "this worker was already destroyed"),
+			Self::Id { .. } => {
+				write!(f, "`Tls` value given does not belong to this worker")
+			}
+		}
+	}
+}
+
+impl<T: Debug> Error for DestroyError<T> {}
