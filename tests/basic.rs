@@ -125,7 +125,7 @@ async fn nested_nested() {
 	inner.await;
 }
 
-/// [`WorkerHandle::terminate()`](wasm_worker::WorkerHandle::terminate).
+/// [`Worker::terminate()`](wasm_worker::Worker::terminate).
 #[wasm_bindgen_test]
 async fn terminate() {
 	let request = Flag::new();

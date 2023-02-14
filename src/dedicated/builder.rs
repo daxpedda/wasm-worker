@@ -11,9 +11,9 @@ use js_sys::Array;
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
-use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
+use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 
-use super::{Closure, WorkerContext, WorkerHandle, WorkerHandleRef};
+use super::{Closure, Worker, WorkerContext, WorkerRef};
 use crate::{MessageEvent, WorkerUrl};
 
 #[must_use = "does nothing unless spawned"]
@@ -71,7 +71,8 @@ impl WorkerBuilder<'_> {
 			let tester = Rc::new(Cell::new(false));
 			let worker_options =
 				WorkerOptions::from(JsValue::from(__wasm_worker_Tester(Rc::clone(&tester))));
-			let worker = Worker::new_with_options("data:,", &worker_options).unwrap_throw();
+			let worker =
+				web_sys::Worker::new_with_options("data:,", &worker_options).unwrap_throw();
 			worker.terminate();
 
 			tester.get()
@@ -87,7 +88,7 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
+	pub fn message_handler<F: 'static + FnMut(&WorkerRef, MessageEvent)>(
 		self,
 		mut message_handler: F,
 	) -> Self {
@@ -97,7 +98,7 @@ impl WorkerBuilder<'_> {
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
-					WorkerHandleRef::new(
+					WorkerRef::new(
 						event.target().unwrap().unchecked_into(),
 						Rc::clone(&id_handle),
 						Weak::clone(&message_handler_handle),
@@ -110,7 +111,7 @@ impl WorkerBuilder<'_> {
 	}
 
 	pub fn message_handler_async<
-		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
+		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		self,
@@ -122,7 +123,7 @@ impl WorkerBuilder<'_> {
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
-					WorkerHandleRef::new(
+					WorkerRef::new(
 						event.target().unwrap().unchecked_into(),
 						Rc::clone(&id_handle),
 						Weak::clone(&message_handler_handle),
@@ -134,14 +135,14 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn spawn<F>(self, f: F) -> WorkerHandle
+	pub fn spawn<F>(self, f: F) -> Worker
 	where
 		F: 'static + FnOnce(WorkerContext) + Send,
 	{
 		self.spawn_internal(Task::Classic(Box::new(f)))
 	}
 
-	pub fn spawn_async<F1, F2>(self, f: F1) -> WorkerHandle
+	pub fn spawn_async<F1, F2>(self, f: F1) -> Worker
 	where
 		F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
 		F2: 'static + Future<Output = ()>,
@@ -156,7 +157,7 @@ impl WorkerBuilder<'_> {
 		self.spawn_internal(task)
 	}
 
-	fn spawn_internal(self, task: Task) -> WorkerHandle {
+	fn spawn_internal(self, task: Task) -> Worker {
 		static COUNTER: AtomicUsize = AtomicUsize::new(0);
 
 		let id = COUNTER.fetch_add(1, Ordering::Relaxed);
@@ -165,9 +166,9 @@ impl WorkerBuilder<'_> {
 		let data = Box::into_raw(Box::new(Data { id, task }));
 
 		let worker = if let Some(options) = self.options {
-			Worker::new_with_options(&self.url.url, &options)
+			web_sys::Worker::new_with_options(&self.url.url, &options)
 		} else {
-			Worker::new(&self.url.url)
+			web_sys::Worker::new(&self.url.url)
 		}
 		.unwrap_throw();
 
@@ -183,7 +184,7 @@ impl WorkerBuilder<'_> {
 
 		worker.post_message(&init).unwrap_throw();
 
-		WorkerHandle::new(worker, self.id, self.message_handler)
+		Worker::new(worker, self.id, self.message_handler)
 	}
 }
 

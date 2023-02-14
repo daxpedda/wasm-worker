@@ -5,19 +5,17 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::rc::{Rc, Weak};
 
-use web_sys::Worker;
-
 use super::{Closure, Tls, TransferError, WorkerOrContext, EXPORTS};
 use crate::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
-pub struct WorkerHandle {
-	worker: Worker,
+pub struct Worker {
+	worker: web_sys::Worker,
 	id: Rc<Cell<Option<usize>>>,
 	message_handler: Rc<RefCell<Option<Closure>>>,
 }
 
-impl Drop for WorkerHandle {
+impl Drop for Worker {
 	fn drop(&mut self) {
 		if Rc::strong_count(&self.message_handler) == 1 {
 			self.worker.set_onmessage(None);
@@ -25,24 +23,24 @@ impl Drop for WorkerHandle {
 	}
 }
 
-impl Eq for WorkerHandle {}
+impl Eq for Worker {}
 
-impl PartialEq for WorkerHandle {
+impl PartialEq for Worker {
 	fn eq(&self, other: &Self) -> bool {
 		self.worker == other.worker
 	}
 }
 
-impl WorkerHandleOrRef for WorkerHandle {
-	fn handle_ref(&self) -> WorkerHandleRef {
-		WorkerHandleRef {
+impl WorkerOrRef for Worker {
+	fn handle_ref(&self) -> WorkerRef {
+		WorkerRef {
 			worker: self.worker.clone(),
 			id: Rc::clone(&self.id),
 			message_handler: Rc::downgrade(&self.message_handler),
 		}
 	}
 
-	fn worker(&self) -> &Worker {
+	fn worker(&self) -> &web_sys::Worker {
 		&self.worker
 	}
 
@@ -55,9 +53,9 @@ impl WorkerHandleOrRef for WorkerHandle {
 	}
 }
 
-impl WorkerHandle {
+impl Worker {
 	pub(super) fn new(
-		worker: Worker,
+		worker: web_sys::Worker,
 		id: Rc<Cell<Option<usize>>>,
 		message_handler: Rc<RefCell<Option<Closure>>>,
 	) -> Self {
@@ -69,38 +67,38 @@ impl WorkerHandle {
 	}
 
 	#[must_use]
-	pub const fn raw(&self) -> &Worker {
+	pub const fn raw(&self) -> &web_sys::Worker {
 		&self.worker
 	}
 
 	#[must_use]
 	#[allow(clippy::same_name_method)]
 	pub fn has_message_handler(&self) -> bool {
-		<Self as WorkerHandleOrRef>::has_message_handler(self)
+		<Self as WorkerOrRef>::has_message_handler(self)
 	}
 
 	#[allow(clippy::same_name_method)]
 	pub fn clear_message_handler(&self) {
-		<Self as WorkerHandleOrRef>::clear_message_handler(self);
+		<Self as WorkerOrRef>::clear_message_handler(self);
 	}
 
 	#[allow(clippy::same_name_method)]
-	pub fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
+	pub fn set_message_handler<F: 'static + FnMut(&WorkerRef, MessageEvent)>(
 		&self,
 		new_message_handler: F,
 	) {
-		<Self as WorkerHandleOrRef>::set_message_handler(self, new_message_handler);
+		<Self as WorkerOrRef>::set_message_handler(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
 	pub fn set_message_handler_async<
-		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
+		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
 		new_message_handler: F1,
 	) {
-		<Self as WorkerHandleOrRef>::set_message_handler_async(self, new_message_handler);
+		<Self as WorkerOrRef>::set_message_handler_async(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
@@ -108,33 +106,33 @@ impl WorkerHandle {
 		&self,
 		messages: M,
 	) -> Result<(), TransferError> {
-		<Self as WorkerHandleOrRef>::transfer_messages(self, messages)
+		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
 
 	#[allow(clippy::same_name_method)]
 	pub fn terminate(&self) {
-		<Self as WorkerHandleOrRef>::terminate(self);
+		<Self as WorkerOrRef>::terminate(self);
 	}
 
 	#[allow(clippy::same_name_method)]
 	pub fn destroy(self, tls: Tls) -> Result<(), DestroyError<Self>> {
-		<Self as WorkerHandleOrRef>::destroy(self, tls)
+		<Self as WorkerOrRef>::destroy(self, tls)
 	}
 }
 
 #[derive(Clone, Debug)]
-pub struct WorkerHandleRef {
-	worker: Worker,
+pub struct WorkerRef {
+	worker: web_sys::Worker,
 	id: Rc<Cell<Option<usize>>>,
 	message_handler: Weak<RefCell<Option<Closure>>>,
 }
 
-impl WorkerHandleOrRef for WorkerHandleRef {
-	fn handle_ref(&self) -> WorkerHandleRef {
+impl WorkerOrRef for WorkerRef {
+	fn handle_ref(&self) -> WorkerRef {
 		self.clone()
 	}
 
-	fn worker(&self) -> &Worker {
+	fn worker(&self) -> &web_sys::Worker {
 		&self.worker
 	}
 
@@ -147,9 +145,9 @@ impl WorkerHandleOrRef for WorkerHandleRef {
 	}
 }
 
-impl WorkerHandleRef {
+impl WorkerRef {
 	pub(super) fn new(
-		worker: Worker,
+		worker: web_sys::Worker,
 		id: Rc<Cell<Option<usize>>>,
 		message_handler: Weak<RefCell<Option<Closure>>>,
 	) -> Self {
@@ -161,19 +159,19 @@ impl WorkerHandleRef {
 	}
 
 	#[must_use]
-	pub const fn raw(&self) -> &Worker {
+	pub const fn raw(&self) -> &web_sys::Worker {
 		&self.worker
 	}
 
 	#[must_use]
 	#[allow(clippy::same_name_method)]
 	pub fn has_message_handler(&self) -> bool {
-		<Self as WorkerHandleOrRef>::has_message_handler(self)
+		<Self as WorkerOrRef>::has_message_handler(self)
 	}
 
 	#[allow(clippy::same_name_method)]
 	pub fn clear_message_handler(&self) {
-		<Self as WorkerHandleOrRef>::clear_message_handler(self);
+		<Self as WorkerOrRef>::clear_message_handler(self);
 	}
 
 	#[allow(clippy::same_name_method)]
@@ -181,7 +179,7 @@ impl WorkerHandleRef {
 		&self,
 		new_message_handler: F,
 	) {
-		<Self as WorkerHandleOrRef>::set_message_handler(self, new_message_handler);
+		<Self as WorkerOrRef>::set_message_handler(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
@@ -192,7 +190,7 @@ impl WorkerHandleRef {
 		&self,
 		new_message_handler: F1,
 	) {
-		<Self as WorkerHandleOrRef>::set_message_handler_async(self, new_message_handler);
+		<Self as WorkerOrRef>::set_message_handler_async(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
@@ -200,24 +198,24 @@ impl WorkerHandleRef {
 		&self,
 		messages: M,
 	) -> Result<(), TransferError> {
-		<Self as WorkerHandleOrRef>::transfer_messages(self, messages)
+		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
 
 	#[allow(clippy::same_name_method)]
 	pub fn terminate(&self) {
-		<Self as WorkerHandleOrRef>::terminate(self);
+		<Self as WorkerOrRef>::terminate(self);
 	}
 
 	#[allow(clippy::same_name_method)]
 	pub fn destroy(self, tls: Tls) -> Result<(), DestroyError<Self>> {
-		<Self as WorkerHandleOrRef>::destroy(self, tls)
+		<Self as WorkerOrRef>::destroy(self, tls)
 	}
 }
 
-trait WorkerHandleOrRef: Debug + Sized {
-	fn handle_ref(&self) -> WorkerHandleRef;
+trait WorkerOrRef: Debug + Sized {
+	fn handle_ref(&self) -> WorkerRef;
 
-	fn worker(&self) -> &Worker;
+	fn worker(&self) -> &web_sys::Worker;
 
 	fn id(&self) -> &Rc<Cell<Option<usize>>>;
 
@@ -236,7 +234,7 @@ trait WorkerHandleOrRef: Debug + Sized {
 		}
 	}
 
-	fn set_message_handler<F: 'static + FnMut(&WorkerHandleRef, MessageEvent)>(
+	fn set_message_handler<F: 'static + FnMut(&WorkerRef, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
 	) {
@@ -253,7 +251,7 @@ trait WorkerHandleOrRef: Debug + Sized {
 	}
 
 	fn set_message_handler_async<
-		F1: 'static + FnMut(&WorkerHandleRef, MessageEvent) -> F2,
+		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	>(
 		&self,
