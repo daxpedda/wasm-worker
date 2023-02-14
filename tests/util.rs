@@ -17,8 +17,8 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{DedicatedWorkerGlobalScope, Window};
 
-pub const SIGNAL_DURATION: Duration = Duration::from_millis(250);
-pub const CLOSE_DURATION: Duration = Duration::from_millis(1000);
+pub const SIGNAL_DURATION: Duration = Duration::from_millis(500);
+pub const CLOSE_DURATION: Duration = Duration::from_millis(2000);
 
 pub struct Sleep(JsFuture);
 
