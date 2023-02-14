@@ -4,7 +4,7 @@ use std::future::Future;
 use std::ops::Deref;
 
 use js_sys::WebAssembly::Global;
-use js_sys::{Array, Function, Object, Reflect};
+use js_sys::{Array, Function, Object, Promise, Reflect};
 use once_cell::unsync::Lazy;
 use wasm_bindgen::closure::Closure as JsClosure;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -16,7 +16,7 @@ use crate::{Message, Messages, RawMessages};
 #[derive(Debug)]
 pub(super) enum Closure {
 	Classic(JsClosure<dyn FnMut(web_sys::MessageEvent)>),
-	Future(JsClosure<dyn FnMut(web_sys::MessageEvent) -> JsValue>),
+	Future(JsClosure<dyn FnMut(web_sys::MessageEvent) -> Promise>),
 }
 
 impl Deref for Closure {
@@ -46,7 +46,6 @@ impl Closure {
 					closure.await;
 					Ok(JsValue::UNDEFINED)
 				})
-				.into()
 			}
 		});
 
