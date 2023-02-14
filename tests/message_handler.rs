@@ -457,6 +457,70 @@ async fn context_message_handler_async() {
 	worker.terminate();
 }
 
+/// [`WorkerBuilder::message_handler()`] when
+/// [`WorkerHandle`](wasm_worker::WorkerHandle) is dropped.
+#[wasm_bindgen_test]
+async fn builder_drop_message_handler() -> Result<()> {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let request = Flag::new();
+	let response = Flag::new();
+
+	WorkerBuilder::new()?
+		.message_handler({
+			let response = response.clone();
+			move |_, _| response.signal()
+		})
+		.spawn_async({
+			let request = request.clone();
+			|context| async move {
+				request.await;
+				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+
+				context.close();
+			}
+		});
+
+	request.signal();
+
+	// The message handler will never respond if dropped.
+	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
+	assert!(matches!(result, Either::Right(((), _))));
+
+	Ok(())
+}
+
+/// [`WorkerHandle::set_message_handler()`](wasm_worker::WorkerHandle::set_message_handler) when
+/// [`WorkerHandle`](wasm_worker::WorkerHandle) is dropped.
+#[wasm_bindgen_test]
+async fn handle_drop_message_handler() {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let request = Flag::new();
+	let response = Flag::new();
+
+	let worker = wasm_worker::spawn_async({
+		let request = request.clone();
+		|context| async move {
+			request.await;
+			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+
+			context.close();
+		}
+	});
+
+	worker.set_message_handler({
+		let response = response.clone();
+		move |_, _| response.signal()
+	});
+	drop(worker);
+	request.signal();
+
+	// The message handler will never respond if dropped.
+	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
+	assert!(matches!(result, Either::Right(((), _))));
+}
+
 /// Multiple messages in
 /// [`WorkerHandle::transfer_messages()`](wasm_worker::WorkerHandle::transfer_messages).
 #[wasm_bindgen_test]
