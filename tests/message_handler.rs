@@ -159,6 +159,83 @@ async fn context_has_message_handler() {
 	flag.await;
 }
 
+/// [`WorkerBuilder::message_handler()`].
+#[wasm_bindgen_test]
+async fn builder_message_handler() -> Result<()> {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let flag = Flag::new();
+
+	let _worker = WorkerBuilder::new()?
+		.message_handler({
+			let flag = flag.clone();
+			move |_, _| flag.signal()
+		})
+		.spawn({
+			|context| {
+				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+
+				context.close();
+			}
+		});
+
+	flag.await;
+
+	Ok(())
+}
+
+/// [`WorkerHandle::set_message_handler()`](wasm_worker::WorkerHandle::set_message_handler).
+#[wasm_bindgen_test]
+async fn handle_message_handler() {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let request = Flag::new();
+	let response = Flag::new();
+
+	let worker = wasm_worker::spawn_async({
+		let request = request.clone();
+		|context| async move {
+			request.await;
+			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+
+			context.close();
+		}
+	});
+
+	worker.set_message_handler({
+		let response = response.clone();
+		move |_, _| response.signal()
+	});
+	request.signal();
+
+	response.await;
+}
+
+/// [`WorkerContext::set_message_handler()`].
+#[wasm_bindgen_test]
+async fn context_message_handler() {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let request = Flag::new();
+	let response = Flag::new();
+
+	let worker = wasm_worker::spawn_async({
+		let request = request.clone();
+		let response = response.clone();
+		|context| async move {
+			context.set_message_handler(move |_, _| response.signal());
+			request.signal();
+		}
+	});
+
+	request.await;
+	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+
+	response.await;
+
+	worker.terminate();
+}
+
 /// [`WorkerBuilder::message_handler_async()`].
 #[wasm_bindgen_test]
 async fn builder_async_message_handler() -> Result<()> {
