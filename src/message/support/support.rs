@@ -66,9 +66,7 @@ impl Future for MessageSupportFuture {
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		let mut self_ = self.as_mut();
-
-		match self_.0.as_mut().expect("polled after `Ready`") {
+		match self.0.as_mut().expect("polled after `Ready`") {
 			Inner::Ready(support) => {
 				let support = *support;
 				self.0.take();

@@ -57,10 +57,8 @@ impl Future for ImportSupportFuture {
 			return Poll::Ready(*support);
 		}
 
-		let mut self_ = self.as_mut();
-
 		loop {
-			match self_.0.as_mut().expect("polled after `Ready`") {
+			match self.0.as_mut().expect("polled after `Ready`") {
 				Inner::Ready(support) => {
 					let support = *support;
 					self.0.take();
@@ -74,7 +72,7 @@ impl Future for ImportSupportFuture {
 						.add_module("data:text/javascript,import'data:text/javascript,'")
 						.unwrap_throw();
 
-					self_.0 = Some(Inner::Create(JsFuture::from(promise)));
+					self.0 = Some(Inner::Create(JsFuture::from(promise)));
 				}
 				Inner::Create(future) => {
 					let result = ready!(Pin::new(future).poll(cx));

@@ -56,10 +56,8 @@ impl Future for ImageBitmapSupportFuture {
 			return Poll::Ready(*support);
 		}
 
-		let mut self_ = self.as_mut();
-
 		loop {
-			match self_.0.as_mut().expect("polled after `Ready`") {
+			match self.0.as_mut().expect("polled after `Ready`") {
 				Inner::Ready(support) => {
 					let support = *support;
 					self.0.take();
@@ -86,7 +84,7 @@ impl Future for ImageBitmapSupportFuture {
 					});
 
 					if let Some(promise) = promise {
-						self_.0 = Some(Inner::Create(JsFuture::from(promise)));
+						self.0 = Some(Inner::Create(JsFuture::from(promise)));
 					} else {
 						self.0.take();
 						return Poll::Ready(Err(SupportError::Undetermined));
