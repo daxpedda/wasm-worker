@@ -36,6 +36,12 @@ impl ImageBitmapSupportFuture {
 
 	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
+		if let Some(support) = SUPPORT.get() {
+			self.0.take();
+
+			return Some(*support);
+		}
+
 		if let Inner::Ready(support) = self.0.as_ref().expect("polled after `Ready`") {
 			let support = *support;
 			self.0.take();
@@ -53,6 +59,8 @@ impl Future for ImageBitmapSupportFuture {
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		if let Some(support) = SUPPORT.get() {
+			self.0.take();
+
 			return Poll::Ready(*support);
 		}
 
