@@ -5,7 +5,7 @@ mod util;
 use anyhow::Result;
 use wasm_bindgen::ShimFormat;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{WorkerBuilder, WorkerUrl, WorkerUrlFormat};
+use wasm_worker::dedicated::{WorkerBuilder, WorkerUrl, WorkerUrlFormat};
 
 use self::util::Flag;
 

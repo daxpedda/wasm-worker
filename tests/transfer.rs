@@ -14,7 +14,8 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{Message, SupportError, WorkerBuilder};
+use wasm_worker::dedicated::WorkerBuilder;
+use wasm_worker::message::{Message, SupportError};
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{
 	AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame,

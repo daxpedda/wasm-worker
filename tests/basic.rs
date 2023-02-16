@@ -4,7 +4,7 @@ mod util;
 
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::WorkerContext;
+use wasm_worker::dedicated::WorkerContext;
 
 use self::util::{Flag, CLOSE_DURATION, SIGNAL_DURATION};
 

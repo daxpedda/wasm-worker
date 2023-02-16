@@ -5,7 +5,7 @@ use once_cell::unsync::OnceCell;
 use web_sys::DedicatedWorkerGlobalScope;
 
 use super::{Closure, Tls, TransferError, WorkerOrContext, EXPORTS};
-use crate::{Message, MessageEvent};
+use crate::message::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerContext {

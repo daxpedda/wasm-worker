@@ -13,8 +13,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 
-use super::{Closure, Worker, WorkerContext, WorkerRef};
-use crate::{MessageEvent, WorkerUrl};
+use super::{Closure, Worker, WorkerContext, WorkerRef, WorkerUrl};
+use crate::message::MessageEvent;
 
 #[must_use = "does nothing unless spawned"]
 #[derive(Debug)]

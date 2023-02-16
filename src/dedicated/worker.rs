@@ -6,7 +6,7 @@ use std::future::Future;
 use std::rc::{Rc, Weak};
 
 use super::{Closure, Tls, TransferError, WorkerOrContext, EXPORTS};
-use crate::{Message, MessageEvent};
+use crate::message::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]
 pub struct Worker {

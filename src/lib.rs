@@ -15,14 +15,7 @@
 //!   receiving messages if receiving message handler is setup after a yield
 //!   point.
 
-mod dedicated;
-mod message;
+pub mod dedicated;
+pub mod message;
 
-pub use self::dedicated::{
-	spawn, spawn_async, DestroyError, ModuleSupportError, Tls, TransferError, Worker,
-	WorkerBuilder, WorkerContext, WorkerRef, WorkerUrl, WorkerUrlFormat,
-};
-pub use self::message::{
-	HasSupportFuture, ImageBitmapSupportFuture, Message, MessageError, MessageEvent, MessageIter,
-	Messages, RawMessage, RawMessages, SupportError,
-};
+pub use dedicated::{spawn, spawn_async};

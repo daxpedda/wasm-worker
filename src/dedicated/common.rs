@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
-use crate::{Message, Messages, RawMessages};
+use crate::message::{Message, Messages, RawMessages};
 
 #[derive(Debug)]
 pub(super) enum Closure {

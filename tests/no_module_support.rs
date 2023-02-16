@@ -5,7 +5,7 @@
 
 use wasm_bindgen::ShimFormat;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{ModuleSupportError, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
+use wasm_worker::dedicated::{ModuleSupportError, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 

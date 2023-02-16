@@ -11,7 +11,8 @@ use futures_channel::oneshot;
 use futures_util::future::{self, Either};
 use js_sys::ArrayBuffer;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::{DestroyError, Message, WorkerBuilder};
+use wasm_worker::dedicated::{DestroyError, WorkerBuilder};
+use wasm_worker::message::Message;
 
 use self::util::{Flag, SIGNAL_DURATION};
 
