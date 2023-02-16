@@ -3,9 +3,8 @@
 mod util;
 
 use anyhow::Result;
-use wasm_bindgen::ShimFormat;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::dedicated::{WorkerBuilder, WorkerUrl, WorkerUrlFormat};
+use wasm_worker::dedicated::{ShimFormat, WorkerBuilder, WorkerUrl};
 
 use self::util::Flag;
 
@@ -57,8 +56,8 @@ async fn url() -> Result<()> {
 	let url = WorkerUrl::new(
 		&wasm_bindgen::shim_url().unwrap(),
 		match &wasm_bindgen::shim_format().unwrap() {
-			ShimFormat::EsModule => WorkerUrlFormat::EsModule,
-			ShimFormat::NoModules { global_name } => WorkerUrlFormat::Classic {
+			wasm_bindgen::ShimFormat::EsModule => ShimFormat::EsModule,
+			wasm_bindgen::ShimFormat::NoModules { global_name } => ShimFormat::Classic {
 				global: global_name,
 			},
 			_ => unreachable!("expected shim to be built for browsers"),

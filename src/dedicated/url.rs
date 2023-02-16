@@ -1,7 +1,9 @@
 use js_sys::Array;
 use once_cell::sync::Lazy;
-use wasm_bindgen::{JsValue, ShimFormat, UnwrapThrowExt};
+use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{Blob, BlobPropertyBag, Url};
+
+use super::ShimFormat;
 
 #[derive(Debug)]
 pub struct WorkerUrl {
@@ -24,10 +26,12 @@ impl WorkerUrl {
 			WorkerUrl::new(
 				&wasm_bindgen::shim_url().expect(ERROR),
 				match &wasm_bindgen::shim_format() {
-					Some(ShimFormat::EsModule) => WorkerUrlFormat::EsModule,
-					Some(ShimFormat::NoModules { global_name }) => WorkerUrlFormat::Classic {
-						global: global_name,
-					},
+					Some(wasm_bindgen::ShimFormat::EsModule) => ShimFormat::EsModule,
+					Some(wasm_bindgen::ShimFormat::NoModules { global_name }) => {
+						ShimFormat::Classic {
+							global: global_name,
+						}
+					}
 					Some(_) | None => unreachable!("{ERROR}"),
 				},
 			)
@@ -37,16 +41,16 @@ impl WorkerUrl {
 	}
 
 	#[must_use]
-	pub fn new(url: &str, format: WorkerUrlFormat<'_>) -> Self {
+	pub fn new(url: &str, format: ShimFormat<'_>) -> Self {
 		let script = match format {
-			WorkerUrlFormat::EsModule => {
+			ShimFormat::EsModule => {
 				format!(
 					"import {{initSync, __wasm_worker_entry}} from '{}';\n\n{}",
 					url,
 					include_str!("worker.js")
 				)
 			}
-			WorkerUrlFormat::Classic { global } => {
+			ShimFormat::Classic { global } => {
 				#[rustfmt::skip]
 				let script = format!(
 					"\
@@ -74,7 +78,7 @@ impl WorkerUrl {
 
 		Self {
 			url,
-			is_module: format.is_module(),
+			is_module: matches!(format, ShimFormat::EsModule),
 		}
 	}
 
@@ -86,20 +90,5 @@ impl WorkerUrl {
 	#[must_use]
 	pub fn as_raw(&self) -> &str {
 		&self.url
-	}
-}
-
-#[derive(Clone, Copy, Debug)]
-pub enum WorkerUrlFormat<'global> {
-	EsModule,
-	Classic { global: &'global str },
-}
-
-impl WorkerUrlFormat<'_> {
-	const fn is_module(self) -> bool {
-		match self {
-			WorkerUrlFormat::EsModule => true,
-			WorkerUrlFormat::Classic { .. } => false,
-		}
 	}
 }

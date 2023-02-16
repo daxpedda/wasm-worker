@@ -10,8 +10,9 @@ pub use self::builder::{ModuleSupportError, WorkerBuilder};
 use self::common::{Closure, WorkerOrContext, EXPORTS};
 pub use self::common::{Tls, TransferError};
 pub use self::context::WorkerContext;
-pub use self::url::{WorkerUrl, WorkerUrlFormat};
+pub use self::url::WorkerUrl;
 pub use self::worker::{DestroyError, Worker, WorkerRef};
+pub use crate::common::ShimFormat;
 
 pub fn spawn<F>(f: F) -> Worker
 where

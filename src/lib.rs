@@ -15,6 +15,7 @@
 //!   receiving messages if receiving message handler is setup after a yield
 //!   point.
 
+mod common;
 pub mod dedicated;
 pub mod message;
 pub mod worklet;

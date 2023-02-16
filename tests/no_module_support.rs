@@ -3,9 +3,8 @@
 //!
 //! Not tested by default!
 
-use wasm_bindgen::ShimFormat;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::dedicated::{ModuleSupportError, WorkerBuilder, WorkerUrl, WorkerUrlFormat};
+use wasm_worker::dedicated::{ModuleSupportError, ShimFormat, WorkerBuilder, WorkerUrl};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
@@ -15,7 +14,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 fn spawn() {
 	assert!(matches!(
 		wasm_bindgen::shim_format(),
-		Some(ShimFormat::EsModule)
+		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
 	wasm_worker::spawn(|_| unreachable!());
@@ -27,7 +26,7 @@ fn spawn() {
 fn spawn_async() {
 	assert!(matches!(
 		wasm_bindgen::shim_format(),
-		Some(ShimFormat::EsModule)
+		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
 	wasm_worker::spawn_async(|_| async { unreachable!() });
@@ -38,7 +37,7 @@ fn spawn_async() {
 fn check() {
 	assert!(matches!(
 		wasm_bindgen::shim_format(),
-		Some(ShimFormat::EsModule)
+		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
 	assert!(!WorkerBuilder::has_module_support());
@@ -49,7 +48,7 @@ fn check() {
 fn builder() {
 	assert!(matches!(
 		wasm_bindgen::shim_format(),
-		Some(ShimFormat::EsModule)
+		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
 	assert_eq!(WorkerBuilder::new().unwrap_err(), ModuleSupportError);
@@ -60,13 +59,10 @@ fn builder() {
 fn builder_url() {
 	assert!(matches!(
 		wasm_bindgen::shim_format(),
-		Some(ShimFormat::EsModule)
+		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
-	let url = WorkerUrl::new(
-		&wasm_bindgen::shim_url().unwrap(),
-		WorkerUrlFormat::EsModule,
-	);
+	let url = WorkerUrl::new(&wasm_bindgen::shim_url().unwrap(), ShimFormat::EsModule);
 	assert_eq!(
 		WorkerBuilder::new_with_url(&url).unwrap_err(),
 		ModuleSupportError
