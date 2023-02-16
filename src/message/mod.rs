@@ -18,7 +18,7 @@ use web_sys::{
 
 pub use self::event::MessageEvent;
 pub use self::raw::{MessageError, RawMessage, RawMessages};
-pub use self::support::{HasSupportFuture, ImageBitmapSupportFuture, SupportError};
+pub use self::support::{ImageBitmapSupportFuture, MessageSupportFuture, SupportError};
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum Message {

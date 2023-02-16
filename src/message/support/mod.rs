@@ -1,12 +1,12 @@
 mod array_buffer;
 #[cfg(web_sys_unstable_apis)]
 mod audio_data;
-mod has_support;
 mod image_bitmap;
 mod message_port;
 mod offscreen_canvas;
 mod readable_stream;
 mod rtc_data_channel;
+mod support;
 mod transform_stream;
 #[cfg(web_sys_unstable_apis)]
 mod video_frame;
@@ -16,9 +16,9 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-pub use has_support::HasSupportFuture;
 pub use image_bitmap::ImageBitmapSupportFuture;
 use js_sys::Array;
+pub use support::MessageSupportFuture;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 use web_sys::{DomException, Worker};
 

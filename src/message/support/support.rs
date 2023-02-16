@@ -9,14 +9,14 @@ use super::super::Message;
 use super::{ImageBitmapSupportFuture, SupportError};
 
 impl Message {
-	pub fn has_support(&self) -> HasSupportFuture {
-		HasSupportFuture::new(self)
+	pub fn has_support(&self) -> MessageSupportFuture {
+		MessageSupportFuture::new(self)
 	}
 }
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct HasSupportFuture(Option<Inner>);
+pub struct MessageSupportFuture(Option<Inner>);
 
 #[derive(Debug)]
 enum Inner {
@@ -24,7 +24,7 @@ enum Inner {
 	ImageBitmap(ImageBitmapSupportFuture),
 }
 
-impl HasSupportFuture {
+impl MessageSupportFuture {
 	fn new(message: &Message) -> Self {
 		Self(Some(match message {
 			Message::ArrayBuffer(_) => Inner::Ready(Message::has_array_buffer_support()),
@@ -61,7 +61,7 @@ impl HasSupportFuture {
 	}
 }
 
-impl Future for HasSupportFuture {
+impl Future for MessageSupportFuture {
 	type Output = Result<(), SupportError>;
 
 	#[track_caller]
@@ -86,7 +86,7 @@ impl Future for HasSupportFuture {
 }
 
 #[cfg(feature = "futures")]
-impl FusedFuture for HasSupportFuture {
+impl FusedFuture for MessageSupportFuture {
 	fn is_terminated(&self) -> bool {
 		self.0.is_none()
 	}
