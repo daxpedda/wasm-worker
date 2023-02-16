@@ -41,7 +41,7 @@ impl WorkerUrl {
 		let script = match format {
 			WorkerUrlFormat::EsModule => {
 				format!(
-					"import __wasm_worker_wasm_bindgen, {{__wasm_worker_entry}} from '{}';\n\n{}",
+					"import {{initSync, __wasm_worker_entry}} from '{}';\n\n{}",
 					url,
 					include_str!("worker.js")
 				)
@@ -51,8 +51,8 @@ impl WorkerUrl {
 				let script = format!(
 					"\
 						importScripts('{}');\n\
-						const __wasm_worker_wasm_bindgen = {global};\n\
-						const __wasm_worker_entry = __wasm_worker_wasm_bindgen.__wasm_worker_entry;\n\
+						const initSync = {global}.initSync;\n\
+						const __wasm_worker_entry = {global}.__wasm_worker_entry;\n\
 						\n\
 						{}\
 					",

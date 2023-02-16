@@ -3,6 +3,9 @@
 
 mod util;
 
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
 use anyhow::Result;
 use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
@@ -701,4 +704,34 @@ async fn context_multi_message() -> Result<()> {
 	flag.await;
 
 	Ok(())
+}
+
+/// Make sure sent messages are queued and correctly sent to the new message
+/// handler if not set after a yield point.
+#[wasm_bindgen_test]
+#[allow(clippy::await_holding_lock)]
+async fn message_handler_race() {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let flag = Flag::new();
+	let barrier = Arc::new(Mutex::new(()));
+	let lock = barrier.lock().unwrap();
+
+	let worker = wasm_worker::spawn_async({
+		let flag = flag.clone();
+		let barrier = Arc::clone(&barrier);
+
+		move |context| async move {
+			drop(barrier.lock().unwrap());
+			context.set_message_handler(move |_, _| flag.signal());
+		}
+	});
+
+	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	util::sleep(Duration::from_secs(5)).await;
+	drop(lock);
+
+	// The message handler will never signal if event was missed.
+	let result = future::select(flag, util::sleep(SIGNAL_DURATION)).await;
+	assert!(matches!(result, Either::Left(((), _))));
 }

@@ -11,7 +11,8 @@
 //! - Document that getting the default worker url will fail if using no-modules
 //!   and not starting in a document.
 //! - Note possible race condition when sending to newly spawned worker not
-//!   receiving messages if receiving message handler wasn't setup yet.
+//!   receiving messages if receiving message handler is setup after a yield
+//!   point.
 
 mod dedicated;
 mod message;

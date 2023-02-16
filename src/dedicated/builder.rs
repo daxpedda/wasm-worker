@@ -213,17 +213,15 @@ enum Task {
 #[allow(unreachable_pub)]
 #[wasm_bindgen]
 pub fn __wasm_worker_entry(data: *mut Data) -> JsValue {
-	// Unhooking the message handler has to happen in JS because loading the WASM
-	// module will actually yield and introduce a race condition where messages sent
-	// will still be handled by the entry message handler.
+	let global = js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>();
+	global.set_onmessage(None);
 
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
 	// `__wasm_worker_entry` from `worker.js`. The data sent to it should only come
 	// from `WorkerBuilder::spawn_internal()`.
 	let data = *unsafe { Box::from_raw(data) };
 
-	let context = js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>();
-	let context = WorkerContext::init(context, data.id);
+	let context = WorkerContext::init(global, data.id);
 
 	match data.task {
 		Task::Classic(classic) => {
