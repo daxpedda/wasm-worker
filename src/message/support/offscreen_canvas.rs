@@ -1,9 +1,10 @@
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::OffscreenCanvas;
 
 use super::super::SupportError;
+use crate::global::Global;
 
 pub(in super::super) fn support() -> Result<(), SupportError> {
 	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
@@ -16,9 +17,7 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 			fn offscreen_canvas(this: &__wasm_worker_OffscreenCanvasGlobal) -> JsValue;
 		}
 
-		let global: __wasm_worker_OffscreenCanvasGlobal = js_sys::global().unchecked_into();
-
-		if global.offscreen_canvas().is_undefined() {
+		if Global::new().offscreen_canvas().is_undefined() {
 			return Err(SupportError::Unsupported);
 		}
 

@@ -30,6 +30,7 @@ web-sys = { version = "0.3", features = [
 	"OfflineAudioContext",
 	"OffscreenCanvas",
 	"ReadableStream",
+	"RequestInit",
 	"RtcDataChannel",
 	"RtcPeerConnection",
 	"TransformStream",

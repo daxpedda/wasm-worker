@@ -1,18 +1,16 @@
 use std::future::Future;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 #[cfg(feature = "futures")]
 use futures_util::future::FusedFuture;
 use once_cell::sync::OnceCell;
-use once_cell::unsync::Lazy;
-use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{ImageBitmap, ImageData, Window, WorkerGlobalScope};
+use web_sys::{ImageBitmap, ImageData};
 
 use super::super::SupportError;
+use crate::global::WindowOrWorker;
 
 static SUPPORT: OnceCell<Result<(), SupportError>> = OnceCell::new();
 
@@ -54,37 +52,6 @@ impl Future for ImageBitmapSupportFuture {
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		enum Global {
-			Window(Window),
-			Worker(WorkerGlobalScope),
-		}
-
-		thread_local! {
-			static GLOBAL: Lazy<Option<Global>> = Lazy::new(|| {
-				#[wasm_bindgen]
-				extern "C" {
-					#[allow(non_camel_case_types)]
-					type __wasm_worker_ImageBitmapGlobal;
-
-					#[wasm_bindgen(method, getter, js_name = Window)]
-					fn window(this: &__wasm_worker_ImageBitmapGlobal) -> JsValue;
-
-					#[wasm_bindgen(method, getter, js_name = WorkerGlobalScope)]
-					fn worker(this: &__wasm_worker_ImageBitmapGlobal) -> JsValue;
-				}
-
-				let global: __wasm_worker_ImageBitmapGlobal = js_sys::global().unchecked_into();
-
-				if !global.window().is_undefined() {
-					Some(Global::Window(global.unchecked_into()))
-				} else if !global.worker().is_undefined() {
-					Some(Global::Worker(global.unchecked_into()))
-				} else {
-					None
-				}
-			});
-		}
-
 		if let Some(support) = SUPPORT.get() {
 			return Poll::Ready(*support);
 		}
@@ -100,15 +67,15 @@ impl Future for ImageBitmapSupportFuture {
 					return Poll::Ready(support);
 				}
 				Inner::Unknown => {
-					let promise = GLOBAL.with(|global| {
-						if let Some(global) = global.deref() {
+					let promise = WindowOrWorker::with(|global| {
+						if let Some(global) = global {
 							let image = ImageData::new_with_sw(1, 1).unwrap_throw();
 
 							match global {
-								Global::Window(window) => {
+								WindowOrWorker::Window(window) => {
 									window.create_image_bitmap_with_image_data(&image)
 								}
-								Global::Worker(worker) => {
+								WindowOrWorker::Worker(worker) => {
 									worker.create_image_bitmap_with_image_data(&image)
 								}
 							}

@@ -17,6 +17,7 @@
 
 mod common;
 pub mod dedicated;
+mod global;
 pub mod message;
 pub mod worklet;
 
