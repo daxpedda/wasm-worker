@@ -42,6 +42,7 @@ impl HasSupportFuture {
 		}))
 	}
 
+	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
 		match self.0.as_mut().expect("polled after `Ready`") {
 			Inner::Ready(support) => {
@@ -63,6 +64,7 @@ impl HasSupportFuture {
 impl Future for HasSupportFuture {
 	type Output = Result<(), SupportError>;
 
+	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let mut self_ = self.as_mut();
 

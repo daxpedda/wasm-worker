@@ -66,7 +66,7 @@ pub struct MessageError<T: Debug>(pub T);
 
 impl<T: Debug> Display for MessageError<T> {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "unexpected message: {:?}", self.0)
+		write!(f, "unexpected message type for: {:?}", self.0)
 	}
 }
 
