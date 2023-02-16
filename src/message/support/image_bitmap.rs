@@ -21,7 +21,6 @@ pub struct ImageBitmapSupportFuture(Option<Inner>);
 #[derive(Debug)]
 enum Inner {
 	Ready(Result<(), SupportError>),
-	Unknown,
 	Create(JsFuture),
 }
 
@@ -30,7 +29,29 @@ impl ImageBitmapSupportFuture {
 		if let Some(support) = SUPPORT.get() {
 			Self(Some(Inner::Ready(*support)))
 		} else {
-			Self(Some(Inner::Unknown))
+			let promise = WindowOrWorker::with(|global| {
+				if let Some(global) = global {
+					let image = ImageData::new_with_sw(1, 1).unwrap_throw();
+
+					match global {
+						WindowOrWorker::Window(window) => {
+							window.create_image_bitmap_with_image_data(&image)
+						}
+						WindowOrWorker::Worker(worker) => {
+							worker.create_image_bitmap_with_image_data(&image)
+						}
+					}
+					.ok()
+				} else {
+					None
+				}
+			});
+
+			if let Some(promise) = promise {
+				Self(Some(Inner::Create(JsFuture::from(promise))))
+			} else {
+				Self(Some(Inner::Ready(Err(SupportError::Undetermined))))
+			}
 		}
 	}
 
@@ -64,51 +85,23 @@ impl Future for ImageBitmapSupportFuture {
 			return Poll::Ready(*support);
 		}
 
-		loop {
-			match self.0.as_mut().expect("polled after `Ready`") {
-				Inner::Ready(support) => {
-					let support = *support;
-					self.0.take();
+		match self.0.as_mut().expect("polled after `Ready`") {
+			Inner::Ready(support) => {
+				let support = *support;
+				self.0.take();
 
-					return Poll::Ready(support);
-				}
-				Inner::Unknown => {
-					let promise = WindowOrWorker::with(|global| {
-						if let Some(global) = global {
-							let image = ImageData::new_with_sw(1, 1).unwrap_throw();
+				Poll::Ready(support)
+			}
+			Inner::Create(future) => {
+				let result = ready!(Pin::new(future).poll(cx));
+				self.0.take();
 
-							match global {
-								WindowOrWorker::Window(window) => {
-									window.create_image_bitmap_with_image_data(&image)
-								}
-								WindowOrWorker::Worker(worker) => {
-									worker.create_image_bitmap_with_image_data(&image)
-								}
-							}
-							.ok()
-						} else {
-							None
-						}
-					});
+				let bitmap: ImageBitmap = result.unwrap_throw().unchecked_into();
 
-					if let Some(promise) = promise {
-						self.0 = Some(Inner::Create(JsFuture::from(promise)));
-					} else {
-						self.0.take();
-						return Poll::Ready(Err(SupportError::Undetermined));
-					}
-				}
-				Inner::Create(future) => {
-					let bitmap: ImageBitmap = ready!(Pin::new(future).poll(cx))
-						.unwrap_throw()
-						.unchecked_into();
+				let support = super::test_support(&bitmap);
 
-					let support = super::test_support(&bitmap);
-
-					self.0.take();
-					SUPPORT.set(support).unwrap();
-					return Poll::Ready(support);
-				}
+				SUPPORT.set(support).unwrap();
+				Poll::Ready(support)
 			}
 		}
 	}
