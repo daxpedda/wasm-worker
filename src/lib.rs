@@ -17,5 +17,6 @@
 
 pub mod dedicated;
 pub mod message;
+pub mod worklet;
 
 pub use dedicated::{spawn, spawn_async};
