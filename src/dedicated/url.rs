@@ -4,6 +4,7 @@ use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 use super::ShimFormat;
+use crate::common::SHIM_URL;
 
 #[derive(Debug)]
 pub struct WorkerUrl {
@@ -24,7 +25,7 @@ impl WorkerUrl {
 		static WORKER_URL: Lazy<WorkerUrl> = Lazy::new(|| {
 			const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
 			WorkerUrl::new(
-				&wasm_bindgen::shim_url().expect(ERROR),
+				&SHIM_URL,
 				match &wasm_bindgen::shim_format() {
 					Some(wasm_bindgen::ShimFormat::EsModule) => ShimFormat::EsModule,
 					Some(wasm_bindgen::ShimFormat::NoModules { global_name }) => {
