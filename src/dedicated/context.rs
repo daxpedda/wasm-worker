@@ -34,7 +34,7 @@ impl WorkerContext {
 	}
 
 	#[must_use]
-	pub const fn raw(&self) -> &DedicatedWorkerGlobalScope {
+	pub const fn as_raw(&self) -> &DedicatedWorkerGlobalScope {
 		&self.context
 	}
 

@@ -36,6 +36,11 @@ impl MessageEvent {
 		&self.event
 	}
 
+	#[must_use]
+	pub const fn as_raw(&self) -> &web_sys::MessageEvent {
+		&self.event
+	}
+
 	#[allow(clippy::missing_const_for_fn)]
 	#[must_use]
 	pub fn into_raw(self) -> web_sys::MessageEvent {

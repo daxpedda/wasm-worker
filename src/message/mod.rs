@@ -37,7 +37,8 @@ pub enum Message {
 }
 
 impl Message {
-	pub(crate) fn into_js_value(self) -> JsValue {
+	#[must_use]
+	pub fn into_raw(self) -> JsValue {
 		match self {
 			Self::ArrayBuffer(value) => value.into(),
 			#[cfg(web_sys_unstable_apis)]

@@ -76,10 +76,7 @@ impl WorkerOrContext<'_> {
 		self,
 		messages: M,
 	) -> Result<(), TransferError> {
-		let mut messages = messages
-			.into_iter()
-			.map(Into::into)
-			.map(Message::into_js_value);
+		let mut messages = messages.into_iter().map(Into::into).map(Message::into_raw);
 
 		let array = 'array: {
 			let Some(message_1) = messages.next() else {

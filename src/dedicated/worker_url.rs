@@ -82,6 +82,11 @@ impl WorkerUrl {
 	pub const fn is_module(&self) -> bool {
 		self.is_module
 	}
+
+	#[must_use]
+	pub fn as_raw(&self) -> &str {
+		&self.url
+	}
 }
 
 #[derive(Clone, Copy, Debug)]

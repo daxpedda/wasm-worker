@@ -67,7 +67,7 @@ impl Worker {
 	}
 
 	#[must_use]
-	pub const fn raw(&self) -> &web_sys::Worker {
+	pub const fn as_raw(&self) -> &web_sys::Worker {
 		&self.worker
 	}
 
@@ -159,7 +159,7 @@ impl WorkerRef {
 	}
 
 	#[must_use]
-	pub const fn raw(&self) -> &web_sys::Worker {
+	pub const fn as_raw(&self) -> &web_sys::Worker {
 		&self.worker
 	}
 
