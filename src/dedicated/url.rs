@@ -1,6 +1,6 @@
 use js_sys::Array;
 use once_cell::sync::Lazy;
-use wasm_bindgen::{JsValue, UnwrapThrowExt};
+use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 use super::ShimFormat;
@@ -68,7 +68,7 @@ impl WorkerUrl {
 			}
 		};
 
-		let sequence = Array::of1(&JsValue::from(script));
+		let sequence = Array::of1(&script.into());
 		let mut property = BlobPropertyBag::new();
 		property.type_("text/javascript");
 		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property);
