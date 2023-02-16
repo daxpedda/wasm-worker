@@ -1,8 +1,8 @@
 mod builder;
 mod common;
 mod context;
+mod url;
 mod worker;
-mod worker_url;
 
 use std::future::Future;
 
@@ -10,8 +10,8 @@ pub use self::builder::{ModuleSupportError, WorkerBuilder};
 use self::common::{Closure, WorkerOrContext, EXPORTS};
 pub use self::common::{Tls, TransferError};
 pub use self::context::WorkerContext;
+pub use self::url::{WorkerUrl, WorkerUrlFormat};
 pub use self::worker::{DestroyError, Worker, WorkerRef};
-pub use self::worker_url::{WorkerUrl, WorkerUrlFormat};
 
 pub fn spawn<F>(f: F) -> Worker
 where
