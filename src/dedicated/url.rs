@@ -58,11 +58,9 @@ impl WorkerUrl {
 		let sequence = Array::of1(&script.into());
 		let mut property = BlobPropertyBag::new();
 		property.type_("text/javascript");
-		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property);
+		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap_throw();
 
-		let url = blob
-			.and_then(|blob| Url::create_object_url_with_blob(&blob))
-			.unwrap_throw();
+		let url = Url::create_object_url_with_blob(&blob).unwrap_throw();
 
 		Self {
 			url,
