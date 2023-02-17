@@ -21,9 +21,12 @@ use crate::global::WindowOrWorker;
 static DEFAULT: OnceCell<WorkletModule> = OnceCell::new();
 
 #[derive(Debug)]
-pub struct WorkletModule {
-	pub(super) shim: String,
-	pub(super) imports: Option<String>,
+pub struct WorkletModule(pub(super) ModuleInner);
+
+#[derive(Debug)]
+pub(super) enum ModuleInner {
+	Import(String),
+	Inline { shim: String, imports: String },
 }
 
 impl WorkletModule {
@@ -50,7 +53,7 @@ impl WorkletModule {
 						WorkletModuleFuture::new_fetch(&url, format)
 					}
 				} else {
-					Inner::ImportSupport {
+					FutureInner::ImportSupport {
 						url,
 						future: import_support,
 					}
@@ -62,16 +65,20 @@ impl WorkletModule {
 		WorkletModuleFuture(Some(inner))
 	}
 
-	fn new_internal(shim: String, imports: Option<String>) -> Self {
-		wasm_bindgen::intern(&shim);
+	fn new_internal(inner: ModuleInner) -> Self {
+		if let ModuleInner::Inline { shim, .. } = &inner {
+			wasm_bindgen::intern(shim);
+		}
 
-		Self { shim, imports }
+		Self(inner)
 	}
 }
 
 impl Drop for WorkletModule {
 	fn drop(&mut self) {
-		wasm_bindgen::unintern(&self.shim);
+		if let ModuleInner::Inline { shim, .. } = &self.0 {
+			wasm_bindgen::unintern(shim);
+		}
 	}
 }
 
@@ -133,10 +140,10 @@ impl FusedFuture for DefaultWorkletModuleFuture {
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct WorkletModuleFuture<'url, 'format>(Option<Inner<'url, 'format>>);
+pub struct WorkletModuleFuture<'url, 'format>(Option<FutureInner<'url, 'format>>);
 
 #[derive(Debug)]
-enum Inner<'url, 'format> {
+enum FutureInner<'url, 'format> {
 	ImportSupport {
 		url: Cow<'url, str>,
 		future: ImportSupportFuture,
@@ -158,10 +165,10 @@ impl WorkletModuleFuture<'_, '_> {
 	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<Result<WorkletModule, JsValue>> {
 		match self.0.as_mut().expect("polled after `Ready`") {
-			Inner::ImportSupport { url, future } => {
+			FutureInner::ImportSupport { url, future } => {
 				if let Some(import_support) = future.into_inner() {
 					if import_support {
-						let Inner::Ready(module) = WorkletModuleFuture::new_ready(url) else {unreachable!()};
+						let FutureInner::Ready(module) = WorkletModuleFuture::new_ready(url) else {unreachable!()};
 						self.0.take();
 
 						Some(Ok(module))
@@ -173,8 +180,8 @@ impl WorkletModuleFuture<'_, '_> {
 					None
 				}
 			}
-			Inner::Ready(_) => {
-				let Some(Inner::Ready(module)) = self.0.take() else {unreachable!()};
+			FutureInner::Ready(_) => {
+				let Some(FutureInner::Ready(module)) = self.0.take() else {unreachable!()};
 
 				Some(Ok(module))
 			}
@@ -182,7 +189,10 @@ impl WorkletModuleFuture<'_, '_> {
 		}
 	}
 
-	fn new_fetch<'url, 'format>(url: &str, format: ShimFormat<'format>) -> Inner<'url, 'format> {
+	fn new_fetch<'url, 'format>(
+		url: &str,
+		format: ShimFormat<'format>,
+	) -> FutureInner<'url, 'format> {
 		let abort = AbortController::new().unwrap_throw();
 		let mut init = RequestInit::new();
 		init.signal(Some(&abort.signal()));
@@ -197,18 +207,17 @@ impl WorkletModuleFuture<'_, '_> {
 		});
 		let future = JsFuture::from(promise);
 
-		Inner::Fetch {
+		FutureInner::Fetch {
 			format,
 			abort,
 			future,
 		}
 	}
 
-	fn new_ready<'url, 'format>(url: &str) -> Inner<'url, 'format> {
-		Inner::Ready(WorkletModule::new_internal(
-			format!("import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n",),
-			None,
-		))
+	fn new_ready<'url, 'format>(url: &str) -> FutureInner<'url, 'format> {
+		FutureInner::Ready(WorkletModule::new_internal(ModuleInner::Import(format!(
+			"import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n",
+		))))
 	}
 }
 
@@ -216,7 +225,7 @@ impl Drop for WorkletModuleFuture<'_, '_> {
 	fn drop(&mut self) {
 		if let Some(inner) = &self.0 {
 			match inner {
-				Inner::Fetch { abort, .. } | Inner::Text { abort, .. } => abort.abort(),
+				FutureInner::Fetch { abort, .. } | FutureInner::Text { abort, .. } => abort.abort(),
 				_ => (),
 			}
 		}
@@ -230,7 +239,7 @@ impl Future for WorkletModuleFuture<'_, '_> {
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		loop {
 			match self.0.as_mut().expect("polled after `Ready`") {
-				Inner::ImportSupport { url, future } => {
+				FutureInner::ImportSupport { url, future } => {
 					let import_support = ready!(Pin::new(future).poll(cx));
 
 					if import_support {
@@ -239,39 +248,44 @@ impl Future for WorkletModuleFuture<'_, '_> {
 						self.0 = Some(Self::new_fetch(url, ShimFormat::EsModule));
 					}
 				}
-				Inner::Fetch { future, .. } => {
+				FutureInner::Fetch { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
 					self.0.take();
 
 					let response: Response = result.map_err(WorkletModuleError)?.unchecked_into();
 
-					let Some(Inner::Fetch { format, abort, .. }) = self.0.take() else {unreachable!()};
-					self.0 = Some(Inner::Text {
+					let Some(FutureInner::Fetch { format, abort, .. }) = self.0.take() else {unreachable!()};
+					self.0 = Some(FutureInner::Text {
 						format,
 						abort,
 						future: JsFuture::from(response.text().map_err(WorkletModuleError)?),
 					});
 				}
-				Inner::Text { future, .. } => {
+				FutureInner::Text { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(Inner::Text { format, .. }) = self.0.take() else {unreachable!()};
+					let Some(FutureInner::Text { format, .. }) = self.0.take() else {unreachable!()};
 
 					let shim: JsString = result.map_err(WorkletModuleError)?.unchecked_into();
 
 					return Poll::Ready(Ok(match format {
-						ShimFormat::EsModule => WorkletModule::new_internal(shim.into(), None),
+						ShimFormat::EsModule => {
+							WorkletModule::new_internal(ModuleInner::Import(shim.into()))
+						}
 						ShimFormat::Classic { global } => {
 							#[rustfmt::skip]
 							let imports = format!("\
                                 const initSync = {global}.initSync;\n\
                                 const __wasm_worker_dedicated_entry = {global}.__wasm_worker_dedicated_entry;\n\
                             ");
-							WorkletModule::new_internal(shim.into(), Some(imports))
+							WorkletModule::new_internal(ModuleInner::Inline {
+								shim: shim.into(),
+								imports,
+							})
 						}
 					}));
 				}
-				Inner::Ready(_) => {
-					let Some(Inner::Ready(module)) = self.0.take() else {unreachable!()};
+				FutureInner::Ready(_) => {
+					let Some(FutureInner::Ready(module)) = self.0.take() else {unreachable!()};
 
 					return Poll::Ready(Ok(module));
 				}

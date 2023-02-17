@@ -9,7 +9,10 @@ use once_cell::sync::OnceCell;
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 use web_sys::{Blob, BlobPropertyBag, Url};
 
-use crate::worklet::{DefaultWorkletModuleFuture, WorkletModule, WorkletModuleError};
+use crate::worklet::module::ModuleInner;
+use crate::worklet::{
+	DefaultWorkletModuleFuture, PolyfillImport, PolyfillInline, WorkletModule, WorkletModuleError,
+};
 
 static DEFAULT: OnceCell<AudioWorkletModule> = OnceCell::new();
 
@@ -29,15 +32,19 @@ impl AudioWorkletModule {
 	}
 
 	#[must_use]
-	pub fn new(WorkletModule { shim, imports }: &WorkletModule) -> Self {
-		let sequence = if let Some(imports) = imports {
-			Array::of3(
+	pub fn new(WorkletModule(inner): &WorkletModule) -> Self {
+		let sequence = match inner {
+			ModuleInner::Import(import) => Array::of3(
+				&PolyfillImport::import().into(),
+				&import.into(),
+				&include_str!("worklet.js").into(),
+			),
+			ModuleInner::Inline { shim, imports } => Array::of4(
+				&PolyfillInline::script().into(),
 				&shim.into(),
 				&imports.into(),
 				&include_str!("worklet.js").into(),
-			)
-		} else {
-			Array::of2(&shim.into(), &include_str!("worklet.js").into())
+			),
 		};
 
 		let mut property = BlobPropertyBag::new();
