@@ -55,10 +55,10 @@ async fn url() -> Result<()> {
 	// Instead we will just use the regular `WorkerUrl` but build it ourselves.
 	let url = WorkerUrl::new(
 		&wasm_bindgen::shim_url().unwrap(),
-		match &wasm_bindgen::shim_format().unwrap() {
+		&match &wasm_bindgen::shim_format().unwrap() {
 			wasm_bindgen::ShimFormat::EsModule => ShimFormat::EsModule,
 			wasm_bindgen::ShimFormat::NoModules { global_name } => ShimFormat::Classic {
-				global: global_name,
+				global: global_name.into(),
 			},
 			_ => unreachable!("expected shim to be built for browsers"),
 		},

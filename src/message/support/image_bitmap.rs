@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 #[cfg(feature = "futures")]
-use futures_util::future::FusedFuture;
+use futures_core::future::FusedFuture;
 use once_cell::sync::OnceCell;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use wasm_bindgen_futures::JsFuture;

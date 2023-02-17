@@ -22,31 +22,18 @@ impl WorkerUrl {
 	#[must_use]
 	#[allow(clippy::should_implement_trait)]
 	pub fn default() -> &'static Self {
-		static WORKER_URL: Lazy<WorkerUrl> = Lazy::new(|| {
-			const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
-			WorkerUrl::new(
-				&SHIM_URL,
-				match &wasm_bindgen::shim_format() {
-					Some(wasm_bindgen::ShimFormat::EsModule) => ShimFormat::EsModule,
-					Some(wasm_bindgen::ShimFormat::NoModules { global_name }) => {
-						ShimFormat::Classic {
-							global: global_name,
-						}
-					}
-					Some(_) | None => unreachable!("{ERROR}"),
-				},
-			)
-		});
+		static WORKER_URL: Lazy<WorkerUrl> =
+			Lazy::new(|| WorkerUrl::new(&SHIM_URL, &ShimFormat::default()));
 
 		&WORKER_URL
 	}
 
 	#[must_use]
-	pub fn new(url: &str, format: ShimFormat<'_>) -> Self {
-		let script = match format {
+	pub fn new(url: &str, format: &ShimFormat<'_>) -> Self {
+		let script = match &format {
 			ShimFormat::EsModule => {
 				format!(
-					"import {{initSync, __wasm_worker_entry}} from '{}';\n\n{}",
+					"import {{initSync, __wasm_worker_dedicated_entry}} from '{}';\n\n{}",
 					url,
 					include_str!("worker.js")
 				)
@@ -57,7 +44,7 @@ impl WorkerUrl {
 					"\
 						importScripts('{}');\n\
 						const initSync = {global}.initSync;\n\
-						const __wasm_worker_entry = {global}.__wasm_worker_entry;\n\
+						const __wasm_worker_dedicated_entry = {global}.__wasm_worker_dedicated_entry;\n\
 						\n\
 						{}\
 					",

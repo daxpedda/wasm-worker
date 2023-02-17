@@ -212,13 +212,13 @@ enum Task {
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 #[wasm_bindgen]
-pub fn __wasm_worker_entry(data: *mut Data) -> JsValue {
+pub unsafe fn __wasm_worker_dedicated_entry(data: *mut Data) -> JsValue {
 	let global = js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>();
 	global.set_onmessage(None);
 
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
-	// `__wasm_worker_entry` from `worker.js`. The data sent to it should only come
-	// from `WorkerBuilder::spawn_internal()`.
+	// `__wasm_worker_dedicated_entry` from `worker.js`. The data sent to it should
+	// only come from `WorkerBuilder::spawn_internal()`.
 	let data = *unsafe { Box::from_raw(data) };
 
 	let context = WorkerContext::init(global, data.id);

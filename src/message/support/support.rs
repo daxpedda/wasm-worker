@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 #[cfg(feature = "futures")]
-use futures_util::future::FusedFuture;
+use futures_core::future::FusedFuture;
 
 use super::super::Message;
 use super::{ImageBitmapSupportFuture, SupportError};

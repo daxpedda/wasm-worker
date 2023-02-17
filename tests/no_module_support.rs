@@ -62,7 +62,7 @@ fn builder_url() {
 		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
-	let url = WorkerUrl::new(&wasm_bindgen::shim_url().unwrap(), ShimFormat::EsModule);
+	let url = WorkerUrl::new(&wasm_bindgen::shim_url().unwrap(), &ShimFormat::EsModule);
 	assert_eq!(
 		WorkerBuilder::new_with_url(&url).unwrap_err(),
 		ModuleSupportError

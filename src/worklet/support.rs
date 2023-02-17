@@ -3,17 +3,21 @@ use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 #[cfg(feature = "futures")]
-use futures_util::future::FusedFuture;
+use futures_core::future::FusedFuture;
 use once_cell::sync::OnceCell;
 use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::OfflineAudioContext;
 
-pub fn has_import_support() -> ImportSupportFuture {
-	ImportSupportFuture::new()
-}
-
 static SUPPORT: OnceCell<bool> = OnceCell::new();
+
+pub fn has_import_support() -> ImportSupportFuture {
+	if let Some(support) = SUPPORT.get() {
+		ImportSupportFuture(Some(Inner::Ready(*support)))
+	} else {
+		ImportSupportFuture(Some(Inner::Unknown))
+	}
+}
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
@@ -27,16 +31,14 @@ enum Inner {
 }
 
 impl ImportSupportFuture {
-	fn new() -> Self {
-		if let Some(support) = SUPPORT.get() {
-			Self(Some(Inner::Ready(*support)))
-		} else {
-			Self(Some(Inner::Unknown))
-		}
-	}
-
 	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<bool> {
+		if let Some(support) = SUPPORT.get() {
+			self.0.take();
+
+			return Some(*support);
+		}
+
 		if let Inner::Ready(support) = self.0.as_ref().expect("polled after `Ready`") {
 			let support = *support;
 			self.0.take();
@@ -54,6 +56,8 @@ impl Future for ImportSupportFuture {
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		if let Some(support) = SUPPORT.get() {
+			self.0.take();
+
 			return Poll::Ready(*support);
 		}
 
@@ -77,10 +81,6 @@ impl Future for ImportSupportFuture {
 				Inner::Create(future) => {
 					let result = ready!(Pin::new(future).poll(cx));
 					let support = result.is_ok();
-
-					if let Err(error) = result {
-						web_sys::console::log_1(&error);
-					}
 
 					self.0.take();
 					SUPPORT.set(support).unwrap();

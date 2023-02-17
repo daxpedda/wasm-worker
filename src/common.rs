@@ -1,11 +1,25 @@
+use std::borrow::Cow;
+
 use once_cell::sync::Lazy;
 
-#[derive(Clone, Copy, Debug)]
+const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
+
+#[derive(Clone, Debug)]
 pub enum ShimFormat<'global> {
 	EsModule,
-	Classic { global: &'global str },
+	Classic { global: Cow<'global, str> },
 }
 
-pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| {
-	wasm_bindgen::shim_url().expect("expected wasm-bindgen `web` or `no-modules` target")
-});
+impl ShimFormat<'_> {
+	pub(crate) fn default() -> Self {
+		match wasm_bindgen::shim_format() {
+			Some(wasm_bindgen::ShimFormat::EsModule) => ShimFormat::EsModule,
+			Some(wasm_bindgen::ShimFormat::NoModules { global_name }) => ShimFormat::Classic {
+				global: global_name.into(),
+			},
+			Some(_) | None => unreachable!("{ERROR}"),
+		}
+	}
+}
+
+pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| wasm_bindgen::shim_url().expect(ERROR));
