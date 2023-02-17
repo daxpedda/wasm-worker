@@ -250,11 +250,10 @@ impl Future for WorkletModuleFuture<'_, '_> {
 				}
 				FutureInner::Fetch { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					self.0.take();
+					let Some(FutureInner::Fetch { format, abort, .. }) = self.0.take() else {unreachable!()};
 
 					let response: Response = result.map_err(WorkletModuleError)?.unchecked_into();
 
-					let Some(FutureInner::Fetch { format, abort, .. }) = self.0.take() else {unreachable!()};
 					self.0 = Some(FutureInner::Text {
 						format,
 						abort,
@@ -275,7 +274,7 @@ impl Future for WorkletModuleFuture<'_, '_> {
 							#[rustfmt::skip]
 							let imports = format!("\
                                 const initSync = {global}.initSync;\n\
-                                const __wasm_worker_dedicated_entry = {global}.__wasm_worker_dedicated_entry;\n\
+                                const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\
                             ");
 							WorkletModule::new_internal(ModuleInner::Inline {
 								shim: shim.into(),
