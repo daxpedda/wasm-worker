@@ -95,29 +95,6 @@ enum Inner {
 	},
 }
 
-impl Debug for Inner {
-	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::Module {
-				context, future, ..
-			} => formatter
-				.debug_struct("Module")
-				.field("context", context)
-				.field("f", &"Box<FnOnce()>")
-				.field("future", future)
-				.finish(),
-			Self::Add {
-				context, future, ..
-			} => formatter
-				.debug_struct("Add")
-				.field("context", context)
-				.field("f", &"Box<FnOnce()>")
-				.field("future", future)
-				.finish(),
-		}
-	}
-}
-
 impl AudioWorkletFuture {
 	fn new_add(
 		context: BaseAudioContext,
@@ -168,12 +145,12 @@ impl Future for AudioWorkletFuture {
 						&data.into(),
 					)));
 
-					let result = AudioWorkletNode::new_with_options(
+					let _node = AudioWorkletNode::new_with_options(
 						&context,
 						"__wasm_worker_InitWasm",
 						&options,
-					);
-					assert!(result.unwrap_throw().is_undefined());
+					)
+					.unwrap_throw();
 
 					return Poll::Ready(Ok(()));
 				}
@@ -186,5 +163,28 @@ impl Future for AudioWorkletFuture {
 impl FusedFuture for AudioWorkletFuture {
 	fn is_terminated(&self) -> bool {
 		self.0.is_none()
+	}
+}
+
+impl Debug for Inner {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Module {
+				context, future, ..
+			} => formatter
+				.debug_struct("Module")
+				.field("context", context)
+				.field("f", &"Box<FnOnce()>")
+				.field("future", future)
+				.finish(),
+			Self::Add {
+				context, future, ..
+			} => formatter
+				.debug_struct("Add")
+				.field("context", context)
+				.field("f", &"Box<FnOnce()>")
+				.field("future", future)
+				.finish(),
+		}
 	}
 }
