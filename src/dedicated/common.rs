@@ -4,7 +4,7 @@ use std::future::Future;
 use std::ops::Deref;
 
 use js_sys::WebAssembly::Global;
-use js_sys::{Array, Function, Object, Promise, Reflect};
+use js_sys::{Array, Function, Number, Object, Promise, Reflect};
 use once_cell::unsync::Lazy;
 use wasm_bindgen::closure::Closure as JsClosure;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -165,8 +165,8 @@ impl Tls {
 	}
 
 	pub(super) fn new(id: usize, tls_base: &Global, stack_alloc: &Global) -> Self {
-		let tls_base = tls_base.value().as_f64().unwrap();
-		let stack_alloc = stack_alloc.value().as_f64().unwrap();
+		let tls_base = Number::unchecked_from_js(tls_base.value()).value_of();
+		let stack_alloc = Number::unchecked_from_js(stack_alloc.value()).value_of();
 
 		Self {
 			id,
