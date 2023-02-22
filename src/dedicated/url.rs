@@ -1,6 +1,5 @@
 use js_sys::Array;
 use once_cell::sync::Lazy;
-use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 use super::ShimFormat;
@@ -14,7 +13,7 @@ pub struct WorkerUrl {
 
 impl Drop for WorkerUrl {
 	fn drop(&mut self) {
-		Url::revoke_object_url(&self.url).unwrap_throw();
+		Url::revoke_object_url(&self.url).unwrap();
 	}
 }
 
@@ -58,9 +57,9 @@ impl WorkerUrl {
 		let sequence = Array::of1(&script.into());
 		let mut property = BlobPropertyBag::new();
 		property.type_("text/javascript");
-		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap_throw();
+		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap();
 
-		let url = Url::create_object_url_with_blob(&blob).unwrap_throw();
+		let url = Url::create_object_url_with_blob(&blob).unwrap();
 
 		Self {
 			url,

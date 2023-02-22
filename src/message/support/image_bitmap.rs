@@ -5,7 +5,7 @@ use std::task::{ready, Context, Poll};
 #[cfg(feature = "futures")]
 use futures_core::future::FusedFuture;
 use once_cell::sync::OnceCell;
-use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{ImageBitmap, ImageData};
 
@@ -31,7 +31,7 @@ impl ImageBitmapSupportFuture {
 		} else {
 			let promise = WindowOrWorker::with(|global| {
 				if let Some(global) = global {
-					let image = ImageData::new_with_sw(1, 1).unwrap_throw();
+					let image = ImageData::new_with_sw(1, 1).unwrap();
 
 					match global {
 						WindowOrWorker::Window(window) => {
@@ -96,7 +96,7 @@ impl Future for ImageBitmapSupportFuture {
 				let result = ready!(Pin::new(future).poll(cx));
 				self.0.take();
 
-				let bitmap: ImageBitmap = result.unwrap_throw().unchecked_into();
+				let bitmap: ImageBitmap = result.unwrap().unchecked_into();
 
 				let support = super::test_support(&bitmap);
 

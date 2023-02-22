@@ -20,7 +20,7 @@ use std::fmt::{Display, Formatter};
 pub use image_bitmap::ImageBitmapSupportFuture;
 use js_sys::Array;
 pub use support::MessageSupportFuture;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DomException, Worker};
 
 use super::Message;
@@ -70,7 +70,7 @@ impl Message {
 }
 
 fn test_support(data: &JsValue) -> Result<(), SupportError> {
-	let worker = Worker::new("data:,").unwrap_throw();
+	let worker = Worker::new("data:,").unwrap();
 	let result = worker.post_message_with_transfer(data, &Array::of1(data));
 	worker.terminate();
 

@@ -5,7 +5,6 @@ use std::task::{ready, Context, Poll};
 #[cfg(feature = "futures")]
 use futures_core::future::FusedFuture;
 use once_cell::sync::OnceCell;
-use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::OfflineAudioContext;
 
@@ -70,11 +69,11 @@ impl Future for ImportSupportFuture {
 					return Poll::Ready(support);
 				}
 				Inner::Unknown => {
-					let context = OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.).unwrap_throw();
-					let worklet = context.audio_worklet().unwrap_throw();
+					let context = OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.).unwrap();
+					let worklet = context.audio_worklet().unwrap();
 					let promise = worklet
 						.add_module("data:text/javascript,import'data:text/javascript,'")
-						.unwrap_throw();
+						.unwrap();
 
 					self.0 = Some(Inner::Create(JsFuture::from(promise)));
 				}

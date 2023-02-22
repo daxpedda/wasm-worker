@@ -6,7 +6,7 @@ use std::task::{ready, Context, Poll};
 use futures_core::future::FusedFuture;
 use js_sys::Array;
 use once_cell::sync::OnceCell;
-use wasm_bindgen::{JsValue, UnwrapThrowExt};
+use wasm_bindgen::JsValue;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 use crate::worklet::module::ModuleInner;
@@ -21,7 +21,7 @@ pub struct AudioWorkletModule(pub(super) String);
 
 impl Drop for AudioWorkletModule {
 	fn drop(&mut self) {
-		Url::revoke_object_url(&self.0).unwrap_throw();
+		Url::revoke_object_url(&self.0).unwrap();
 	}
 }
 
@@ -49,8 +49,8 @@ impl AudioWorkletModule {
 
 		let mut property = BlobPropertyBag::new();
 		property.type_("text/javascript");
-		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap_throw();
-		let url = Url::create_object_url_with_blob(&blob).unwrap_throw();
+		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap();
+		let url = Url::create_object_url_with_blob(&blob).unwrap();
 
 		Self(url)
 	}

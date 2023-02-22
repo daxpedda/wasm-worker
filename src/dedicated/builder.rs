@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use js_sys::Array;
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 
 use super::{Closure, Worker, WorkerContext, WorkerRef, WorkerUrl};
@@ -71,8 +71,7 @@ impl WorkerBuilder<'_> {
 			let tester = Rc::new(Cell::new(false));
 			let worker_options =
 				WorkerOptions::from(JsValue::from(__wasm_worker_Tester(Rc::clone(&tester))));
-			let worker =
-				web_sys::Worker::new_with_options("data:,", &worker_options).unwrap_throw();
+			let worker = web_sys::Worker::new_with_options("data:,", &worker_options).unwrap();
 			worker.terminate();
 
 			tester.get()
@@ -170,7 +169,7 @@ impl WorkerBuilder<'_> {
 		} else {
 			web_sys::Worker::new(&self.url.url)
 		}
-		.unwrap_throw();
+		.unwrap();
 
 		if let Some(message_handler) = RefCell::borrow(&self.message_handler).deref() {
 			worker.set_onmessage(Some(message_handler));
@@ -182,7 +181,7 @@ impl WorkerBuilder<'_> {
 			&data.into(),
 		);
 
-		worker.post_message(&init).unwrap_throw();
+		worker.post_message(&init).unwrap();
 
 		Worker::new(worker, self.id, self.message_handler)
 	}

@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsValue, UnwrapThrowExt};
+use wasm_bindgen::JsValue;
 use web_sys::OffscreenCanvas;
 
 use super::super::SupportError;
@@ -21,7 +21,7 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 			return Err(SupportError::Unsupported);
 		}
 
-		let canvas = OffscreenCanvas::new(1, 0).unwrap_throw();
+		let canvas = OffscreenCanvas::new(1, 0).unwrap();
 
 		super::test_support(&canvas)
 	});

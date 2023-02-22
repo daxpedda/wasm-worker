@@ -8,7 +8,7 @@ use js_sys::{Array, Function, Number, Object, Promise, Reflect};
 use once_cell::unsync::Lazy;
 use wasm_bindgen::closure::Closure as JsClosure;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
 use crate::message::{Message, Messages, RawMessages};
@@ -159,7 +159,7 @@ impl Tls {
 	thread_local! {
 		static DESCRIPTOR: Lazy<Object> = Lazy::new(|| {
 			let descriptor = Object::new();
-			Reflect::set(&descriptor, &"value".into(), &"i32".into()).unwrap_throw();
+			Reflect::set(&descriptor, &"value".into(), &"i32".into()).unwrap();
 			descriptor
 		});
 	}
@@ -176,13 +176,12 @@ impl Tls {
 	}
 
 	pub(super) fn tls_base(&self) -> Global {
-		Self::DESCRIPTOR
-			.with(|descriptor| Global::new(descriptor, &self.tls_base.into()).unwrap_throw())
+		Self::DESCRIPTOR.with(|descriptor| Global::new(descriptor, &self.tls_base.into()).unwrap())
 	}
 
 	pub(super) fn stack_alloc(&self) -> Global {
 		Self::DESCRIPTOR
-			.with(|descriptor| Global::new(descriptor, &self.stack_alloc.into()).unwrap_throw())
+			.with(|descriptor| Global::new(descriptor, &self.stack_alloc.into()).unwrap())
 	}
 }
 

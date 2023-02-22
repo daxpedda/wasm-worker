@@ -11,7 +11,7 @@ use futures_util::future::Either;
 use futures_util::{future, FutureExt};
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::closure::Closure;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::dedicated::WorkerBuilder;
@@ -220,7 +220,7 @@ async fn audio_data() -> Result<()> {
 				3000.,
 				0.,
 			);
-			AudioData::new(&init).unwrap_throw()
+			AudioData::new(&init).unwrap()
 		},
 		|data| assert_eq!(data.format(), None),
 		|data| {
@@ -287,7 +287,7 @@ async fn message_port() -> Result<()> {
 		Message::has_message_port_support(),
 		true,
 		|| async {
-			let channel = MessageChannel::new().unwrap_throw();
+			let channel = MessageChannel::new().unwrap();
 
 			channel
 				.port2()
@@ -298,7 +298,7 @@ async fn message_port() -> Result<()> {
 		{
 			let flag = flag.clone();
 			move |port: &MessagePort| {
-				port.post_message(&JsValue::NULL).unwrap_throw();
+				port.post_message(&JsValue::NULL).unwrap();
 
 				let mut flag = flag.clone();
 				async move {
@@ -320,7 +320,7 @@ async fn offscreen_canvas() -> Result<()> {
 	test_transfer(
 		Message::has_offscreen_canvas_support(),
 		false,
-		|| async { OffscreenCanvas::new(1, 1).unwrap_throw() },
+		|| async { OffscreenCanvas::new(1, 1).unwrap() },
 		|canvas| {
 			assert_eq!(canvas.width(), 0);
 			assert_eq!(canvas.height(), 0);
@@ -341,7 +341,7 @@ async fn readable_stream() -> Result<()> {
 	test_transfer(
 		Message::has_readable_stream_support(),
 		false,
-		|| async { ReadableStream::new().unwrap_throw() },
+		|| async { ReadableStream::new().unwrap() },
 		|stream| assert!(stream.locked()),
 		|stream| {
 			assert!(!stream.locked());
@@ -359,7 +359,7 @@ async fn rtc_data_channel() -> Result<()> {
 		Message::has_rtc_data_channel_support(),
 		false,
 		|| async {
-			let connection = RtcPeerConnection::new().unwrap_throw();
+			let connection = RtcPeerConnection::new().unwrap();
 			connection.create_data_channel("")
 		},
 		|channel| assert_eq!(channel.ready_state(), RtcDataChannelState::Closed),
@@ -378,7 +378,7 @@ async fn transform_stream() -> Result<()> {
 	test_transfer(
 		Message::has_transform_stream_support(),
 		false,
-		|| async { TransformStream::new().unwrap_throw() },
+		|| async { TransformStream::new().unwrap() },
 		|stream| {
 			assert!(stream.readable().locked());
 			assert!(stream.writable().locked());
@@ -405,7 +405,7 @@ async fn video_frame() -> Result<()> {
 				&mut [0; 4],
 				&VideoFrameBufferInit::new(1, 1, VideoPixelFormat::Rgba, 0.),
 			)
-			.unwrap_throw()
+			.unwrap()
 		},
 		|frame| {
 			assert_eq!(frame.coded_width(), 0);
@@ -429,7 +429,7 @@ async fn writable_stream() -> Result<()> {
 	test_transfer(
 		Message::has_writable_stream_support(),
 		false,
-		|| async { WritableStream::new().unwrap_throw() },
+		|| async { WritableStream::new().unwrap() },
 		|stream| assert!(stream.locked()),
 		|stream| {
 			assert!(!stream.locked());

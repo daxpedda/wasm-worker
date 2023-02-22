@@ -8,7 +8,6 @@ use std::task::{ready, Context, Poll};
 #[cfg(feature = "futures")]
 use futures_core::future::FusedFuture;
 use js_sys::{Array, Reflect};
-use wasm_bindgen::UnwrapThrowExt;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
@@ -33,7 +32,7 @@ impl AudioWorkletExt for BaseAudioContext {
 		&self,
 		f: F,
 	) -> Result<AudioWorkletFuture, WorkletInitError> {
-		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap_throw();
+		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
 			assert!(init);
@@ -42,7 +41,7 @@ impl AudioWorkletExt for BaseAudioContext {
 		}
 
 		assert!(init.is_undefined());
-		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap_throw();
+		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap();
 
 		Ok(AudioWorkletFuture(Some(Inner::Module {
 			context: self.clone(),
@@ -56,7 +55,7 @@ impl AudioWorkletExt for BaseAudioContext {
 		module: &AudioWorkletModule,
 		f: F,
 	) -> Result<AudioWorkletFuture, WorkletInitError> {
-		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap_throw();
+		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
 			assert!(init);
@@ -65,7 +64,7 @@ impl AudioWorkletExt for BaseAudioContext {
 		}
 
 		assert!(init.is_undefined());
-		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap_throw();
+		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap();
 
 		Ok(AudioWorkletFuture(Some(AudioWorkletFuture::new_add(
 			self.clone(),
@@ -103,9 +102,9 @@ impl AudioWorkletFuture {
 	) -> Inner {
 		let promise = context
 			.audio_worklet()
-			.unwrap_throw()
+			.unwrap()
 			.add_module(&module.0)
-			.unwrap_throw();
+			.unwrap();
 
 		Inner::Add {
 			context,
@@ -134,7 +133,7 @@ impl Future for AudioWorkletFuture {
 					let result = ready!(Pin::new(future).poll(cx));
 					let Some(Inner::Add { context, f, ..}) = self.0.take() else {unreachable!()};
 
-					assert!(result.unwrap_throw().is_undefined());
+					assert!(result.unwrap().is_undefined());
 
 					let data = Box::into_raw(Box::new(Data(f)));
 
@@ -150,7 +149,7 @@ impl Future for AudioWorkletFuture {
 						"__wasm_worker_InitWasm",
 						&options,
 					)
-					.unwrap_throw();
+					.unwrap();
 
 					return Poll::Ready(Ok(()));
 				}

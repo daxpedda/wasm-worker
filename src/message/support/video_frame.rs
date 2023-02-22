@@ -1,5 +1,4 @@
 use once_cell::sync::Lazy;
-use wasm_bindgen::UnwrapThrowExt;
 use web_sys::{VideoFrame, VideoFrameBufferInit, VideoPixelFormat};
 
 use super::super::SupportError;
@@ -15,7 +14,7 @@ pub(in super::super) fn support() -> Result<(), SupportError> {
 			&mut [0; 4],
 			&VideoFrameBufferInit::new(1, 1, VideoPixelFormat::Rgba, 0.),
 		)
-		.unwrap_throw();
+		.unwrap();
 
 		super::test_support(&frame)
 	});

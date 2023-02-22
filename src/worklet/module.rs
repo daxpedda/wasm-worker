@@ -10,7 +10,7 @@ use std::task::{ready, Context, Poll};
 use futures_core::future::FusedFuture;
 use js_sys::JsString;
 use once_cell::sync::OnceCell;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{AbortController, RequestInit, Response};
 
@@ -193,7 +193,7 @@ impl WorkletModuleFuture<'_, '_> {
 		url: &str,
 		format: ShimFormat<'format>,
 	) -> FutureInner<'url, 'format> {
-		let abort = AbortController::new().unwrap_throw();
+		let abort = AbortController::new().unwrap();
 		let mut init = RequestInit::new();
 		init.signal(Some(&abort.signal()));
 
