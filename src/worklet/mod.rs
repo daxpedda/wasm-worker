@@ -9,9 +9,7 @@ use std::fmt::{Display, Formatter};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub use self::audio::AudioWorkletExt;
-pub use self::module::{
-	DefaultWorkletModuleFuture, WorkletModule, WorkletModuleError, WorkletModuleFuture,
-};
+pub use self::module::{WorkletModule, WorkletModuleError, WorkletModuleFuture};
 use self::polyfill::{PolyfillImport, PolyfillInline};
 pub use self::support::{has_import_support, ImportSupportFuture};
 pub use crate::common::ShimFormat;

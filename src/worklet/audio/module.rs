@@ -9,9 +9,9 @@ use once_cell::sync::OnceCell;
 use wasm_bindgen::JsValue;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
-use crate::worklet::module::ModuleInner;
+use crate::worklet::module::Inner;
 use crate::worklet::{
-	DefaultWorkletModuleFuture, PolyfillImport, PolyfillInline, WorkletModule, WorkletModuleError,
+	PolyfillImport, PolyfillInline, WorkletModule, WorkletModuleError, WorkletModuleFuture,
 };
 
 static DEFAULT: OnceCell<AudioWorkletModule> = OnceCell::new();
@@ -34,12 +34,12 @@ impl AudioWorkletModule {
 	#[must_use]
 	pub fn new(WorkletModule(inner): &WorkletModule) -> Self {
 		let sequence = match inner {
-			ModuleInner::Import(import) => Array::of3(
+			Inner::Import(import) => Array::of3(
 				&PolyfillImport::import().into(),
 				&import.into(),
 				&include_str!("worklet.js").into(),
 			),
-			ModuleInner::Inline { shim, imports } => Array::of4(
+			Inner::Inline { shim, imports } => Array::of4(
 				&PolyfillInline::script().into(),
 				&shim.into(),
 				&imports.into(),
@@ -63,7 +63,7 @@ impl AudioWorkletModule {
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct AudioWorkletModuleFuture(Option<DefaultWorkletModuleFuture>);
+pub struct AudioWorkletModuleFuture(Option<WorkletModuleFuture<'static, 'static, true>>);
 
 impl AudioWorkletModuleFuture {
 	#[track_caller]

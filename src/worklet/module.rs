@@ -18,28 +18,35 @@ use super::{ImportSupportFuture, ShimFormat};
 use crate::common::SHIM_URL;
 use crate::global::WindowOrWorker;
 
-static DEFAULT: OnceCell<WorkletModule> = OnceCell::new();
+static DEFAULT_MODULE: OnceCell<WorkletModule> = OnceCell::new();
 
 #[derive(Debug)]
-pub struct WorkletModule(pub(super) ModuleInner);
+pub struct WorkletModule(pub(super) Inner);
 
 #[derive(Debug)]
-pub(super) enum ModuleInner {
+pub(super) enum Inner {
 	Import(String),
 	Inline { shim: String, imports: String },
 }
 
 impl WorkletModule {
 	#[allow(clippy::should_implement_trait)]
-	pub fn default() -> DefaultWorkletModuleFuture {
-		DefaultWorkletModuleFuture(Some(Self::new(SHIM_URL.deref(), ShimFormat::default())))
+	pub fn default() -> WorkletModuleFuture<'static, 'static, true> {
+		Self::new_internal(SHIM_URL.deref(), ShimFormat::default())
 	}
 
 	#[allow(clippy::new_ret_no_self)]
 	pub fn new<'url, 'format, URL: Into<Cow<'url, str>>>(
 		url: URL,
 		format: ShimFormat<'format>,
-	) -> WorkletModuleFuture<'url, 'format> {
+	) -> WorkletModuleFuture<'url, 'format, false> {
+		Self::new_internal(url, format)
+	}
+
+	fn new_internal<'url, 'format, const DEFAULT: bool, URL: Into<Cow<'url, str>>>(
+		url: URL,
+		format: ShimFormat<'format>,
+	) -> WorkletModuleFuture<'url, 'format, DEFAULT> {
 		let url = url.into();
 
 		let inner = match format {
@@ -48,25 +55,25 @@ impl WorkletModule {
 
 				if let Some(import_support) = import_support.into_inner() {
 					if import_support {
-						WorkletModuleFuture::new_ready(&url)
+						WorkletModuleFuture::<DEFAULT>::new_ready(&url)
 					} else {
-						WorkletModuleFuture::new_fetch(&url, format)
+						WorkletModuleFuture::<DEFAULT>::new_fetch(&url, format)
 					}
 				} else {
-					FutureInner::ImportSupport {
+					State::ImportSupport {
 						url,
 						future: import_support,
 					}
 				}
 			}
-			ShimFormat::Classic { .. } => WorkletModuleFuture::new_fetch(&url, format),
+			ShimFormat::Classic { .. } => WorkletModuleFuture::<DEFAULT>::new_fetch(&url, format),
 		};
 
 		WorkletModuleFuture(Some(inner))
 	}
 
-	fn new_internal(inner: ModuleInner) -> Self {
-		if let ModuleInner::Inline { shim, .. } = &inner {
+	fn new_inner(inner: Inner) -> Self {
+		if let Inner::Inline { shim, .. } = &inner {
 			wasm_bindgen::intern(shim);
 		}
 
@@ -76,7 +83,7 @@ impl WorkletModule {
 
 impl Drop for WorkletModule {
 	fn drop(&mut self) {
-		if let ModuleInner::Inline { shim, .. } = &self.0 {
+		if let Inner::Inline { shim, .. } = &self.0 {
 			wasm_bindgen::unintern(shim);
 		}
 	}
@@ -84,66 +91,10 @@ impl Drop for WorkletModule {
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct DefaultWorkletModuleFuture(Option<WorkletModuleFuture<'static, 'static>>);
-
-impl DefaultWorkletModuleFuture {
-	#[track_caller]
-	pub fn into_inner(&mut self) -> Option<Result<&'static WorkletModule, JsValue>> {
-		if let Some(default) = DEFAULT.get() {
-			self.0.take();
-
-			return Some(Ok(default));
-		}
-
-		if let Some(result) = self.0.as_mut().expect("polled after `Ready`").into_inner() {
-			self.0.take();
-
-			Some(match result {
-				Ok(module) => Ok(DEFAULT.get_or_init(|| module)),
-				Err(error) => Err(error),
-			})
-		} else {
-			None
-		}
-	}
-}
-
-impl Future for DefaultWorkletModuleFuture {
-	type Output = Result<&'static WorkletModule, WorkletModuleError>;
-
-	#[track_caller]
-	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		let inner = self.0.as_mut().expect("polled after `Ready`");
-
-		if let Some(default) = DEFAULT.get() {
-			self.0.take();
-
-			return Poll::Ready(Ok(default));
-		}
-
-		let result = ready!(Pin::new(inner).poll(cx));
-		self.0.take();
-
-		match result {
-			Ok(module) => Poll::Ready(Ok(DEFAULT.get_or_init(|| module))),
-			Err(error) => Poll::Ready(Err(error)),
-		}
-	}
-}
-
-#[cfg(feature = "futures")]
-impl FusedFuture for DefaultWorkletModuleFuture {
-	fn is_terminated(&self) -> bool {
-		self.0.is_none()
-	}
-}
+pub struct WorkletModuleFuture<'url, 'format, const DEFAULT: bool>(Option<State<'url, 'format>>);
 
 #[derive(Debug)]
-#[must_use = "does nothing if not polled"]
-pub struct WorkletModuleFuture<'url, 'format>(Option<FutureInner<'url, 'format>>);
-
-#[derive(Debug)]
-enum FutureInner<'url, 'format> {
+enum State<'url, 'format> {
 	ImportSupport {
 		url: Cow<'url, str>,
 		future: ImportSupportFuture,
@@ -161,38 +112,79 @@ enum FutureInner<'url, 'format> {
 	Ready(WorkletModule),
 }
 
-impl WorkletModuleFuture<'_, '_> {
+impl WorkletModuleFuture<'_, '_, true> {
+	#[track_caller]
+	pub fn into_inner(&mut self) -> Option<Result<&'static WorkletModule, JsValue>> {
+		Self::into_inner_internal(self).map(|result| {
+			result.map(|module| {
+				let CowModule::Borrowed(module) = module else { unreachable!()};
+				module
+			})
+		})
+	}
+}
+
+impl WorkletModuleFuture<'_, '_, false> {
 	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<Result<WorkletModule, JsValue>> {
+		Self::into_inner_internal(self).map(|result| {
+			result.map(|module| {
+				let CowModule::Owned(module) = module else { unreachable!()};
+				module
+			})
+		})
+	}
+}
+
+impl<const DEFAULT: bool> WorkletModuleFuture<'_, '_, DEFAULT> {
+	#[track_caller]
+	#[allow(clippy::wrong_self_convention)]
+	fn into_inner_internal(&mut self) -> Option<Result<CowModule, JsValue>> {
+		if DEFAULT {
+			if let Some(default) = DEFAULT_MODULE.get() {
+				self.0.take();
+
+				return Some(Ok(default.into()));
+			}
+		}
+
 		match self.0.as_mut().expect("polled after `Ready`") {
-			FutureInner::ImportSupport { url, future } => {
+			State::ImportSupport { url, future } => {
 				if let Some(import_support) = future.into_inner() {
 					if import_support {
-						let FutureInner::Ready(module) = WorkletModuleFuture::new_ready(url) else {unreachable!()};
+						let State::Ready(module) = WorkletModuleFuture::<DEFAULT>::new_ready(url) else {unreachable!()};
 						self.0.take();
 
-						Some(Ok(module))
+						Some(Ok(if DEFAULT {
+							DEFAULT_MODULE.get_or_init(|| module).into()
+						} else {
+							module.into()
+						}))
 					} else {
-						self.0 = Some(WorkletModuleFuture::new_fetch(url, ShimFormat::EsModule));
+						self.0 = Some(WorkletModuleFuture::<DEFAULT>::new_fetch(
+							url,
+							ShimFormat::EsModule,
+						));
 						None
 					}
 				} else {
 					None
 				}
 			}
-			FutureInner::Ready(_) => {
-				let Some(FutureInner::Ready(module)) = self.0.take() else {unreachable!()};
+			State::Ready(_) => {
+				let Some(State::Ready(module)) = self.0.take() else {unreachable!()};
 
-				Some(Ok(module))
+				Some(Ok(if DEFAULT {
+					DEFAULT_MODULE.get_or_init(|| module).into()
+				} else {
+					module.into()
+				}))
 			}
 			_ => None,
 		}
 	}
 
-	fn new_fetch<'url, 'format>(
-		url: &str,
-		format: ShimFormat<'format>,
-	) -> FutureInner<'url, 'format> {
+	fn new_fetch<'url, 'format>(url: &str, format: ShimFormat<'format>) -> State<'url, 'format> {
 		let abort = AbortController::new().unwrap();
 		let mut init = RequestInit::new();
 		init.signal(Some(&abort.signal()));
@@ -207,39 +199,35 @@ impl WorkletModuleFuture<'_, '_> {
 		});
 		let future = JsFuture::from(promise);
 
-		FutureInner::Fetch {
+		State::Fetch {
 			format,
 			abort,
 			future,
 		}
 	}
 
-	fn new_ready<'url, 'format>(url: &str) -> FutureInner<'url, 'format> {
-		FutureInner::Ready(WorkletModule::new_internal(ModuleInner::Import(format!(
+	fn new_ready<'url, 'format>(url: &str) -> State<'url, 'format> {
+		State::Ready(WorkletModule::new_inner(Inner::Import(format!(
 			"import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n",
 		))))
 	}
-}
-
-impl Drop for WorkletModuleFuture<'_, '_> {
-	fn drop(&mut self) {
-		if let Some(inner) = &self.0 {
-			match inner {
-				FutureInner::Fetch { abort, .. } | FutureInner::Text { abort, .. } => abort.abort(),
-				_ => (),
-			}
-		}
-	}
-}
-
-impl Future for WorkletModuleFuture<'_, '_> {
-	type Output = Result<WorkletModule, WorkletModuleError>;
 
 	#[track_caller]
-	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+	fn poll_internal(
+		mut self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+	) -> Poll<Result<CowModule, WorkletModuleError>> {
+		if DEFAULT {
+			if let Some(default) = DEFAULT_MODULE.get() {
+				self.0.take();
+
+				return Poll::Ready(Ok(default.into()));
+			}
+		}
+
 		loop {
 			match self.0.as_mut().expect("polled after `Ready`") {
-				FutureInner::ImportSupport { url, future } => {
+				State::ImportSupport { url, future } => {
 					let import_support = ready!(Pin::new(future).poll(cx));
 
 					if import_support {
@@ -248,27 +236,27 @@ impl Future for WorkletModuleFuture<'_, '_> {
 						self.0 = Some(Self::new_fetch(url, ShimFormat::EsModule));
 					}
 				}
-				FutureInner::Fetch { future, .. } => {
+				State::Fetch { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(FutureInner::Fetch { format, abort, .. }) = self.0.take() else {unreachable!()};
+					let Some(State::Fetch { format, abort, .. }) = self.0.take() else {unreachable!()};
 
 					let response: Response = result.map_err(WorkletModuleError)?.unchecked_into();
 
-					self.0 = Some(FutureInner::Text {
+					self.0 = Some(State::Text {
 						format,
 						abort,
 						future: JsFuture::from(response.text().map_err(WorkletModuleError)?),
 					});
 				}
-				FutureInner::Text { future, .. } => {
+				State::Text { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(FutureInner::Text { format, .. }) = self.0.take() else {unreachable!()};
+					let Some(State::Text { format, .. }) = self.0.take() else {unreachable!()};
 
 					let shim: JsString = result.map_err(WorkletModuleError)?.unchecked_into();
 
-					return Poll::Ready(Ok(match format {
+					let module = match format {
 						ShimFormat::EsModule => {
-							WorkletModule::new_internal(ModuleInner::Import(shim.into()))
+							WorkletModule::new_inner(Inner::Import(shim.into()))
 						}
 						ShimFormat::Classic { global } => {
 							#[rustfmt::skip]
@@ -276,27 +264,94 @@ impl Future for WorkletModuleFuture<'_, '_> {
                                 const initSync = {global}.initSync;\n\
                                 const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\
                             ");
-							WorkletModule::new_internal(ModuleInner::Inline {
+							WorkletModule::new_inner(Inner::Inline {
 								shim: shim.into(),
 								imports,
 							})
 						}
+					};
+
+					return Poll::Ready(Ok(if DEFAULT {
+						DEFAULT_MODULE.get_or_init(|| module).into()
+					} else {
+						module.into()
 					}));
 				}
-				FutureInner::Ready(_) => {
-					let Some(FutureInner::Ready(module)) = self.0.take() else {unreachable!()};
+				State::Ready(_) => {
+					let Some(State::Ready(module)) = self.0.take() else {unreachable!()};
 
-					return Poll::Ready(Ok(module));
+					return Poll::Ready(Ok(if DEFAULT {
+						DEFAULT_MODULE.get_or_init(|| module).into()
+					} else {
+						module.into()
+					}));
 				}
 			}
 		}
 	}
 }
 
+impl<const DEFAULT: bool> Drop for WorkletModuleFuture<'_, '_, DEFAULT> {
+	fn drop(&mut self) {
+		if let Some(inner) = &self.0 {
+			match inner {
+				State::Fetch { abort, .. } | State::Text { abort, .. } => abort.abort(),
+				_ => (),
+			}
+		}
+	}
+}
+
+impl Future for WorkletModuleFuture<'_, '_, true> {
+	type Output = Result<&'static WorkletModule, WorkletModuleError>;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		Self::poll_internal(self, cx).map_ok(|module| {
+			let CowModule::Borrowed(module) = module else { unreachable!()};
+			module
+		})
+	}
+}
+
+impl Future for WorkletModuleFuture<'_, '_, false> {
+	type Output = Result<WorkletModule, WorkletModuleError>;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		Self::poll_internal(self, cx).map_ok(|module| {
+			let CowModule::Owned(module) = module else { unreachable!()};
+			module
+		})
+	}
+}
+
 #[cfg(feature = "futures")]
-impl FusedFuture for WorkletModuleFuture<'_, '_> {
+impl FusedFuture for WorkletModuleFuture<'_, '_, true> {
 	fn is_terminated(&self) -> bool {
 		self.0.is_none()
+	}
+}
+
+#[cfg(feature = "futures")]
+impl FusedFuture for WorkletModuleFuture<'_, '_, false> {
+	fn is_terminated(&self) -> bool {
+		self.0.is_none()
+	}
+}
+
+enum CowModule {
+	Borrowed(&'static WorkletModule),
+	Owned(WorkletModule),
+}
+
+impl From<&'static WorkletModule> for CowModule {
+	fn from(value: &'static WorkletModule) -> Self {
+		Self::Borrowed(value)
+	}
+}
+
+impl From<WorkletModule> for CowModule {
+	fn from(value: WorkletModule) -> Self {
+		Self::Owned(value)
 	}
 }
 
