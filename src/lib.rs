@@ -14,6 +14,9 @@
 //! - Note possible race condition when sending to newly spawned worker not
 //!   receiving messages if receiving message handler is setup after a yield
 //!   point.
+//! - Note Chrome not cleaning up worklets: <https://bugs.chromium.org/p/chromium/issues/detail?id=1298955>.
+//! - Note `TextDe/Encoder` polyfill required: <https://github.com/rustwasm/wasm-bindgen/issues/2367>.
+//! - Note workaround for missing ports on worklet creation: <https://github.com/WebAudio/web-audio-api/issues/2456>.
 
 mod common;
 pub mod dedicated;
