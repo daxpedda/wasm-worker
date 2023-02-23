@@ -86,7 +86,7 @@ impl Type {
 		#[rustfmt::skip]
 		let imports = format!("\
 			const initSync = {global}.initSync;\n\
-			const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\
+			const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\n\
 		");
 		Self::Inline {
 			shim: shim.into(),
