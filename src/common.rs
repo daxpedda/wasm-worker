@@ -12,13 +12,16 @@ pub enum ShimFormat<'global> {
 
 impl ShimFormat<'_> {
 	pub(crate) fn default() -> Self {
-		match wasm_bindgen::shim_format() {
-			Some(wasm_bindgen::ShimFormat::EsModule) => ShimFormat::EsModule,
-			Some(wasm_bindgen::ShimFormat::NoModules { global_name }) => ShimFormat::Classic {
-				global: global_name.into(),
-			},
-			Some(_) | None => unreachable!("{ERROR}"),
-		}
+		static SHIM_URL: Lazy<ShimFormat<'static>> =
+			Lazy::new(|| match wasm_bindgen::shim_format() {
+				Some(wasm_bindgen::ShimFormat::EsModule) => ShimFormat::EsModule,
+				Some(wasm_bindgen::ShimFormat::NoModules { global_name }) => ShimFormat::Classic {
+					global: global_name.into(),
+				},
+				Some(_) | None => unreachable!("{ERROR}"),
+			});
+
+		SHIM_URL.clone()
 	}
 }
 
