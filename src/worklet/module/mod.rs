@@ -1,4 +1,5 @@
 mod future;
+mod polyfill;
 
 use std::borrow::Cow;
 use std::error::Error;
@@ -10,6 +11,7 @@ use once_cell::sync::OnceCell;
 use wasm_bindgen::JsValue;
 
 pub use self::future::WorkletModuleFuture;
+use self::polyfill::{PolyfillImport, PolyfillInline};
 use super::{ImportSupportFuture, ShimFormat};
 use crate::common::SHIM_URL;
 
@@ -20,8 +22,15 @@ pub struct WorkletModule(pub(super) Type);
 
 #[derive(Debug)]
 pub(super) enum Type {
-	Import(String),
-	Inline { shim: String, imports: String },
+	Import {
+		polyfill: &'static str,
+		imports: String,
+	},
+	Inline {
+		polyfill: &'static str,
+		shim: String,
+		imports: String,
+	},
 }
 
 impl WorkletModule {
@@ -77,9 +86,10 @@ impl Drop for WorkletModule {
 
 impl Type {
 	fn import(url: &str) -> Self {
-		Self::Import(format!(
-			"import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n",
-		))
+		Self::Import {
+			polyfill: PolyfillImport::import(),
+			imports: format!("import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n",),
+		}
 	}
 
 	fn inline(shim: JsString, global: &str) -> Self {
@@ -89,6 +99,7 @@ impl Type {
 			const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\n\
 		");
 		Self::Inline {
+			polyfill: PolyfillInline::script(),
 			shim: shim.into(),
 			imports,
 		}

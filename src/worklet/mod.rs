@@ -1,6 +1,5 @@
 pub mod audio;
 mod module;
-mod polyfill;
 mod support;
 
 use std::error::Error;
@@ -10,7 +9,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 pub use self::audio::AudioWorkletExt;
 pub use self::module::{WorkletModule, WorkletModuleError, WorkletModuleFuture};
-use self::polyfill::{PolyfillImport, PolyfillInline};
 pub use self::support::{has_import_support, ImportSupportFuture};
 pub use crate::common::ShimFormat;
 

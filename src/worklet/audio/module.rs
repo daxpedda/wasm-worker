@@ -9,9 +9,7 @@ use once_cell::sync::OnceCell;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 use crate::worklet::module::Type;
-use crate::worklet::{
-	PolyfillImport, PolyfillInline, WorkletModule, WorkletModuleError, WorkletModuleFuture,
-};
+use crate::worklet::{WorkletModule, WorkletModuleError, WorkletModuleFuture};
 
 static DEFAULT: OnceCell<AudioWorkletModule> = OnceCell::new();
 
@@ -33,13 +31,17 @@ impl AudioWorkletModule {
 	#[must_use]
 	pub fn new(WorkletModule(r#type): &WorkletModule) -> Self {
 		let sequence = match r#type {
-			Type::Import(import) => Array::of3(
-				&PolyfillImport::import().into(),
-				&import.into(),
+			Type::Import { polyfill, imports } => Array::of3(
+				&(*polyfill).into(),
+				&imports.into(),
 				&include_str!("worklet.js").into(),
 			),
-			Type::Inline { shim, imports } => Array::of4(
-				&PolyfillInline::script().into(),
+			Type::Inline {
+				polyfill,
+				shim,
+				imports,
+			} => Array::of4(
+				&(*polyfill).into(),
 				&shim.into(),
 				&imports.into(),
 				&include_str!("worklet.js").into(),
