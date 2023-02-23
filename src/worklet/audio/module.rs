@@ -31,8 +31,8 @@ impl AudioWorkletModule {
 	}
 
 	#[must_use]
-	pub fn new(WorkletModule(inner): &WorkletModule) -> Self {
-		let sequence = match inner {
+	pub fn new(WorkletModule(r#type): &WorkletModule) -> Self {
+		let sequence = match r#type {
 			Type::Import(import) => Array::of3(
 				&PolyfillImport::import().into(),
 				&import.into(),
@@ -93,7 +93,7 @@ impl Future for AudioWorkletModuleFuture {
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		let inner = self.0.as_mut().expect("polled after `Ready`");
+		let future = self.0.as_mut().expect("polled after `Ready`");
 
 		if let Some(default) = DEFAULT.get() {
 			self.0.take();
@@ -101,7 +101,7 @@ impl Future for AudioWorkletModuleFuture {
 			return Poll::Ready(Ok(default));
 		}
 
-		let result = ready!(Pin::new(inner).poll(cx));
+		let result = ready!(Pin::new(future).poll(cx));
 		self.0.take();
 
 		match result {

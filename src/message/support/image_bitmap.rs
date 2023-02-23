@@ -16,10 +16,10 @@ static SUPPORT: OnceCell<Result<(), SupportError>> = OnceCell::new();
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct ImageBitmapSupportFuture(Option<Inner>);
+pub struct ImageBitmapSupportFuture(Option<State>);
 
 #[derive(Debug)]
-enum Inner {
+enum State {
 	Ready(Result<(), SupportError>),
 	Create(JsFuture),
 }
@@ -27,13 +27,13 @@ enum Inner {
 impl ImageBitmapSupportFuture {
 	pub(in super::super) fn new() -> Self {
 		if let Some(support) = SUPPORT.get() {
-			Self(Some(Inner::Ready(*support)))
+			Self(Some(State::Ready(*support)))
 		} else {
-			let promise = WindowOrWorker::with(|global| {
+			WindowOrWorker::with(|global| {
 				if let Some(global) = global {
 					let image = ImageData::new_with_sw(1, 1).unwrap();
 
-					match global {
+					let promise = match global {
 						WindowOrWorker::Window(window) => {
 							window.create_image_bitmap_with_image_data(&image)
 						}
@@ -41,29 +41,29 @@ impl ImageBitmapSupportFuture {
 							worker.create_image_bitmap_with_image_data(&image)
 						}
 					}
-					.ok()
-				} else {
-					None
-				}
-			});
+					.unwrap();
 
-			if let Some(promise) = promise {
-				Self(Some(Inner::Create(JsFuture::from(promise))))
-			} else {
-				Self(Some(Inner::Ready(Err(SupportError::Undetermined))))
-			}
+					Self(Some(State::Create(JsFuture::from(promise))))
+				} else {
+					Self(Some(State::Ready(Err(SupportError::Undetermined))))
+				}
+			})
 		}
 	}
 
 	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
+		let state = self.0.as_ref().expect("polled after `Ready`");
+
 		if let Some(support) = SUPPORT.get() {
-			self.0.take();
+			if let State::Ready(new_support) = self.0.take().unwrap() {
+				assert_eq!(*support, new_support);
+			}
 
 			return Some(*support);
 		}
 
-		if let Inner::Ready(support) = self.0.as_ref().expect("polled after `Ready`") {
+		if let State::Ready(support) = state {
 			let support = *support;
 			self.0.take();
 
@@ -79,20 +79,24 @@ impl Future for ImageBitmapSupportFuture {
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		let state = self.0.as_mut().expect("polled after `Ready`");
+
 		if let Some(support) = SUPPORT.get() {
-			self.0.take();
+			if let State::Ready(new_support) = self.0.take().unwrap() {
+				assert_eq!(*support, new_support);
+			}
 
 			return Poll::Ready(*support);
 		}
 
-		match self.0.as_mut().expect("polled after `Ready`") {
-			Inner::Ready(support) => {
+		match state {
+			State::Ready(support) => {
 				let support = *support;
 				self.0.take();
 
 				Poll::Ready(support)
 			}
-			Inner::Create(future) => {
+			State::Create(future) => {
 				let result = ready!(Pin::new(future).poll(cx));
 				self.0.take();
 

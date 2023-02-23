@@ -12,33 +12,45 @@ static SUPPORT: OnceCell<bool> = OnceCell::new();
 
 pub fn has_import_support() -> ImportSupportFuture {
 	if let Some(support) = SUPPORT.get() {
-		ImportSupportFuture(Some(Inner::Ready(*support)))
+		ImportSupportFuture(Some(State::Ready(*support)))
 	} else {
-		ImportSupportFuture(Some(Inner::Unknown))
+		let context = OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
+			1, 1, 8000.,
+		)
+		.unwrap();
+		let worklet = context.audio_worklet().unwrap();
+		let promise = worklet
+			.add_module("data:text/javascript,import'data:text/javascript,'")
+			.unwrap();
+
+		ImportSupportFuture(Some(State::Create(JsFuture::from(promise))))
 	}
 }
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct ImportSupportFuture(Option<Inner>);
+pub struct ImportSupportFuture(Option<State>);
 
 #[derive(Debug)]
-enum Inner {
+enum State {
 	Ready(bool),
-	Unknown,
 	Create(JsFuture),
 }
 
 impl ImportSupportFuture {
 	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<bool> {
+		let state = self.0.as_ref().expect("polled after `Ready`");
+
 		if let Some(support) = SUPPORT.get() {
-			self.0.take();
+			if let State::Ready(new_support) = self.0.take().unwrap() {
+				assert_eq!(*support, new_support);
+			}
 
 			return Some(*support);
 		}
 
-		if let Inner::Ready(support) = self.0.as_ref().expect("polled after `Ready`") {
+		if let State::Ready(support) = state {
 			let support = *support;
 			self.0.take();
 
@@ -54,37 +66,34 @@ impl Future for ImportSupportFuture {
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		let state = self.0.as_mut().expect("polled after `Ready`");
+
 		if let Some(support) = SUPPORT.get() {
-			self.0.take();
+			if let State::Ready(new_support) = self.0.take().unwrap() {
+				assert_eq!(*support, new_support);
+			}
 
 			return Poll::Ready(*support);
 		}
 
-		loop {
-			match self.0.as_mut().expect("polled after `Ready`") {
-				Inner::Ready(support) => {
-					let support = *support;
-					self.0.take();
+		match state {
+			State::Ready(support) => {
+				let support = *support;
+				self.0.take();
 
-					return Poll::Ready(support);
-				}
-				Inner::Unknown => {
-					let context = OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.).unwrap();
-					let worklet = context.audio_worklet().unwrap();
-					let promise = worklet
-						.add_module("data:text/javascript,import'data:text/javascript,'")
-						.unwrap();
+				Poll::Ready(support)
+			}
+			State::Create(future) => {
+				let result = ready!(Pin::new(future).poll(cx));
+				self.0.take();
 
-					self.0 = Some(Inner::Create(JsFuture::from(promise)));
-				}
-				Inner::Create(future) => {
-					let result = ready!(Pin::new(future).poll(cx));
-					let support = result.is_ok();
+				let support = result.is_ok();
 
-					self.0.take();
-					SUPPORT.set(support).unwrap();
-					return Poll::Ready(support);
+				if let Err((old_support, _)) = SUPPORT.try_insert(support) {
+					assert_eq!(support, *old_support);
 				}
+
+				Poll::Ready(support)
 			}
 		}
 	}

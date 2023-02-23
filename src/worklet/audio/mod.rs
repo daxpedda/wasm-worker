@@ -43,7 +43,7 @@ impl AudioWorkletExt for BaseAudioContext {
 		assert!(init.is_undefined());
 		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap();
 
-		Ok(AudioWorkletFuture(Some(Inner::Module {
+		Ok(AudioWorkletFuture(Some(State::Module {
 			context: self.clone(),
 			f: Box::new(|| f(AudioWorkletContext)),
 			future: AudioWorkletModule::default(),
@@ -79,9 +79,9 @@ pub struct AudioWorkletContext;
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct AudioWorkletFuture(Option<Inner>);
+pub struct AudioWorkletFuture(Option<State>);
 
-enum Inner {
+enum State {
 	Module {
 		context: BaseAudioContext,
 		f: Box<dyn 'static + FnOnce() + Send>,
@@ -99,14 +99,14 @@ impl AudioWorkletFuture {
 		context: BaseAudioContext,
 		f: Box<dyn 'static + FnOnce() + Send>,
 		module: &AudioWorkletModule,
-	) -> Inner {
+	) -> State {
 		let promise = context
 			.audio_worklet()
 			.unwrap()
 			.add_module(&module.0)
 			.unwrap();
 
-		Inner::Add {
+		State::Add {
 			context,
 			f,
 			future: JsFuture::from(promise),
@@ -121,17 +121,17 @@ impl Future for AudioWorkletFuture {
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		loop {
 			match self.0.as_mut().expect("polled after `Ready`") {
-				Inner::Module { future, .. } => {
+				State::Module { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(Inner::Module {context, f, ..}) = self.0.take() else { unreachable!() };
+					let Some(State::Module {context, f, ..}) = self.0.take() else { unreachable!() };
 
 					let module = result?;
 
 					self.0 = Some(Self::new_add(context, f, module));
 				}
-				Inner::Add { future, .. } => {
+				State::Add { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(Inner::Add { context, f, ..}) = self.0.take() else { unreachable!() };
+					let Some(State::Add { context, f, ..}) = self.0.take() else { unreachable!() };
 
 					assert!(result.unwrap().is_undefined());
 
@@ -165,7 +165,7 @@ impl FusedFuture for AudioWorkletFuture {
 	}
 }
 
-impl Debug for Inner {
+impl Debug for State {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Module {

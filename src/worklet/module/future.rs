@@ -67,7 +67,9 @@ impl<'url, 'format, const DEFAULT: bool> WorkletModuleFuture<'url, 'format, DEFA
 
 		if DEFAULT {
 			if let Some(default) = DEFAULT_MODULE.get() {
-				self.abort();
+				if let Some(new_support) = self.abort() {
+					assert_eq!(default.is_some(), new_support);
+				}
 
 				return Some(
 					default
@@ -106,7 +108,9 @@ impl<'url, 'format, const DEFAULT: bool> WorkletModuleFuture<'url, 'format, DEFA
 
 		if DEFAULT {
 			if let Some(default) = DEFAULT_MODULE.get() {
-				self.abort();
+				if let Some(new_support) = self.abort() {
+					assert_eq!(default.is_some(), new_support);
+				}
 
 				return Poll::Ready(
 					default
@@ -174,12 +178,14 @@ impl<'url, 'format, const DEFAULT: bool> WorkletModuleFuture<'url, 'format, DEFA
 		Self(Some(State::error::<DEFAULT>()))
 	}
 
-	fn abort(&mut self) {
-		if let Some(state) = self.0.take() {
-			match state {
-				State::Fetch { abort, .. } | State::Text { abort, .. } => abort.abort(),
-				_ => (),
+	fn abort(&mut self) -> Option<bool> {
+		match self.0.take()? {
+			State::ImportSupport { .. } => None,
+			State::Fetch { abort, .. } | State::Text { abort, .. } => {
+				abort.abort();
+				None
 			}
+			State::Ready(support) => Some(support.is_ok()),
 		}
 	}
 }
