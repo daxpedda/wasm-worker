@@ -6,10 +6,9 @@ use std::task::{ready, Context, Poll};
 use futures_core::future::FusedFuture;
 use js_sys::Array;
 use once_cell::sync::OnceCell;
-use wasm_bindgen::JsValue;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
-use crate::worklet::module::Inner;
+use crate::worklet::module::Type;
 use crate::worklet::{
 	PolyfillImport, PolyfillInline, WorkletModule, WorkletModuleError, WorkletModuleFuture,
 };
@@ -34,12 +33,12 @@ impl AudioWorkletModule {
 	#[must_use]
 	pub fn new(WorkletModule(inner): &WorkletModule) -> Self {
 		let sequence = match inner {
-			Inner::Import(import) => Array::of3(
+			Type::Import(import) => Array::of3(
 				&PolyfillImport::import().into(),
 				&import.into(),
 				&include_str!("worklet.js").into(),
 			),
-			Inner::Inline { shim, imports } => Array::of4(
+			Type::Inline { shim, imports } => Array::of4(
 				&PolyfillInline::script().into(),
 				&shim.into(),
 				&imports.into(),
@@ -67,7 +66,9 @@ pub struct AudioWorkletModuleFuture(Option<WorkletModuleFuture<'static, 'static,
 
 impl AudioWorkletModuleFuture {
 	#[track_caller]
-	pub fn into_inner(&mut self) -> Option<Result<&'static AudioWorkletModule, JsValue>> {
+	pub fn into_inner(
+		&mut self,
+	) -> Option<Result<&'static AudioWorkletModule, WorkletModuleError>> {
 		if let Some(default) = DEFAULT.get() {
 			self.0.take();
 

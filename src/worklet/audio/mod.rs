@@ -123,7 +123,7 @@ impl Future for AudioWorkletFuture {
 			match self.0.as_mut().expect("polled after `Ready`") {
 				Inner::Module { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(Inner::Module {context, f, ..}) = self.0.take() else {unreachable!()};
+					let Some(Inner::Module {context, f, ..}) = self.0.take() else { unreachable!() };
 
 					let module = result?;
 
@@ -131,7 +131,7 @@ impl Future for AudioWorkletFuture {
 				}
 				Inner::Add { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(Inner::Add { context, f, ..}) = self.0.take() else {unreachable!()};
+					let Some(Inner::Add { context, f, ..}) = self.0.take() else { unreachable!() };
 
 					assert!(result.unwrap().is_undefined());
 
