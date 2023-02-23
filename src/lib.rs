@@ -17,13 +17,16 @@
 //! - Note Chrome not cleaning up worklets: <https://bugs.chromium.org/p/chromium/issues/detail?id=1298955>.
 //! - Note `TextDe/Encoder` polyfill required: <https://github.com/rustwasm/wasm-bindgen/issues/2367>.
 //! - Note workaround for missing ports on worklet creation: <https://github.com/WebAudio/web-audio-api/issues/2456>.
-//! 
+//!
 //! TODO:
+//! - Implement `PainWorklet`.
 //! - Implement initial message handler for the worker side in builders.
-//! - Test that all functions (e.g. support checks) also work in workers in worklets and adjust appropriately.
+//! - Test that all functions (e.g. support checks) also work in workers in
+//!   worklets and adjust appropriately.
 //! - Implement support for `MessagePort`.
 //! - Support sending additional messages that are not transfered.
 //! - Support sending initial messages in Worker and Worklet.
+//! - Remove polyfill by fixing it in `wasm-bindgen`.
 //! - Implement a higher level implementation of this library.
 
 mod common;
