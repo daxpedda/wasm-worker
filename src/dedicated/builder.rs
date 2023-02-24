@@ -88,10 +88,10 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn message_handler<F: 'static + FnMut(&WorkerRef, MessageEvent)>(
-		self,
-		mut message_handler: F,
-	) -> Self {
+	pub fn message_handler<F>(self, mut message_handler: F) -> Self
+	where
+		F: 'static + FnMut(&WorkerRef, MessageEvent),
+	{
 		let id_handle = Rc::clone(&self.id);
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
 		RefCell::borrow_mut(&self.message_handler).replace(Closure::classic({
@@ -110,13 +110,11 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn message_handler_async<
+	pub fn message_handler_async<F1, F2>(self, mut message_handler: F1) -> Self
+	where
 		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
-	>(
-		self,
-		mut message_handler: F1,
-	) -> Self {
+	{
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
 		RefCell::borrow_mut(&self.message_handler).replace(Closure::future({
 			let id_handle = Rc::clone(&self.id);

@@ -66,10 +66,10 @@ impl WorkerContext {
 		self.context.set_onmessage(None);
 	}
 
-	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
-		&self,
-		mut new_message_handler: F,
-	) {
+	pub fn set_message_handler<F>(&self, mut new_message_handler: F)
+	where
+		F: 'static + FnMut(&Self, MessageEvent),
+	{
 		Self::MESSAGE_HANDLER.with(|message_handler| {
 			let mut message_handler = message_handler.borrow_mut();
 
@@ -82,13 +82,11 @@ impl WorkerContext {
 		});
 	}
 
-	pub fn set_message_handler_async<
+	pub fn set_message_handler_async<F1, F2>(&self, mut new_message_handler: F1)
+	where
 		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
-	>(
-		&self,
-		mut new_message_handler: F1,
-	) {
+	{
 		Self::MESSAGE_HANDLER.with(|message_handler| {
 			let mut message_handler = message_handler.borrow_mut();
 
@@ -101,10 +99,11 @@ impl WorkerContext {
 		});
 	}
 
-	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
-		&self,
-		messages: M,
-	) -> Result<(), TransferError> {
+	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
+	where
+		M: IntoIterator<Item = I>,
+		I: Into<Message>,
+	{
 		WorkerOrContext::Context(&self.context).transfer_messages(messages)
 	}
 

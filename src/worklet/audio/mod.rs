@@ -15,23 +15,24 @@ pub use self::module::{AudioWorkletModule, AudioWorkletModuleFuture};
 use super::{Data, WorkletInitError, WorkletModuleError};
 
 pub trait AudioWorkletExt {
-	fn init_wasm<F: 'static + FnOnce(AudioWorkletContext) + Send>(
-		&self,
-		f: F,
-	) -> Result<AudioWorkletFuture, WorkletInitError>;
+	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture, WorkletInitError>
+	where
+		F: 'static + FnOnce(AudioWorkletContext) + Send;
 
-	fn init_wasm_with_module<F: 'static + FnOnce(AudioWorkletContext) + Send>(
+	fn init_wasm_with_module<F>(
 		&self,
 		module: &AudioWorkletModule,
 		f: F,
-	) -> Result<AudioWorkletFuture, WorkletInitError>;
+	) -> Result<AudioWorkletFuture, WorkletInitError>
+	where
+		F: 'static + FnOnce(AudioWorkletContext) + Send;
 }
 
 impl AudioWorkletExt for BaseAudioContext {
-	fn init_wasm<F: 'static + FnOnce(AudioWorkletContext) + Send>(
-		&self,
-		f: F,
-	) -> Result<AudioWorkletFuture, WorkletInitError> {
+	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture, WorkletInitError>
+	where
+		F: 'static + FnOnce(AudioWorkletContext) + Send,
+	{
 		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
@@ -50,11 +51,14 @@ impl AudioWorkletExt for BaseAudioContext {
 		})))
 	}
 
-	fn init_wasm_with_module<F: 'static + FnOnce(AudioWorkletContext) + Send>(
+	fn init_wasm_with_module<F>(
 		&self,
 		module: &AudioWorkletModule,
 		f: F,
-	) -> Result<AudioWorkletFuture, WorkletInitError> {
+	) -> Result<AudioWorkletFuture, WorkletInitError>
+	where
+		F: 'static + FnOnce(AudioWorkletContext) + Send,
+	{
 		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {

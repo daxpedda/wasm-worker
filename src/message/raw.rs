@@ -62,12 +62,17 @@ pub enum RawMessages {
 }
 
 #[derive(Debug)]
-pub struct MessageError<T: Debug>(pub T);
+pub struct MessageError<T>(pub T)
+where
+	T: Debug;
 
-impl<T: Debug> Display for MessageError<T> {
+impl<T> Display for MessageError<T>
+where
+	T: Debug,
+{
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "unexpected message type for: {:?}", self.0)
 	}
 }
 
-impl<T: Debug> Error for MessageError<T> {}
+impl<T> Error for MessageError<T> where T: Debug {}

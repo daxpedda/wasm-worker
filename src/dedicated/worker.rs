@@ -83,29 +83,28 @@ impl Worker {
 	}
 
 	#[allow(clippy::same_name_method)]
-	pub fn set_message_handler<F: 'static + FnMut(&WorkerRef, MessageEvent)>(
-		&self,
-		new_message_handler: F,
-	) {
+	pub fn set_message_handler<F>(&self, new_message_handler: F)
+	where
+		F: 'static + FnMut(&WorkerRef, MessageEvent),
+	{
 		<Self as WorkerOrRef>::set_message_handler(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
-	pub fn set_message_handler_async<
+	pub fn set_message_handler_async<F1, F2>(&self, new_message_handler: F1)
+	where
 		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
-	>(
-		&self,
-		new_message_handler: F1,
-	) {
+	{
 		<Self as WorkerOrRef>::set_message_handler_async(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
-	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
-		&self,
-		messages: M,
-	) -> Result<(), TransferError> {
+	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
+	where
+		M: IntoIterator<Item = I>,
+		I: Into<Message>,
+	{
 		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
 
@@ -175,29 +174,28 @@ impl WorkerRef {
 	}
 
 	#[allow(clippy::same_name_method)]
-	pub fn set_message_handler<F: 'static + FnMut(&Self, MessageEvent)>(
-		&self,
-		new_message_handler: F,
-	) {
+	pub fn set_message_handler<F>(&self, new_message_handler: F)
+	where
+		F: 'static + FnMut(&Self, MessageEvent),
+	{
 		<Self as WorkerOrRef>::set_message_handler(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
-	pub fn set_message_handler_async<
+	pub fn set_message_handler_async<F1, F2>(&self, new_message_handler: F1)
+	where
 		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
-	>(
-		&self,
-		new_message_handler: F1,
-	) {
+	{
 		<Self as WorkerOrRef>::set_message_handler_async(self, new_message_handler);
 	}
 
 	#[allow(clippy::same_name_method)]
-	pub fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
-		&self,
-		messages: M,
-	) -> Result<(), TransferError> {
+	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
+	where
+		M: IntoIterator<Item = I>,
+		I: Into<Message>,
+	{
 		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
 
@@ -305,12 +303,18 @@ trait WorkerOrRef: Debug + Sized {
 }
 
 #[derive(Debug)]
-pub enum DestroyError<T: Debug> {
+pub enum DestroyError<T>
+where
+	T: Debug,
+{
 	Already(Tls),
 	Match { handle: T, tls: Tls },
 }
 
-impl<T: Debug> Display for DestroyError<T> {
+impl<T> Display for DestroyError<T>
+where
+	T: Debug,
+{
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Already(_) => write!(f, "this worker was already destroyed"),
@@ -321,4 +325,4 @@ impl<T: Debug> Display for DestroyError<T> {
 	}
 }
 
-impl<T: Debug> Error for DestroyError<T> {}
+impl<T> Error for DestroyError<T> where T: Debug {}

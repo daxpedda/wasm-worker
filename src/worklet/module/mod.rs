@@ -40,10 +40,13 @@ impl WorkletModule {
 	}
 
 	#[allow(clippy::new_ret_no_self)]
-	pub fn new<'url, 'format, URL: Into<Cow<'url, str>>>(
+	pub fn new<'url, 'format, URL>(
 		url: URL,
 		format: ShimFormat<'format>,
-	) -> WorkletModuleFuture<'url, 'format, false> {
+	) -> WorkletModuleFuture<'url, 'format, false>
+	where
+		URL: Into<Cow<'url, str>>,
+	{
 		Self::new_internal(url, format)
 	}
 
