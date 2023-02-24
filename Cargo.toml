@@ -6,6 +6,19 @@ version = "0.0.0"
 
 [features]
 futures = ["dep:futures-core"]
+worklet = [
+	"web-sys/AbortController",
+	"web-sys/AbortSignal",
+	"web-sys/AudioWorklet",
+	"web-sys/AudioWorkletGlobalScope",
+	"web-sys/AudioWorkletNode",
+	"web-sys/AudioWorkletNodeOptions",
+	"web-sys/BaseAudioContext",
+	"web-sys/OfflineAudioContext",
+	"web-sys/RequestInit",
+	"web-sys/Response",
+	"web-sys/WorkletGlobalScope",
+]
 
 [dependencies]
 futures-core = { version = "0.3", optional = true, default-features = false }
@@ -14,16 +27,9 @@ once_cell = "1"
 wasm-bindgen = { version = "0.2", default-features = false }
 wasm-bindgen-futures = "0.4"
 web-sys = { version = "0.3", features = [
-	"AbortController",
-	"AbortSignal",
 	"AudioData",
 	"AudioDataInit",
 	"AudioSampleFormat",
-	"AudioWorklet",
-	"AudioWorkletGlobalScope",
-	"AudioWorkletNode",
-	"AudioWorkletNodeOptions",
-	"BaseAudioContext",
 	"Blob",
 	"BlobPropertyBag",
 	"DedicatedWorkerGlobalScope",
@@ -33,11 +39,8 @@ web-sys = { version = "0.3", features = [
 	"MessageChannel",
 	"MessageEvent",
 	"MessagePort",
-	"OfflineAudioContext",
 	"OffscreenCanvas",
 	"ReadableStream",
-	"RequestInit",
-	"Response",
 	"RtcDataChannel",
 	"RtcPeerConnection",
 	"TransformStream",
@@ -50,7 +53,6 @@ web-sys = { version = "0.3", features = [
 	"WorkerGlobalScope",
 	"WorkerOptions",
 	"WorkerType",
-	"WorkletGlobalScope",
 	"WritableStream",
 ] }
 
