@@ -1,19 +1,23 @@
+mod context;
 mod module;
 
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::Ordering;
 use std::task::{ready, Context, Poll};
 
 #[cfg(feature = "futures")]
 use futures_core::future::FusedFuture;
 use js_sys::{Array, Reflect};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
+use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, WorkletGlobalScope};
 
+pub use self::context::AudioWorkletContext;
 pub use self::module::{AudioWorkletModule, AudioWorkletModuleFuture};
 use super::{Data, WorkletInitError, WorkletModuleError};
+use crate::common::ID_COUNTER;
 
 pub trait AudioWorkletExt: sealed::Sealed {
 	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture<'_>, WorkletInitError>
@@ -38,7 +42,10 @@ impl AudioWorkletExt for BaseAudioContext {
 
 		Ok(AudioWorkletFuture(Some(State::Module {
 			context: Cow::Borrowed(self),
-			f: Box::new(|| f(AudioWorkletContext)),
+			f: Box::new(|global, id| {
+				let context = AudioWorkletContext::init(global, id);
+				f(context);
+			}),
 			future: AudioWorkletModule::default(),
 		})))
 	}
@@ -55,7 +62,10 @@ impl AudioWorkletExt for BaseAudioContext {
 
 		Ok(AudioWorkletFuture(Some(AudioWorkletFuture::new_add(
 			Cow::Borrowed(self),
-			Box::new(|| f(AudioWorkletContext)),
+			Box::new(|global, id| {
+				let context = AudioWorkletContext::init(global, id);
+				f(context);
+			}),
 			module,
 		))))
 	}
@@ -76,9 +86,6 @@ fn init_wasm_internal(this: &BaseAudioContext) -> Result<(), WorkletInitError> {
 	Ok(())
 }
 
-#[derive(Clone, Copy, Debug)]
-pub struct AudioWorkletContext;
-
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
 pub struct AudioWorkletFuture<'context>(Option<State<'context>>);
@@ -86,12 +93,12 @@ pub struct AudioWorkletFuture<'context>(Option<State<'context>>);
 enum State<'context> {
 	Module {
 		context: Cow<'context, BaseAudioContext>,
-		f: Box<dyn 'static + FnOnce() + Send>,
+		f: Box<dyn 'static + FnOnce(WorkletGlobalScope, usize) + Send>,
 		future: AudioWorkletModuleFuture,
 	},
 	Add {
 		context: Cow<'context, BaseAudioContext>,
-		f: Box<dyn 'static + FnOnce() + Send>,
+		f: Box<dyn 'static + FnOnce(WorkletGlobalScope, usize) + Send>,
 		future: JsFuture,
 	},
 }
@@ -115,7 +122,7 @@ impl AudioWorkletFuture<'_> {
 
 	fn new_add<'context>(
 		context: Cow<'context, BaseAudioContext>,
-		f: Box<dyn 'static + FnOnce() + Send>,
+		f: Box<dyn 'static + FnOnce(WorkletGlobalScope, usize) + Send>,
 		module: &AudioWorkletModule,
 	) -> State<'context> {
 		let promise = context
@@ -154,7 +161,8 @@ impl Future for AudioWorkletFuture<'_> {
 					let result = result.unwrap();
 					debug_assert!(result.is_undefined());
 
-					let data = Box::into_raw(Box::new(Data(f)));
+					let id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+					let data = Box::into_raw(Box::new(Data { id, task: f }));
 
 					let mut options = AudioWorkletNodeOptions::new();
 					options.processor_options(Some(&Array::of3(
