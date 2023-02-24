@@ -33,16 +33,7 @@ impl AudioWorkletExt for BaseAudioContext {
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send,
 	{
-		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
-
-		if let Some(init) = init.as_bool() {
-			debug_assert!(init);
-
-			return Err(WorkletInitError);
-		}
-
-		debug_assert!(init.is_undefined());
-		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap();
+		init_wasm_internal(self)?;
 
 		Ok(AudioWorkletFuture(Some(State::Module {
 			context: self.clone(),
@@ -59,16 +50,7 @@ impl AudioWorkletExt for BaseAudioContext {
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send,
 	{
-		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
-
-		if let Some(init) = init.as_bool() {
-			debug_assert!(init);
-
-			return Err(WorkletInitError);
-		}
-
-		debug_assert!(init.is_undefined());
-		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap();
+		init_wasm_internal(self)?;
 
 		Ok(AudioWorkletFuture(Some(AudioWorkletFuture::new_add(
 			self.clone(),
@@ -76,6 +58,21 @@ impl AudioWorkletExt for BaseAudioContext {
 			module,
 		))))
 	}
+}
+
+fn init_wasm_internal(this: &BaseAudioContext) -> Result<(), WorkletInitError> {
+	let init = Reflect::get(this, &"__wasm_worker_init".into()).unwrap();
+
+	if let Some(init) = init.as_bool() {
+		debug_assert!(init);
+
+		return Err(WorkletInitError);
+	}
+
+	debug_assert!(init.is_undefined());
+	Reflect::set(this, &"__wasm_worker_init".into(), &true.into()).unwrap();
+
+	Ok(())
 }
 
 #[derive(Clone, Copy, Debug)]
