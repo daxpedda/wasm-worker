@@ -74,7 +74,9 @@ impl AudioWorkletModuleFuture {
 		let future = self.0.as_mut().expect("polled after `Ready`");
 
 		if let Some(default) = DEFAULT.get() {
-			self.0.take();
+			if let Some(result) = self.0.take().unwrap().into_inner() {
+				debug_assert!(result.is_ok());
+			}
 
 			return Some(Ok(default));
 		}
