@@ -98,7 +98,7 @@ impl Type {
 	fn inline(shim: JsString, global: &str) -> Self {
 		#[rustfmt::skip]
 		let imports = format!("\
-			const initSync = {global}.initSync;\n\
+			\nconst initSync = {global}.initSync;\n\
 			const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\n\
 		");
 		Self::Inline {
