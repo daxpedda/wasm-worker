@@ -71,22 +71,21 @@ impl AudioWorkletModuleFuture {
 	pub fn into_inner(
 		&mut self,
 	) -> Option<Result<&'static AudioWorkletModule, WorkletModuleError>> {
+		let future = self.0.as_mut().expect("polled after `Ready`");
+
 		if let Some(default) = DEFAULT.get() {
 			self.0.take();
 
 			return Some(Ok(default));
 		}
 
-		if let Some(result) = self.0.as_mut().expect("polled after `Ready`").into_inner() {
-			self.0.take();
+		let result = future.into_inner()?;
+		self.0.take();
 
-			Some(match result {
-				Ok(module) => Ok(DEFAULT.get_or_init(|| AudioWorkletModule::new(module))),
-				Err(error) => Err(error),
-			})
-		} else {
-			None
-		}
+		Some(match result {
+			Ok(module) => Ok(DEFAULT.get_or_init(|| AudioWorkletModule::new(module))),
+			Err(error) => Err(error),
+		})
 	}
 }
 
