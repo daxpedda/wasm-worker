@@ -82,11 +82,13 @@ impl<'url, 'format, const DEFAULT: bool> WorkletModuleFuture<'url, 'format, DEFA
 
 		match state {
 			State::ImportSupport { url, future, .. } => {
-				if future.into_inner()? {
-					let State::Ready(module) = State::ready::<DEFAULT>(Type::import(url)) else { unreachable!() };
-					self.0.take();
+				let support = future.into_inner()?;
 
-					Some(module)
+				let State::Ready(Ok(module)) = State::ready::<DEFAULT>(Type::import(url)) else { unreachable!() };
+				self.0.take();
+
+				if support {
+					Some(Ok(module))
 				} else {
 					Some(Err(WorkletModuleError::Support))
 				}
