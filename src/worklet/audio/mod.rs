@@ -14,7 +14,7 @@ use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 pub use self::module::{AudioWorkletModule, AudioWorkletModuleFuture};
 use super::{Data, WorkletInitError, WorkletModuleError};
 
-pub trait AudioWorkletExt {
+pub trait AudioWorkletExt: sealed::Sealed {
 	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture, WorkletInitError>
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send;
@@ -190,4 +190,10 @@ impl Debug for State {
 				.finish(),
 		}
 	}
+}
+
+mod sealed {
+	pub trait Sealed {}
+
+	impl Sealed for web_sys::BaseAudioContext {}
 }
