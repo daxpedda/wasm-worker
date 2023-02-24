@@ -3,11 +3,8 @@ use std::fmt::{self, Display, Formatter};
 use std::future::Future;
 use std::ops::Deref;
 
-use js_sys::WebAssembly::Global;
-use js_sys::{Array, Function, Number, Object, Promise, Reflect};
-use once_cell::unsync::Lazy;
+use js_sys::{Array, Function, Promise};
 use wasm_bindgen::closure::Closure as JsClosure;
-use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
@@ -119,69 +116,6 @@ impl WorkerOrContext<'_> {
 				error: error.into(),
 				messages: Messages(RawMessages::Array(array)),
 			})
-	}
-}
-
-thread_local! {
-	pub(super) static EXPORTS: Lazy<Exports> = Lazy::new(|| wasm_bindgen::exports().unchecked_into());
-}
-
-pub(super) type Exports = __wasm_worker_Exports;
-
-#[wasm_bindgen]
-extern "C" {
-	#[allow(non_camel_case_types)]
-	pub(super) type __wasm_worker_Exports;
-
-	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
-	pub(super) unsafe fn thread_destroy(
-		this: &__wasm_worker_Exports,
-		tls_base: &Global,
-		stack_alloc: &Global,
-	);
-
-	#[wasm_bindgen(method, getter, js_name = __tls_base)]
-	pub(super) fn tls_base(this: &__wasm_worker_Exports) -> Global;
-
-	#[wasm_bindgen(method, getter, js_name = __stack_alloc)]
-	pub(super) fn stack_alloc(this: &__wasm_worker_Exports) -> Global;
-}
-
-#[derive(Debug)]
-#[allow(missing_copy_implementations)]
-pub struct Tls {
-	pub(super) id: usize,
-	tls_base: f64,
-	stack_alloc: f64,
-}
-
-impl Tls {
-	thread_local! {
-		static DESCRIPTOR: Lazy<Object> = Lazy::new(|| {
-			let descriptor = Object::new();
-			Reflect::set(&descriptor, &"value".into(), &"i32".into()).unwrap();
-			descriptor
-		});
-	}
-
-	pub(super) fn new(id: usize, tls_base: &Global, stack_alloc: &Global) -> Self {
-		let tls_base = Number::unchecked_from_js(tls_base.value()).value_of();
-		let stack_alloc = Number::unchecked_from_js(stack_alloc.value()).value_of();
-
-		Self {
-			id,
-			tls_base,
-			stack_alloc,
-		}
-	}
-
-	pub(super) fn tls_base(&self) -> Global {
-		Self::DESCRIPTOR.with(|descriptor| Global::new(descriptor, &self.tls_base.into()).unwrap())
-	}
-
-	pub(super) fn stack_alloc(&self) -> Global {
-		Self::DESCRIPTOR
-			.with(|descriptor| Global::new(descriptor, &self.stack_alloc.into()).unwrap())
 	}
 }
 

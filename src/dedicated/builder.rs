@@ -5,7 +5,7 @@ use std::future::Future;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::rc::{Rc, Weak};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 
 use js_sys::Array;
 use once_cell::sync::Lazy;
@@ -14,6 +14,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 
 use super::{Closure, Worker, WorkerContext, WorkerRef, WorkerUrl};
+use crate::common::ID_COUNTER;
 use crate::message::MessageEvent;
 
 #[must_use = "does nothing unless spawned"]
@@ -156,9 +157,7 @@ impl WorkerBuilder<'_> {
 	}
 
 	fn spawn_internal(self, task: Task) -> Worker {
-		static COUNTER: AtomicUsize = AtomicUsize::new(0);
-
-		let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+		let id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
 		self.id.set(Some(id));
 
 		let data = Box::into_raw(Box::new(Data { id, task }));

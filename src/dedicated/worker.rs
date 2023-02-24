@@ -5,7 +5,8 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::rc::{Rc, Weak};
 
-use super::{Closure, Tls, TransferError, WorkerOrContext, EXPORTS};
+use super::{Closure, TransferError, WorkerOrContext};
+use crate::common::{Tls, EXPORTS};
 use crate::message::{Message, MessageEvent};
 
 #[derive(Clone, Debug)]

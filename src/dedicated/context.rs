@@ -4,7 +4,8 @@ use std::future::Future;
 use once_cell::unsync::OnceCell;
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::{Closure, Tls, TransferError, WorkerOrContext, EXPORTS};
+use super::{Closure, TransferError, WorkerOrContext};
+use crate::common::{Tls, EXPORTS};
 use crate::message::{Message, MessageEvent};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
