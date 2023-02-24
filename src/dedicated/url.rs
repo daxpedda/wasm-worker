@@ -2,8 +2,7 @@ use js_sys::Array;
 use once_cell::sync::Lazy;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
-use super::ShimFormat;
-use crate::common::SHIM_URL;
+use crate::common::{ShimFormat, SHIM_URL};
 
 #[derive(Debug)]
 pub struct WorkerUrl {

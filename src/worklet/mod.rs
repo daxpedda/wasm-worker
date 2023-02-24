@@ -10,7 +10,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 pub use self::audio::AudioWorkletExt;
 pub use self::module::{WorkletModule, WorkletModuleError, WorkletModuleFuture};
 pub use self::support::{has_import_support, ImportSupportFuture};
-pub use crate::common::ShimFormat;
 
 #[doc(hidden)]
 #[allow(missing_debug_implementations, unreachable_pub)]

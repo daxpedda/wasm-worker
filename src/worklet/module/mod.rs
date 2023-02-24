@@ -12,8 +12,8 @@ use wasm_bindgen::JsValue;
 
 pub use self::future::WorkletModuleFuture;
 use self::polyfill::{PolyfillImport, PolyfillInline};
-use super::{ImportSupportFuture, ShimFormat};
-use crate::common::SHIM_URL;
+use super::ImportSupportFuture;
+use crate::common::{ShimFormat, SHIM_URL};
 
 static DEFAULT_MODULE: OnceCell<Option<WorkletModule>> = OnceCell::new();
 

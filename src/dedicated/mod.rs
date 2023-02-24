@@ -12,7 +12,6 @@ pub use self::common::{Tls, TransferError};
 pub use self::context::WorkerContext;
 pub use self::url::WorkerUrl;
 pub use self::worker::{DestroyError, Worker, WorkerRef};
-pub use crate::common::ShimFormat;
 
 #[track_caller]
 pub fn spawn<F>(f: F) -> Worker

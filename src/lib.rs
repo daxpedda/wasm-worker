@@ -29,7 +29,7 @@
 //! - Remove polyfill by fixing it in `wasm-bindgen`.
 //! - Implement a higher level implementation of this library.
 
-mod common;
+pub mod common;
 pub mod dedicated;
 mod global;
 pub mod message;

@@ -4,7 +4,8 @@
 //! Not tested by default!
 
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::dedicated::{ModuleSupportError, ShimFormat, WorkerBuilder, WorkerUrl};
+use wasm_worker::common::ShimFormat;
+use wasm_worker::dedicated::{ModuleSupportError, WorkerBuilder, WorkerUrl};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
