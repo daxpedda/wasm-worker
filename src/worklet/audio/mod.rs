@@ -36,12 +36,12 @@ impl AudioWorkletExt for BaseAudioContext {
 		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
-			assert!(init);
+			debug_assert!(init);
 
 			return Err(WorkletInitError);
 		}
 
-		assert!(init.is_undefined());
+		debug_assert!(init.is_undefined());
 		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap();
 
 		Ok(AudioWorkletFuture(Some(State::Module {
@@ -62,12 +62,12 @@ impl AudioWorkletExt for BaseAudioContext {
 		let init = Reflect::get(self, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
-			assert!(init);
+			debug_assert!(init);
 
 			return Err(WorkletInitError);
 		}
 
-		assert!(init.is_undefined());
+		debug_assert!(init.is_undefined());
 		Reflect::set(self, &"__wasm_worker_init".into(), &true.into()).unwrap();
 
 		Ok(AudioWorkletFuture(Some(AudioWorkletFuture::new_add(
@@ -137,7 +137,8 @@ impl Future for AudioWorkletFuture {
 					let result = ready!(Pin::new(future).poll(cx));
 					let Some(State::Add { context, f, ..}) = self.0.take() else { unreachable!() };
 
-					assert!(result.unwrap().is_undefined());
+					let result = result.unwrap();
+					debug_assert!(result.is_undefined());
 
 					let data = Box::into_raw(Box::new(Data(f)));
 

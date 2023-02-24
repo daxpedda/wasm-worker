@@ -44,7 +44,7 @@ impl ImportSupportFuture {
 
 		if let Some(support) = SUPPORT.get() {
 			if let State::Ready(new_support) = self.0.take().unwrap() {
-				assert_eq!(*support, new_support);
+				debug_assert_eq!(*support, new_support);
 			}
 
 			return Some(*support);
@@ -70,7 +70,7 @@ impl Future for ImportSupportFuture {
 
 		if let Some(support) = SUPPORT.get() {
 			if let State::Ready(new_support) = self.0.take().unwrap() {
-				assert_eq!(*support, new_support);
+				debug_assert_eq!(*support, new_support);
 			}
 
 			return Poll::Ready(*support);
@@ -90,7 +90,7 @@ impl Future for ImportSupportFuture {
 				let support = result.is_ok();
 
 				if let Err((old_support, _)) = SUPPORT.try_insert(support) {
-					assert_eq!(support, *old_support);
+					debug_assert_eq!(support, *old_support);
 				}
 
 				Poll::Ready(support)

@@ -68,7 +68,7 @@ impl<'url, 'format, const DEFAULT: bool> WorkletModuleFuture<'url, 'format, DEFA
 		if DEFAULT {
 			if let Some(default) = DEFAULT_MODULE.get() {
 				if let Some(new_support) = self.abort() {
-					assert_eq!(default.is_some(), new_support);
+					debug_assert_eq!(default.is_some(), new_support);
 				}
 
 				return Some(
@@ -111,7 +111,7 @@ impl<'url, 'format, const DEFAULT: bool> WorkletModuleFuture<'url, 'format, DEFA
 		if DEFAULT {
 			if let Some(default) = DEFAULT_MODULE.get() {
 				if let Some(new_support) = self.abort() {
-					assert_eq!(default.is_some(), new_support);
+					debug_assert_eq!(default.is_some(), new_support);
 				}
 
 				return Poll::Ready(
@@ -275,7 +275,7 @@ impl<'format> State<'_, 'format> {
 	fn error<const DEFAULT: bool>() -> Self {
 		if DEFAULT {
 			if let Err((old_value, ..)) = DEFAULT_MODULE.try_insert(None) {
-				assert!(old_value.is_none());
+				debug_assert!(old_value.is_none());
 			};
 		}
 

@@ -57,7 +57,7 @@ impl ImageBitmapSupportFuture {
 
 		if let Some(support) = SUPPORT.get() {
 			if let State::Ready(new_support) = self.0.take().unwrap() {
-				assert_eq!(*support, new_support);
+				debug_assert_eq!(*support, new_support);
 			}
 
 			return Some(*support);
@@ -83,7 +83,7 @@ impl Future for ImageBitmapSupportFuture {
 
 		if let Some(support) = SUPPORT.get() {
 			if let State::Ready(new_support) = self.0.take().unwrap() {
-				assert_eq!(*support, new_support);
+				debug_assert_eq!(*support, new_support);
 			}
 
 			return Poll::Ready(*support);
