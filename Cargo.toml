@@ -20,6 +20,7 @@ web-sys = { version = "0.3", features = [
 	"AudioDataInit",
 	"AudioSampleFormat",
 	"AudioWorklet",
+	"AudioWorkletGlobalScope",
 	"AudioWorkletNode",
 	"AudioWorkletNodeOptions",
 	"BaseAudioContext",
@@ -49,6 +50,7 @@ web-sys = { version = "0.3", features = [
 	"WorkerGlobalScope",
 	"WorkerOptions",
 	"WorkerType",
+	"WorkletGlobalScope",
 	"WritableStream",
 ] }
 
