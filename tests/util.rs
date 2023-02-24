@@ -42,7 +42,7 @@ pub fn sleep(duration: Duration) -> Sleep {
 		/// Cached [`Global`].
 		static GLOBAL: Global = {
 			#[wasm_bindgen]
-			extern "C" {
+			extern {
 				type SleepGlobal;
 
 				#[wasm_bindgen(method, getter, js_name = Window)]
