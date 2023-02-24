@@ -1,5 +1,6 @@
 mod module;
 
+use std::borrow::Cow;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
@@ -15,7 +16,7 @@ pub use self::module::{AudioWorkletModule, AudioWorkletModuleFuture};
 use super::{Data, WorkletInitError, WorkletModuleError};
 
 pub trait AudioWorkletExt: sealed::Sealed {
-	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture, WorkletInitError>
+	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture<'_>, WorkletInitError>
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send;
 
@@ -23,20 +24,20 @@ pub trait AudioWorkletExt: sealed::Sealed {
 		&self,
 		module: &AudioWorkletModule,
 		f: F,
-	) -> Result<AudioWorkletFuture, WorkletInitError>
+	) -> Result<AudioWorkletFuture<'_>, WorkletInitError>
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send;
 }
 
 impl AudioWorkletExt for BaseAudioContext {
-	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture, WorkletInitError>
+	fn init_wasm<F>(&self, f: F) -> Result<AudioWorkletFuture<'_>, WorkletInitError>
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send,
 	{
 		init_wasm_internal(self)?;
 
 		Ok(AudioWorkletFuture(Some(State::Module {
-			context: self.clone(),
+			context: Cow::Borrowed(self),
 			f: Box::new(|| f(AudioWorkletContext)),
 			future: AudioWorkletModule::default(),
 		})))
@@ -46,14 +47,14 @@ impl AudioWorkletExt for BaseAudioContext {
 		&self,
 		module: &AudioWorkletModule,
 		f: F,
-	) -> Result<AudioWorkletFuture, WorkletInitError>
+	) -> Result<AudioWorkletFuture<'_>, WorkletInitError>
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send,
 	{
 		init_wasm_internal(self)?;
 
 		Ok(AudioWorkletFuture(Some(AudioWorkletFuture::new_add(
-			self.clone(),
+			Cow::Borrowed(self),
 			Box::new(|| f(AudioWorkletContext)),
 			module,
 		))))
@@ -80,27 +81,43 @@ pub struct AudioWorkletContext;
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct AudioWorkletFuture(Option<State>);
+pub struct AudioWorkletFuture<'context>(Option<State<'context>>);
 
-enum State {
+enum State<'context> {
 	Module {
-		context: BaseAudioContext,
+		context: Cow<'context, BaseAudioContext>,
 		f: Box<dyn 'static + FnOnce() + Send>,
 		future: AudioWorkletModuleFuture,
 	},
 	Add {
-		context: BaseAudioContext,
+		context: Cow<'context, BaseAudioContext>,
 		f: Box<dyn 'static + FnOnce() + Send>,
 		future: JsFuture,
 	},
 }
 
-impl AudioWorkletFuture {
-	fn new_add(
-		context: BaseAudioContext,
+impl AudioWorkletFuture<'_> {
+	pub fn to_owned(self) -> AudioWorkletFuture<'static> {
+		AudioWorkletFuture(match self.0 {
+			Some(State::Module { context, f, future }) => Some(State::Module {
+				context: Cow::Owned(context.into_owned()),
+				f,
+				future,
+			}),
+			Some(State::Add { context, f, future }) => Some(State::Add {
+				context: Cow::Owned(context.into_owned()),
+				f,
+				future,
+			}),
+			None => None,
+		})
+	}
+
+	fn new_add<'context>(
+		context: Cow<'context, BaseAudioContext>,
 		f: Box<dyn 'static + FnOnce() + Send>,
 		module: &AudioWorkletModule,
-	) -> State {
+	) -> State<'context> {
 		let promise = context
 			.audio_worklet()
 			.unwrap()
@@ -115,7 +132,7 @@ impl AudioWorkletFuture {
 	}
 }
 
-impl Future for AudioWorkletFuture {
+impl Future for AudioWorkletFuture<'_> {
 	type Output = Result<(), WorkletModuleError>;
 
 	#[track_caller]
@@ -161,13 +178,13 @@ impl Future for AudioWorkletFuture {
 }
 
 #[cfg(feature = "futures")]
-impl FusedFuture for AudioWorkletFuture {
+impl FusedFuture for AudioWorkletFuture<'_> {
 	fn is_terminated(&self) -> bool {
 		self.0.is_none()
 	}
 }
 
-impl Debug for State {
+impl Debug for State<'_> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Module {
