@@ -39,7 +39,7 @@ thread_local! {
 pub(crate) type Exports = __wasm_worker_Exports;
 
 #[wasm_bindgen]
-extern {
+extern "C" {
 	#[allow(non_camel_case_types)]
 	pub(crate) type __wasm_worker_Exports;
 
