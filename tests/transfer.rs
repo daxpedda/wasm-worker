@@ -4,11 +4,11 @@
 mod util;
 
 use std::fmt::Debug;
-use std::future::Future;
+use std::future::{ready, Future};
 
 use anyhow::Result;
-use futures_util::future::Either;
-use futures_util::{future, FutureExt};
+use futures_util::future::{self, Either};
+use futures_util::FutureExt;
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
@@ -79,21 +79,26 @@ async fn serialize() -> Result<()> {
 ///
 /// If `force` is `true` the test will fail if the type is not supported,
 /// otherwise the test will be skipped.
-async fn test_transfer<T, F1, F2>(
-	support: Result<(), SupportError>,
+async fn test_transfer<T, F1, F2, F3>(
+	support: impl Fn() -> F1,
 	force: bool,
-	init: impl Fn() -> F1,
+	init: impl Fn() -> F2,
 	assert_sent: impl 'static + Copy + Fn(&T) + Send,
-	assert_received: impl 'static + Clone + Fn(&T) -> F2 + Send,
+	assert_received: impl 'static + Clone + Fn(&T) -> F3 + Send,
 ) -> Result<()>
 where
 	T: Clone + JsCast + TryFrom<Message>,
 	Message: From<T>,
 	<T as TryFrom<Message>>::Error: Debug,
-	F1: Future<Output = T>,
-	F2: Future<Output = ()>,
+	F1: Future<Output = Result<(), SupportError>>,
+	F2: Future<Output = T>,
+	F3: Future<Output = ()>,
 {
-	match support {
+	let message = Message::from(JsValue::UNDEFINED.unchecked_into());
+	let mut future = message.has_support();
+	assert!(future.into_inner().is_some());
+
+	match support().await {
 		Ok(()) => (),
 		Err(_) => {
 			if force {
@@ -185,7 +190,7 @@ where
 #[wasm_bindgen_test]
 async fn array_buffer() -> Result<()> {
 	test_transfer(
-		Message::has_array_buffer_support(),
+		|| ready(Message::has_array_buffer_support()),
 		true,
 		|| async {
 			let buffer = ArrayBuffer::new(1);
@@ -209,7 +214,7 @@ async fn array_buffer() -> Result<()> {
 #[cfg(web_sys_unstable_apis)]
 async fn audio_data() -> Result<()> {
 	test_transfer(
-		Message::has_audio_data_support(),
+		|| ready(Message::has_audio_data_support()),
 		false,
 		|| async {
 			let init = AudioDataInit::new(
@@ -233,21 +238,13 @@ async fn audio_data() -> Result<()> {
 	.await
 }
 
-/// [`ImageBitmap`] and
-/// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::ImageBitmapSupportFuture::into_inner).
+/// [`ImageBitmap`].
 #[wasm_bindgen_test]
 async fn image_bitmap() -> Result<()> {
-	let mut future = Message::has_image_bitmap_support();
-	assert_eq!(future.into_inner(), None);
-	assert!(future.await.is_ok());
-
-	assert!(Message::has_image_bitmap_support()
-		.into_inner()
-		.unwrap()
-		.is_ok());
+	let _ = Message::has_image_bitmap_support().await;
 
 	test_transfer(
-		Message::has_image_bitmap_support().into_inner().unwrap(),
+		Message::has_image_bitmap_support,
 		true,
 		|| {
 			let image = ImageData::new_with_sw(1, 1).unwrap();
@@ -284,7 +281,7 @@ async fn message_port() -> Result<()> {
 	});
 
 	test_transfer(
-		Message::has_message_port_support(),
+		|| ready(Message::has_message_port_support()),
 		true,
 		|| async {
 			let channel = MessageChannel::new().unwrap();
@@ -318,7 +315,7 @@ async fn message_port() -> Result<()> {
 #[wasm_bindgen_test]
 async fn offscreen_canvas() -> Result<()> {
 	test_transfer(
-		Message::has_offscreen_canvas_support(),
+		|| ready(Message::has_offscreen_canvas_support()),
 		false,
 		|| async { OffscreenCanvas::new(1, 1).unwrap() },
 		|canvas| {
@@ -339,7 +336,7 @@ async fn offscreen_canvas() -> Result<()> {
 #[wasm_bindgen_test]
 async fn readable_stream() -> Result<()> {
 	test_transfer(
-		Message::has_readable_stream_support(),
+		|| ready(Message::has_readable_stream_support()),
 		false,
 		|| async { ReadableStream::new().unwrap() },
 		|stream| assert!(stream.locked()),
@@ -356,7 +353,7 @@ async fn readable_stream() -> Result<()> {
 #[wasm_bindgen_test]
 async fn rtc_data_channel() -> Result<()> {
 	test_transfer(
-		Message::has_rtc_data_channel_support(),
+		|| ready(Message::has_rtc_data_channel_support()),
 		false,
 		|| async {
 			let connection = RtcPeerConnection::new().unwrap();
@@ -376,7 +373,7 @@ async fn rtc_data_channel() -> Result<()> {
 #[wasm_bindgen_test]
 async fn transform_stream() -> Result<()> {
 	test_transfer(
-		Message::has_transform_stream_support(),
+		|| ready(Message::has_transform_stream_support()),
 		false,
 		|| async { TransformStream::new().unwrap() },
 		|stream| {
@@ -398,7 +395,7 @@ async fn transform_stream() -> Result<()> {
 #[cfg(web_sys_unstable_apis)]
 async fn video_frame() -> Result<()> {
 	test_transfer(
-		Message::has_video_frame_support(),
+		|| ready(Message::has_video_frame_support()),
 		false,
 		|| async {
 			VideoFrame::new_with_u8_array_and_video_frame_buffer_init(
@@ -427,7 +424,7 @@ async fn video_frame() -> Result<()> {
 #[wasm_bindgen_test]
 async fn writable_stream() -> Result<()> {
 	test_transfer(
-		Message::has_writable_stream_support(),
+		|| ready(Message::has_writable_stream_support()),
 		false,
 		|| async { WritableStream::new().unwrap() },
 		|stream| assert!(stream.locked()),
