@@ -4,13 +4,16 @@ mod audio_data;
 mod image_bitmap;
 mod message_port;
 mod offscreen_canvas;
+#[cfg(web_sys_unstable_apis)]
 mod readable_stream;
 mod rtc_data_channel;
 #[allow(clippy::module_inception)]
 mod support;
+#[cfg(web_sys_unstable_apis)]
 mod transform_stream;
 #[cfg(web_sys_unstable_apis)]
 mod video_frame;
+#[cfg(web_sys_unstable_apis)]
 mod writable_stream;
 
 use std::error::Error;
@@ -47,6 +50,7 @@ impl Message {
 		offscreen_canvas::support()
 	}
 
+	#[cfg(web_sys_unstable_apis)]
 	pub fn has_readable_stream_support() -> Result<(), SupportError> {
 		readable_stream::support()
 	}
@@ -55,6 +59,7 @@ impl Message {
 		rtc_data_channel::support()
 	}
 
+	#[cfg(web_sys_unstable_apis)]
 	pub fn has_transform_stream_support() -> Result<(), SupportError> {
 		transform_stream::support()
 	}
@@ -64,6 +69,7 @@ impl Message {
 		video_frame::support()
 	}
 
+	#[cfg(web_sys_unstable_apis)]
 	pub fn has_writable_stream_support() -> Result<(), SupportError> {
 		writable_stream::support()
 	}

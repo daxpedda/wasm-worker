@@ -33,12 +33,17 @@ impl MessageSupportFuture {
 			Message::ImageBitmap(_) => State::ImageBitmap(Message::has_image_bitmap_support()),
 			Message::MessagePort(_) => State::Ready(Message::has_message_port_support()),
 			Message::OffscreenCanvas(_) => State::Ready(Message::has_offscreen_canvas_support()),
+			#[cfg(web_sys_unstable_apis)]
 			Message::ReadableStream(_) => State::Ready(Message::has_readable_stream_support()),
 			Message::RtcDataChannel(_) => State::Ready(Message::has_rtc_data_channel_support()),
+			#[cfg(web_sys_unstable_apis)]
 			Message::TransformStream(_) => State::Ready(Message::has_transform_stream_support()),
 			#[cfg(web_sys_unstable_apis)]
 			Message::VideoFrame(_) => State::Ready(Message::has_video_frame_support()),
+			#[cfg(web_sys_unstable_apis)]
 			Message::WritableStream(_) => State::Ready(Message::has_writable_stream_support()),
+			#[cfg(not(web_sys_unstable_apis))]
+			_ => State::Ready(Err(SupportError::Undetermined)),
 		}))
 	}
 

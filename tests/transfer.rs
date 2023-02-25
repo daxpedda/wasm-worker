@@ -334,6 +334,7 @@ async fn offscreen_canvas() -> Result<()> {
 
 /// [`ReadableStream`].
 #[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
 async fn readable_stream() -> Result<()> {
 	test_transfer(
 		|| ready(Message::has_readable_stream_support()),
@@ -371,6 +372,7 @@ async fn rtc_data_channel() -> Result<()> {
 
 /// [`TransformStream`].
 #[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
 async fn transform_stream() -> Result<()> {
 	test_transfer(
 		|| ready(Message::has_transform_stream_support()),
@@ -422,6 +424,7 @@ async fn video_frame() -> Result<()> {
 
 /// [`WritableStream`].
 #[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
 async fn writable_stream() -> Result<()> {
 	test_transfer(
 		|| ready(Message::has_writable_stream_support()),
