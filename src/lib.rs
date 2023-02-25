@@ -28,6 +28,7 @@
 //! - Support sending initial messages in Worker and Worklet.
 //! - Remove polyfill by fixing it in `wasm-bindgen`.
 //! - Implement a higher level implementation of this library.
+//! - Explore supporting widestring.
 
 pub mod common;
 pub mod dedicated;
