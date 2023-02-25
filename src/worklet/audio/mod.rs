@@ -104,7 +104,7 @@ enum State<'context> {
 }
 
 impl AudioWorkletFuture<'_> {
-	pub fn to_owned(self) -> AudioWorkletFuture<'static> {
+	pub fn into_static(self) -> AudioWorkletFuture<'static> {
 		AudioWorkletFuture(match self.0 {
 			Some(State::Module { context, f, future }) => Some(State::Module {
 				context: Cow::Owned(context.into_owned()),

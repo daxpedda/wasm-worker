@@ -60,6 +60,35 @@ impl WorkletModuleFuture<'_, '_, false> {
 }
 
 impl<'url, 'format, const DEFAULT: bool> WorkletModuleFuture<'url, 'format, DEFAULT> {
+	pub fn into_static(mut self) -> WorkletModuleFuture<'static, 'static, DEFAULT> {
+		WorkletModuleFuture(match self.0.take() {
+			Some(State::ImportSupport { url, future }) => Some(State::ImportSupport {
+				url: Cow::Owned(url.into_owned()),
+				future,
+			}),
+			Some(State::Fetch {
+				global,
+				abort,
+				future,
+			}) => Some(State::Fetch {
+				global: Cow::Owned(global.into_owned()),
+				abort,
+				future,
+			}),
+			Some(State::Text {
+				global,
+				abort,
+				future,
+			}) => Some(State::Text {
+				global: Cow::Owned(global.into_owned()),
+				abort,
+				future,
+			}),
+			Some(State::Ready(result)) => Some(State::Ready(result)),
+			None => None,
+		})
+	}
+
 	#[track_caller]
 	#[allow(clippy::wrong_self_convention)]
 	fn into_inner_internal(&mut self) -> Option<Result<CowModule, WorkletModuleError>> {
