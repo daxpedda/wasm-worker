@@ -4,11 +4,9 @@ use std::task::{ready, Context, Poll};
 
 #[cfg(feature = "futures")]
 use futures_core::future::FusedFuture;
-use js_sys::Array;
 use once_cell::sync::OnceCell;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
-use crate::worklet::module::Type;
 use crate::worklet::{WorkletModule, WorkletModuleError, WorkletModuleFuture};
 
 static DEFAULT: OnceCell<AudioWorkletUrl> = OnceCell::new();
@@ -29,25 +27,8 @@ impl AudioWorkletUrl {
 	}
 
 	#[must_use]
-	pub fn new(WorkletModule(r#type): &WorkletModule) -> Self {
-		let sequence = match r#type {
-			Type::Import { polyfill, imports } => Array::of3(
-				&(*polyfill).into(),
-				&imports.into(),
-				&include_str!("worklet.js").into(),
-			),
-			Type::Inline {
-				polyfill,
-				shim,
-				imports,
-			} => Array::of4(
-				&(*polyfill).into(),
-				&shim.into(),
-				&imports.into(),
-				&include_str!("worklet.js").into(),
-			),
-		};
-
+	pub fn new(module: &WorkletModule) -> Self {
+		let sequence = module.to_sequence(include_str!("worklet.js"));
 		let mut property = BlobPropertyBag::new();
 		property.type_("text/javascript");
 		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap();

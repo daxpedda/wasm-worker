@@ -6,7 +6,7 @@ use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
 
-use js_sys::JsString;
+use js_sys::{Array, JsString};
 use once_cell::sync::OnceCell;
 use wasm_bindgen::JsValue;
 
@@ -18,19 +18,12 @@ use crate::common::{ShimFormat, SHIM_URL};
 static DEFAULT_MODULE: OnceCell<Option<WorkletModule>> = OnceCell::new();
 
 #[derive(Debug)]
-pub struct WorkletModule(pub(super) Type);
+pub struct WorkletModule(Type);
 
 #[derive(Debug)]
-pub(super) enum Type {
-	Import {
-		polyfill: &'static str,
-		imports: String,
-	},
-	Inline {
-		polyfill: &'static str,
-		shim: String,
-		imports: String,
-	},
+enum Type {
+	Import(String),
+	Inline { shim: String, imports: String },
 }
 
 impl WorkletModule {
@@ -77,6 +70,22 @@ impl WorkletModule {
 
 		Self(r#type)
 	}
+
+	pub(super) fn to_sequence(&self, worklet: &str) -> Array {
+		match &self.0 {
+			Type::Import(import) => Array::of3(
+				&PolyfillImport::import().into(),
+				&import.into(),
+				&worklet.into(),
+			),
+			Type::Inline { shim, imports } => Array::of4(
+				&PolyfillInline::script().into(),
+				&shim.into(),
+				&imports.into(),
+				&worklet.into(),
+			),
+		}
+	}
 }
 
 impl Drop for WorkletModule {
@@ -89,10 +98,9 @@ impl Drop for WorkletModule {
 
 impl Type {
 	fn import(url: &str) -> Self {
-		Self::Import {
-			polyfill: PolyfillImport::import(),
-			imports: format!("import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n",),
-		}
+		Self::Import(format!(
+			"import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n"
+		))
 	}
 
 	fn inline(shim: JsString, global: &str) -> Self {
@@ -102,7 +110,6 @@ impl Type {
 			const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\n\
 		");
 		Self::Inline {
-			polyfill: PolyfillInline::script(),
 			shim: shim.into(),
 			imports,
 		}
