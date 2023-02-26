@@ -1,6 +1,14 @@
+use std::cell::Cell;
+use std::error::Error;
+use std::fmt::{self, Display, Formatter};
+use std::ops::Deref;
+use std::rc::Rc;
+
 use js_sys::Array;
 use once_cell::sync::Lazy;
-use web_sys::{Blob, BlobPropertyBag, Url};
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::JsValue;
+use web_sys::{Blob, BlobPropertyBag, Url, WorkerOptions};
 
 use crate::common::{ShimFormat, SHIM_URL};
 
@@ -17,19 +25,21 @@ impl Drop for WorkerUrl {
 }
 
 impl WorkerUrl {
-	#[must_use]
 	#[allow(clippy::should_implement_trait)]
-	pub fn default() -> &'static Self {
-		static WORKER_URL: Lazy<WorkerUrl> =
-			Lazy::new(|| WorkerUrl::new(&SHIM_URL, &ShimFormat::default()));
+	pub fn default() -> Result<&'static Self, ModuleSupportError> {
+		static WORKER_URL: Lazy<Option<WorkerUrl>> =
+			Lazy::new(|| WorkerUrl::new(&SHIM_URL, &ShimFormat::default()).ok());
 
-		&WORKER_URL
+		WORKER_URL.deref().as_ref().ok_or(ModuleSupportError)
 	}
 
-	#[must_use]
-	pub fn new(url: &str, format: &ShimFormat<'_>) -> Self {
+	pub fn new(url: &str, format: &ShimFormat<'_>) -> Result<Self, ModuleSupportError> {
 		let script = match &format {
 			ShimFormat::EsModule => {
+				if !Self::has_module_support() {
+					return Err(ModuleSupportError);
+				}
+
 				format!(
 					"import {{initSync, __wasm_worker_dedicated_entry}} from '{}';\n\n{}",
 					url,
@@ -60,10 +70,10 @@ impl WorkerUrl {
 
 		let url = Url::create_object_url_with_blob(&blob).unwrap();
 
-		Self {
+		Ok(Self {
 			url,
 			is_module: matches!(format, ShimFormat::EsModule),
-		}
+		})
 	}
 
 	#[must_use]
@@ -75,4 +85,44 @@ impl WorkerUrl {
 	pub fn as_raw(&self) -> &str {
 		&self.url
 	}
+
+	#[must_use]
+	pub fn has_module_support() -> bool {
+		static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
+			#[wasm_bindgen]
+			#[allow(non_camel_case_types)]
+			struct __wasm_worker_ModuleSupport(Rc<Cell<bool>>);
+
+			#[wasm_bindgen]
+			impl __wasm_worker_ModuleSupport {
+				#[allow(unreachable_pub)]
+				#[wasm_bindgen(getter = type)]
+				pub fn type_(&self) {
+					self.0.set(true);
+				}
+			}
+
+			let tester = Rc::new(Cell::new(false));
+			let worker_options = WorkerOptions::from(JsValue::from(__wasm_worker_ModuleSupport(
+				Rc::clone(&tester),
+			)));
+			let worker = web_sys::Worker::new_with_options("data:,", &worker_options).unwrap();
+			worker.terminate();
+
+			tester.get()
+		});
+
+		*HAS_MODULE_SUPPORT
+	}
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ModuleSupportError;
+
+impl Display for ModuleSupportError {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		write!(f, "browser doesn't support worker modules")
+	}
+}
+
+impl Error for ModuleSupportError {}

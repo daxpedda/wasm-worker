@@ -63,9 +63,9 @@ async fn url() -> Result<()> {
 		_ => unreachable!("expected shim to be built for browsers"),
 	};
 
-	let url = WorkerUrl::new(&url, &format);
+	let url = WorkerUrl::new(&url, &format)?;
 
-	WorkerBuilder::new_with_url(&url)?.spawn({
+	WorkerBuilder::new_with_url(&url).spawn({
 		let flag = flag.clone();
 		move |context| {
 			flag.signal();

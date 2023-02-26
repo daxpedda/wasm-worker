@@ -1,6 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::error::Error;
-use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::ops::Deref;
 use std::pin::Pin;
@@ -8,12 +6,11 @@ use std::rc::{Rc, Weak};
 use std::sync::atomic::Ordering;
 
 use js_sys::Array;
-use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 
-use super::{Closure, Worker, WorkerContext, WorkerRef, WorkerUrl};
+use super::{Closure, ModuleSupportError, Worker, WorkerContext, WorkerRef, WorkerUrl};
 use crate::common::ID_COUNTER;
 use crate::message::MessageEvent;
 
@@ -28,16 +25,11 @@ pub struct WorkerBuilder<'url> {
 
 impl WorkerBuilder<'_> {
 	pub fn new() -> Result<WorkerBuilder<'static>, ModuleSupportError> {
-		Self::new_with_url(WorkerUrl::default())
+		WorkerUrl::default().map(Self::new_with_url)
 	}
 
-	pub fn new_with_url(url: &WorkerUrl) -> Result<WorkerBuilder<'_>, ModuleSupportError> {
-		#[allow(clippy::if_then_some_else_none)]
+	pub fn new_with_url(url: &WorkerUrl) -> WorkerBuilder<'_> {
 		let options = if url.is_module() {
-			if !Self::has_module_support() {
-				return Err(ModuleSupportError);
-			}
-
 			let mut options = WorkerOptions::new();
 			options.type_(WorkerType::Module);
 			Some(options)
@@ -45,41 +37,12 @@ impl WorkerBuilder<'_> {
 			None
 		};
 
-		Ok(WorkerBuilder {
+		WorkerBuilder {
 			url,
 			options,
 			id: Rc::new(Cell::new(None)),
 			message_handler: Rc::new(RefCell::new(None)),
-		})
-	}
-
-	#[must_use]
-	pub fn has_module_support() -> bool {
-		static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
-			#[wasm_bindgen]
-			#[allow(non_camel_case_types)]
-			struct __wasm_worker_ModuleSupport(Rc<Cell<bool>>);
-
-			#[wasm_bindgen]
-			impl __wasm_worker_ModuleSupport {
-				#[allow(unreachable_pub)]
-				#[wasm_bindgen(getter = type)]
-				pub fn type_(&self) {
-					self.0.set(true);
-				}
-			}
-
-			let tester = Rc::new(Cell::new(false));
-			let worker_options = WorkerOptions::from(JsValue::from(__wasm_worker_ModuleSupport(
-				Rc::clone(&tester),
-			)));
-			let worker = web_sys::Worker::new_with_options("data:,", &worker_options).unwrap();
-			worker.terminate();
-
-			tester.get()
-		});
-
-		*HAS_MODULE_SUPPORT
+		}
 	}
 
 	pub fn name(mut self, name: &str) -> Self {
@@ -228,14 +191,3 @@ pub unsafe fn __wasm_worker_dedicated_entry(data: *mut Data) -> JsValue {
 		Task::Future(future) => wasm_bindgen_futures::future_to_promise(future(context)).into(),
 	}
 }
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct ModuleSupportError;
-
-impl Display for ModuleSupportError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "browser doesn't support worker modules")
-	}
-}
-
-impl Error for ModuleSupportError {}

@@ -34,7 +34,7 @@ fn spawn_async() {
 	wasm_worker::spawn_async(|_| async { unreachable!() });
 }
 
-/// [`WorkerBuilder::has_module_support()`].
+/// [`WorkerUrl:has_module_support()`].
 #[wasm_bindgen_test]
 fn check() {
 	assert!(matches!(
@@ -42,7 +42,7 @@ fn check() {
 		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
-	assert!(!WorkerBuilder::has_module_support());
+	assert!(!WorkerUrl::has_module_support());
 }
 
 /// [`WorkerBuilder::new()`].
@@ -64,9 +64,6 @@ fn builder_url() {
 		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
-	let url = WorkerUrl::new(&wasm_bindgen::shim_url().unwrap(), &ShimFormat::EsModule);
-	assert_eq!(
-		WorkerBuilder::new_with_url(&url).unwrap_err(),
-		ModuleSupportError
-	);
+	let result = WorkerUrl::new(&wasm_bindgen::shim_url().unwrap(), &ShimFormat::EsModule);
+	assert_eq!(result.unwrap_err(), ModuleSupportError);
 }

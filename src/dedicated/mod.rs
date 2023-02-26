@@ -6,11 +6,11 @@ mod worker;
 
 use std::future::Future;
 
-pub use self::builder::{ModuleSupportError, WorkerBuilder};
+pub use self::builder::WorkerBuilder;
 pub use self::common::TransferError;
 use self::common::{Closure, WorkerOrContext};
 pub use self::context::WorkerContext;
-pub use self::url::WorkerUrl;
+pub use self::url::{ModuleSupportError, WorkerUrl};
 pub use self::worker::{DestroyError, Worker, WorkerRef};
 
 #[track_caller]
