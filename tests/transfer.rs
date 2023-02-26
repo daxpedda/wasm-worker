@@ -6,7 +6,6 @@ mod util;
 use std::fmt::Debug;
 use std::future::{ready, Future};
 
-use anyhow::Result;
 use futures_util::future::{self, Either};
 use futures_util::FutureExt;
 use js_sys::{ArrayBuffer, Uint8Array};
@@ -32,12 +31,13 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 /// [`RawMessage::serialize()`](wasm_worker::RawMessage::serialize).
 #[wasm_bindgen_test]
-async fn serialize() -> Result<()> {
+async fn serialize() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |_, event| {
@@ -71,8 +71,6 @@ async fn serialize() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// Tests transfering `T`.
@@ -85,8 +83,7 @@ async fn test_transfer<T, F1, F2, F3>(
 	init: impl Fn() -> F2,
 	assert_sent: impl 'static + Copy + Fn(&T) + Send,
 	assert_received: impl 'static + Clone + Fn(&T) -> F3 + Send,
-) -> Result<()>
-where
+) where
 	T: Clone + JsCast + TryFrom<Message>,
 	Message: From<T>,
 	<T as TryFrom<Message>>::Error: Debug,
@@ -104,7 +101,7 @@ where
 			if force {
 				panic!("type unsupported in this browser")
 			} else {
-				return Ok(());
+				return;
 			}
 		}
 	}
@@ -112,7 +109,8 @@ where
 	let request = Flag::new();
 	let response = Flag::new();
 
-	let worker = WorkerBuilder::new()?
+	let worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler_async({
 			let assert_received = assert_received.clone();
 			let response = response.clone();
@@ -182,13 +180,11 @@ where
 	response.await;
 
 	worker.terminate();
-
-	Ok(())
 }
 
 /// [`ArrayBuffer`].
 #[wasm_bindgen_test]
-async fn array_buffer() -> Result<()> {
+async fn array_buffer() {
 	test_transfer(
 		|| ready(Message::has_array_buffer_support()),
 		true,
@@ -206,13 +202,13 @@ async fn array_buffer() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`AudioData`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
-async fn audio_data() -> Result<()> {
+async fn audio_data() {
 	test_transfer(
 		|| ready(Message::has_audio_data_support()),
 		false,
@@ -235,12 +231,12 @@ async fn audio_data() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`ImageBitmap`].
 #[wasm_bindgen_test]
-async fn image_bitmap() -> Result<()> {
+async fn image_bitmap() {
 	let _ = Message::has_image_bitmap_support().await;
 
 	test_transfer(
@@ -268,12 +264,12 @@ async fn image_bitmap() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`MessagePort`](web_sys::MessagePort).
 #[wasm_bindgen_test]
-async fn message_port() -> Result<()> {
+async fn message_port() {
 	let flag = Flag::new();
 	let closure: Closure<dyn Fn()> = Closure::new({
 		let flag = flag.clone();
@@ -308,12 +304,12 @@ async fn message_port() -> Result<()> {
 			}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`OffscreenCanvas`].
 #[wasm_bindgen_test]
-async fn offscreen_canvas() -> Result<()> {
+async fn offscreen_canvas() {
 	test_transfer(
 		|| ready(Message::has_offscreen_canvas_support()),
 		false,
@@ -329,13 +325,13 @@ async fn offscreen_canvas() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`ReadableStream`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
-async fn readable_stream() -> Result<()> {
+async fn readable_stream() {
 	test_transfer(
 		|| ready(Message::has_readable_stream_support()),
 		false,
@@ -347,12 +343,12 @@ async fn readable_stream() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`RtcDataChannel`](web_sys::RtcDataChannel).
 #[wasm_bindgen_test]
-async fn rtc_data_channel() -> Result<()> {
+async fn rtc_data_channel() {
 	test_transfer(
 		|| ready(Message::has_rtc_data_channel_support()),
 		false,
@@ -367,13 +363,13 @@ async fn rtc_data_channel() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`TransformStream`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
-async fn transform_stream() -> Result<()> {
+async fn transform_stream() {
 	test_transfer(
 		|| ready(Message::has_transform_stream_support()),
 		false,
@@ -389,13 +385,13 @@ async fn transform_stream() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`VideoFrame`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
-async fn video_frame() -> Result<()> {
+async fn video_frame() {
 	test_transfer(
 		|| ready(Message::has_video_frame_support()),
 		false,
@@ -419,13 +415,13 @@ async fn video_frame() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }
 
 /// [`WritableStream`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
-async fn writable_stream() -> Result<()> {
+async fn writable_stream() {
 	test_transfer(
 		|| ready(Message::has_writable_stream_support()),
 		false,
@@ -437,5 +433,5 @@ async fn writable_stream() -> Result<()> {
 			async {}
 		},
 	)
-	.await
+	.await;
 }

@@ -6,7 +6,6 @@ use std::cell::RefCell;
 use std::ops::DerefMut;
 use std::rc::Rc;
 
-use anyhow::Result;
 use futures_channel::oneshot;
 use futures_util::future::{self, Either};
 use js_sys::ArrayBuffer;
@@ -100,7 +99,7 @@ async fn handle_wrong() {
 
 /// [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy).
 #[wasm_bindgen_test]
-async fn handle_ref() -> Result<()> {
+async fn handle_ref() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
@@ -108,7 +107,8 @@ async fn handle_ref() -> Result<()> {
 	let (sender, receiver) = oneshot::channel();
 	let receiver = Rc::new(RefCell::new(receiver));
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler_async({
 			let request = request.clone();
 			move |worker, _| {
@@ -144,19 +144,18 @@ async fn handle_ref() -> Result<()> {
 	// The worker will never respond if destroyed.
 	let result = future::select(&mut response, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
-
-	Ok(())
 }
 
 /// Calling [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy)
 /// twice on the same worker.
 #[wasm_bindgen_test]
-async fn handle_ref_twice() -> Result<()> {
+async fn handle_ref_twice() {
 	let flag = Flag::new();
 	let (sender, receiver) = oneshot::channel();
 	let receiver = Rc::new(RefCell::new(receiver));
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler_async({
 			let flag = flag.clone();
 			let receiver = Rc::clone(&receiver);
@@ -188,14 +187,12 @@ async fn handle_ref_twice() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// Calling [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy)
 /// with the wrong [`Tls`](wasm_worker::common::Tls).
 #[wasm_bindgen_test]
-async fn handle_ref_wrong() -> Result<()> {
+async fn handle_ref_wrong() {
 	let flag = Flag::new();
 	let (sender_wrong, receiver_wrong) = oneshot::channel();
 	let (sender_right, receiver_right) = oneshot::channel();
@@ -206,7 +203,8 @@ async fn handle_ref_wrong() -> Result<()> {
 		sender_wrong.send((context.tls(), context.tls())).unwrap();
 		context.close();
 	});
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler_async({
 			let flag = flag.clone();
 			let receiver_wrong = Rc::clone(&receiver_wrong);
@@ -255,6 +253,4 @@ async fn handle_ref_wrong() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }

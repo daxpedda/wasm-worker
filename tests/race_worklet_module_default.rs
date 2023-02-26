@@ -1,6 +1,5 @@
 //! Tests behavior of [`WorkletModule::default()`].
 
-use anyhow::Result;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::worklet::WorkletModule;
 
@@ -9,7 +8,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// [`WorkletModule::default()`] and
 /// [`WorkletModuleFuture::into_inner()`](wasm_worker::worklet::WorkletModuleFuture::into_inner).
 #[wasm_bindgen_test]
-async fn test() -> Result<()> {
+async fn test() {
 	let mut future_1 = WorkletModule::default();
 	assert!(future_1.into_inner().is_none());
 
@@ -31,6 +30,4 @@ async fn test() -> Result<()> {
 
 	let mut support = WorkletModule::has_import_support();
 	assert!(support.into_inner().is_some());
-
-	Ok(())
 }

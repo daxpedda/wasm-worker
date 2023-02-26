@@ -58,7 +58,6 @@ web-sys = { version = "0.3", features = [
 ] }
 
 [dev-dependencies]
-anyhow = "1"
 futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
 wasm-bindgen-test = "0.3"

@@ -7,7 +7,6 @@ mod util;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use anyhow::Result;
 use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -22,13 +21,14 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// [`WorkerBuilder::message_handler()`] with
 /// [`Worker::clear_message_handler()`](wasm_worker::dedicated::Worker::clear_message_handler).
 #[wasm_bindgen_test]
-async fn builder_clear_message_handler() -> Result<()> {
+async fn builder_clear_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
 
-	let worker = WorkerBuilder::new()?
+	let worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let response = response.clone();
 			move |_, _| response.signal()
@@ -49,8 +49,6 @@ async fn builder_clear_message_handler() -> Result<()> {
 	// The message handler will never respond if cleared.
 	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
-
-	Ok(())
 }
 
 /// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler)
@@ -156,15 +154,14 @@ async fn context_clear_message_handler() {
 /// [`WorkerBuilder::message_handler()`] with
 /// [`Worker::builder_has_message_handler()`](wasm_worker::dedicated::Worker::builder_has_message_handler).
 #[wasm_bindgen_test]
-fn builder_has_message_handler() -> Result<()> {
-	let worker = WorkerBuilder::new()?
+fn builder_has_message_handler() {
+	let worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler(|_, _| ())
 		.spawn(WorkerContext::close);
 	assert!(worker.has_message_handler());
 	worker.clear_message_handler();
 	assert!(!worker.has_message_handler());
-
-	Ok(())
 }
 
 /// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler)
@@ -183,12 +180,13 @@ fn handle_has_message_handler() {
 /// [`WorkerRef::set_message_handler()`](wasm_worker::dedicated::WorkerRef::set_message_handler) with
 /// [`WorkerRef::has_message_handler()`](wasm_worker::dedicated::WorkerRef::has_message_handler).
 #[wasm_bindgen_test]
-async fn handle_ref_has_message_handler() -> Result<()> {
+async fn handle_ref_has_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |worker, _| {
@@ -206,8 +204,6 @@ async fn handle_ref_has_message_handler() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// [`WorkerContext::has_message_handler()`].
@@ -236,12 +232,13 @@ async fn context_has_message_handler() {
 
 /// [`WorkerBuilder::message_handler()`].
 #[wasm_bindgen_test]
-async fn builder_message_handler() -> Result<()> {
+async fn builder_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |_, _| flag.signal()
@@ -255,8 +252,6 @@ async fn builder_message_handler() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler).
@@ -288,12 +283,13 @@ async fn handle_message_handler() {
 
 /// [`WorkerRef::set_message_handler()`](wasm_worker::dedicated::WorkerRef::set_message_handler).
 #[wasm_bindgen_test]
-async fn handle_ref_message_handler() -> Result<()> {
+async fn handle_ref_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |worker, _| {
@@ -313,8 +309,6 @@ async fn handle_ref_message_handler() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// [`WorkerContext::set_message_handler()`].
@@ -344,12 +338,13 @@ async fn context_message_handler() {
 
 /// [`WorkerBuilder::message_handler_async()`].
 #[wasm_bindgen_test]
-async fn builder_message_handler_async() -> Result<()> {
+async fn builder_message_handler_async() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler_async({
 			let flag = flag.clone();
 			move |_, _| {
@@ -366,8 +361,6 @@ async fn builder_message_handler_async() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// [`Worker::set_message_handler_async()`](wasm_worker::dedicated::Worker::set_message_handler_async).
@@ -402,12 +395,13 @@ async fn handle_message_handler_async() {
 
 /// [`WorkerRef::set_message_handler()`](wasm_worker::dedicated::WorkerRef::set_message_handler).
 #[wasm_bindgen_test]
-async fn handle_ref_message_handler_async() -> Result<()> {
+async fn handle_ref_message_handler_async() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |worker, _| {
@@ -430,8 +424,6 @@ async fn handle_ref_message_handler_async() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// [`WorkerContext::set_message_handler_async()`].
@@ -465,13 +457,14 @@ async fn context_message_handler_async() {
 /// [`WorkerBuilder::message_handler()`] when
 /// [`Worker`](wasm_worker::dedicated::Worker) is dropped.
 #[wasm_bindgen_test]
-async fn builder_drop_message_handler() -> Result<()> {
+async fn builder_drop_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
 
-	WorkerBuilder::new()?
+	WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let response = response.clone();
 			move |_, _| response.signal()
@@ -491,8 +484,6 @@ async fn builder_drop_message_handler() -> Result<()> {
 	// The message handler will never respond if dropped.
 	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
-
-	Ok(())
 }
 
 /// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler)
@@ -587,13 +578,14 @@ async fn handle_multi_message() {
 /// Multiple messages in
 /// [`WorkerRef::transfer_messages()`](wasm_worker::dedicated::WorkerRef::transfer_messages).
 #[wasm_bindgen_test]
-async fn handle_ref_multi_message() -> Result<()> {
+async fn handle_ref_multi_message() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let request = Flag::new();
 	let response = Flag::new();
 
-	let worker = WorkerBuilder::new()?
+	let worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler_async({
 			let request = request.clone();
 			move |worker, _| {
@@ -652,18 +644,17 @@ async fn handle_ref_multi_message() -> Result<()> {
 	response.await;
 
 	worker.terminate();
-
-	Ok(())
 }
 
 /// Multiple messages in [`WorkerContext::transfer_messages()`].
 #[wasm_bindgen_test]
-async fn context_multi_message() -> Result<()> {
+async fn context_multi_message() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
 	let flag = Flag::new();
 
-	let _worker = WorkerBuilder::new()?
+	let _worker = WorkerBuilder::new()
+		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |_, event| {
@@ -705,8 +696,6 @@ async fn context_multi_message() -> Result<()> {
 		});
 
 	flag.await;
-
-	Ok(())
 }
 
 /// Make sure sent messages are queued and correctly sent to the new message
