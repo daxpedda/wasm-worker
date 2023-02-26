@@ -11,21 +11,21 @@ use web_sys::{Blob, BlobPropertyBag, Url};
 use crate::worklet::module::Type;
 use crate::worklet::{WorkletModule, WorkletModuleError, WorkletModuleFuture};
 
-static DEFAULT: OnceCell<AudioWorkletModule> = OnceCell::new();
+static DEFAULT: OnceCell<AudioWorkletUrl> = OnceCell::new();
 
 #[derive(Debug)]
-pub struct AudioWorkletModule(pub(super) String);
+pub struct AudioWorkletUrl(pub(super) String);
 
-impl Drop for AudioWorkletModule {
+impl Drop for AudioWorkletUrl {
 	fn drop(&mut self) {
 		Url::revoke_object_url(&self.0).unwrap();
 	}
 }
 
-impl AudioWorkletModule {
+impl AudioWorkletUrl {
 	#[allow(clippy::should_implement_trait)]
-	pub fn default() -> AudioWorkletModuleFuture {
-		AudioWorkletModuleFuture(Some(WorkletModule::default()))
+	pub fn default() -> AudioWorkletUrlFuture {
+		AudioWorkletUrlFuture(Some(WorkletModule::default()))
 	}
 
 	#[must_use]
@@ -64,13 +64,11 @@ impl AudioWorkletModule {
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
-pub struct AudioWorkletModuleFuture(Option<WorkletModuleFuture<'static, 'static, true>>);
+pub struct AudioWorkletUrlFuture(Option<WorkletModuleFuture<'static, 'static, true>>);
 
-impl AudioWorkletModuleFuture {
+impl AudioWorkletUrlFuture {
 	#[track_caller]
-	pub fn into_inner(
-		&mut self,
-	) -> Option<Result<&'static AudioWorkletModule, WorkletModuleError>> {
+	pub fn into_inner(&mut self) -> Option<Result<&'static AudioWorkletUrl, WorkletModuleError>> {
 		let future = self.0.as_mut().expect("polled after `Ready`");
 
 		if let Some(default) = DEFAULT.get() {
@@ -85,14 +83,14 @@ impl AudioWorkletModuleFuture {
 		self.0.take();
 
 		Some(match result {
-			Ok(module) => Ok(DEFAULT.get_or_init(|| AudioWorkletModule::new(module))),
+			Ok(module) => Ok(DEFAULT.get_or_init(|| AudioWorkletUrl::new(module))),
 			Err(error) => Err(error),
 		})
 	}
 }
 
-impl Future for AudioWorkletModuleFuture {
-	type Output = Result<&'static AudioWorkletModule, WorkletModuleError>;
+impl Future for AudioWorkletUrlFuture {
+	type Output = Result<&'static AudioWorkletUrl, WorkletModuleError>;
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -108,14 +106,14 @@ impl Future for AudioWorkletModuleFuture {
 		self.0.take();
 
 		match result {
-			Ok(module) => Poll::Ready(Ok(DEFAULT.get_or_init(|| AudioWorkletModule::new(module)))),
+			Ok(module) => Poll::Ready(Ok(DEFAULT.get_or_init(|| AudioWorkletUrl::new(module)))),
 			Err(error) => Poll::Ready(Err(error)),
 		}
 	}
 }
 
 #[cfg(feature = "futures")]
-impl FusedFuture for AudioWorkletModuleFuture {
+impl FusedFuture for AudioWorkletUrlFuture {
 	fn is_terminated(&self) -> bool {
 		self.0.is_none()
 	}

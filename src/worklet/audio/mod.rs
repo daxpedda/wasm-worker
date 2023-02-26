@@ -1,5 +1,5 @@
 mod context;
-mod module;
+mod url;
 
 use std::borrow::Cow;
 use std::fmt::{self, Debug, Formatter};
@@ -15,7 +15,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, WorkletGlobalScope};
 
 pub use self::context::AudioWorkletContext;
-pub use self::module::{AudioWorkletModule, AudioWorkletModuleFuture};
+pub use self::url::{AudioWorkletUrl, AudioWorkletUrlFuture};
 use super::{Data, WorkletInitError, WorkletModuleError};
 use crate::common::ID_COUNTER;
 
@@ -24,9 +24,9 @@ pub trait AudioWorkletExt: sealed::Sealed {
 	where
 		F: 'static + FnOnce(AudioWorkletContext) + Send;
 
-	fn init_wasm_with_module<F>(
+	fn init_wasm_with_url<F>(
 		&self,
-		module: &AudioWorkletModule,
+		url: &AudioWorkletUrl,
 		f: F,
 	) -> Result<AudioWorkletFuture<'_>, WorkletInitError>
 	where
@@ -40,19 +40,19 @@ impl AudioWorkletExt for BaseAudioContext {
 	{
 		init_wasm_internal(self)?;
 
-		Ok(AudioWorkletFuture(Some(State::Module {
+		Ok(AudioWorkletFuture(Some(State::Url {
 			context: Cow::Borrowed(self),
 			f: Box::new(|global, id| {
 				let context = AudioWorkletContext::init(global, id);
 				f(context);
 			}),
-			future: AudioWorkletModule::default(),
+			future: AudioWorkletUrl::default(),
 		})))
 	}
 
-	fn init_wasm_with_module<F>(
+	fn init_wasm_with_url<F>(
 		&self,
-		module: &AudioWorkletModule,
+		url: &AudioWorkletUrl,
 		f: F,
 	) -> Result<AudioWorkletFuture<'_>, WorkletInitError>
 	where
@@ -66,7 +66,7 @@ impl AudioWorkletExt for BaseAudioContext {
 				let context = AudioWorkletContext::init(global, id);
 				f(context);
 			}),
-			module,
+			url,
 		))))
 	}
 }
@@ -91,10 +91,10 @@ fn init_wasm_internal(this: &BaseAudioContext) -> Result<(), WorkletInitError> {
 pub struct AudioWorkletFuture<'context>(Option<State<'context>>);
 
 enum State<'context> {
-	Module {
+	Url {
 		context: Cow<'context, BaseAudioContext>,
 		f: Box<dyn 'static + FnOnce(WorkletGlobalScope, usize) + Send>,
-		future: AudioWorkletModuleFuture,
+		future: AudioWorkletUrlFuture,
 	},
 	Add {
 		context: Cow<'context, BaseAudioContext>,
@@ -106,7 +106,7 @@ enum State<'context> {
 impl AudioWorkletFuture<'_> {
 	pub fn into_static(self) -> AudioWorkletFuture<'static> {
 		AudioWorkletFuture(match self.0 {
-			Some(State::Module { context, f, future }) => Some(State::Module {
+			Some(State::Url { context, f, future }) => Some(State::Url {
 				context: Cow::Owned(context.into_owned()),
 				f,
 				future,
@@ -123,13 +123,9 @@ impl AudioWorkletFuture<'_> {
 	fn new_add<'context>(
 		context: Cow<'context, BaseAudioContext>,
 		f: Box<dyn 'static + FnOnce(WorkletGlobalScope, usize) + Send>,
-		module: &AudioWorkletModule,
+		url: &AudioWorkletUrl,
 	) -> State<'context> {
-		let promise = context
-			.audio_worklet()
-			.unwrap()
-			.add_module(&module.0)
-			.unwrap();
+		let promise = context.audio_worklet().unwrap().add_module(&url.0).unwrap();
 
 		State::Add {
 			context,
@@ -146,13 +142,13 @@ impl Future for AudioWorkletFuture<'_> {
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		loop {
 			match self.0.as_mut().expect("polled after `Ready`") {
-				State::Module { future, .. } => {
+				State::Url { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(State::Module {context, f, ..}) = self.0.take() else { unreachable!() };
+					let Some(State::Url {context, f, ..}) = self.0.take() else { unreachable!() };
 
-					let module = result?;
+					let url = result?;
 
-					self.0 = Some(Self::new_add(context, f, module));
+					self.0 = Some(Self::new_add(context, f, url));
 				}
 				State::Add { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
@@ -195,10 +191,10 @@ impl FusedFuture for AudioWorkletFuture<'_> {
 impl Debug for State<'_> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::Module {
+			Self::Url {
 				context, future, ..
 			} => formatter
-				.debug_struct("Module")
+				.debug_struct("Url")
 				.field("context", context)
 				.field("f", &"Box<FnOnce()>")
 				.field("future", future)
