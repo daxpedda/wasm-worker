@@ -1,5 +1,5 @@
-//! Tests behavior of [`Message::has_support`] in relation to
-//! [`ImageBitmap`](web_sys::ImageBitmap).
+//! Tests behavior of [`Message::has_support()`] in with
+//! [`Message::ImageBitmap`].
 
 use anyhow::Result;
 use wasm_bindgen::{JsCast, JsValue};
@@ -9,7 +9,7 @@ use wasm_worker::message::Message;
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 /// [`Message::has_support`] and
-/// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::ImageBitmapSupportFuture::into_inner).
+/// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::message::ImageBitmapSupportFuture::into_inner).
 #[wasm_bindgen_test]
 async fn test() -> Result<()> {
 	let message = Message::ImageBitmap(JsValue::UNDEFINED.unchecked_into());

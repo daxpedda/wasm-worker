@@ -1,3 +1,7 @@
+# Documentation
+
+`RUSTFLAGS="--cfg=web_sys_unstable_apis -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals" cargo doc --all-features --no-deps`
+
 # Run Examples
 
 `CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER=wasm-server-runner cargo run --example basic --all-features`

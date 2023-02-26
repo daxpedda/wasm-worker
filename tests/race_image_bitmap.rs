@@ -1,5 +1,5 @@
 //! Tests behavior of
-//! [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::ImageBitmapSupportFuture::into_inner).
+//! [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::message::ImageBitmapSupportFuture::into_inner).
 
 use anyhow::Result;
 use wasm_bindgen::{JsCast, JsValue};
@@ -8,7 +8,7 @@ use wasm_worker::message::Message;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::ImageBitmapSupportFuture::into_inner)
+/// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::message::ImageBitmapSupportFuture::into_inner)
 /// and [`Message::has_support`].
 #[wasm_bindgen_test]
 async fn test() -> Result<()> {

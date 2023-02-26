@@ -1,5 +1,6 @@
 //! Tests functionality around setting and clearing message handlers in
-//! [`WorkerBuilder`], [`Worker`](wasm_worker::Worker) and [`WorkerContext`].
+//! [`WorkerBuilder`], [`Worker`](wasm_worker::dedicated::Worker) and
+//! [`WorkerContext`].
 
 mod util;
 
@@ -18,7 +19,7 @@ use self::util::{Flag, SIGNAL_DURATION};
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 /// [`WorkerBuilder::message_handler()`] with
-/// [`Worker::clear_message_handler()`](wasm_worker::Worker::clear_message_handler).
+/// [`Worker::clear_message_handler()`](wasm_worker::dedicated::Worker::clear_message_handler).
 #[wasm_bindgen_test]
 async fn builder_clear_message_handler() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -51,8 +52,8 @@ async fn builder_clear_message_handler() -> Result<()> {
 	Ok(())
 }
 
-/// [`Worker::set_message_handler()`](wasm_worker::Worker::set_message_handler)
-/// with [`Worker::clear_message_handler()`](wasm_worker::Worker::clear_message_handler).
+/// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler)
+/// with [`Worker::clear_message_handler()`](wasm_worker::dedicated::Worker::clear_message_handler).
 #[wasm_bindgen_test]
 async fn handle_clear_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -82,8 +83,8 @@ async fn handle_clear_message_handler() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// [`WorkerRef::set_message_handler()`](wasm_worker::WorkerRef::set_message_handler) with
-/// [`WorkerRef::clear_message_handler()`](wasm_worker::WorkerRef::clear_message_handler).
+/// [`WorkerRef::set_message_handler()`](wasm_worker::dedicated::WorkerRef::set_message_handler) with
+/// [`WorkerRef::clear_message_handler()`](wasm_worker::dedicated::WorkerRef::clear_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_clear_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -152,7 +153,7 @@ async fn context_clear_message_handler() {
 }
 
 /// [`WorkerBuilder::message_handler()`] with
-/// [`Worker::builder_has_message_handler()`](wasm_worker::Worker::builder_has_message_handler).
+/// [`Worker::builder_has_message_handler()`](wasm_worker::dedicated::Worker::builder_has_message_handler).
 #[wasm_bindgen_test]
 fn builder_has_message_handler() -> Result<()> {
 	let worker = WorkerBuilder::new()?
@@ -165,8 +166,8 @@ fn builder_has_message_handler() -> Result<()> {
 	Ok(())
 }
 
-/// [`Worker::set_message_handler()`](wasm_worker::Worker::set_message_handler)
-/// with [`Worker::has_message_handler()`](wasm_worker::Worker::has_message_handler).
+/// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler)
+/// with [`Worker::has_message_handler()`](wasm_worker::dedicated::Worker::has_message_handler).
 #[wasm_bindgen_test]
 fn handle_has_message_handler() {
 	let worker = wasm_worker::spawn(WorkerContext::close);
@@ -178,8 +179,8 @@ fn handle_has_message_handler() {
 	assert!(!worker.has_message_handler());
 }
 
-/// [`WorkerRef::set_message_handler()`](wasm_worker::WorkerRef::set_message_handler) with
-/// [`WorkerRef::has_message_handler()`](wasm_worker::WorkerRef::has_message_handler).
+/// [`WorkerRef::set_message_handler()`](wasm_worker::dedicated::WorkerRef::set_message_handler) with
+/// [`WorkerRef::has_message_handler()`](wasm_worker::dedicated::WorkerRef::has_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_has_message_handler() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -257,7 +258,7 @@ async fn builder_message_handler() -> Result<()> {
 	Ok(())
 }
 
-/// [`Worker::set_message_handler()`](wasm_worker::Worker::set_message_handler).
+/// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler).
 #[wasm_bindgen_test]
 async fn handle_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -284,7 +285,7 @@ async fn handle_message_handler() {
 	response.await;
 }
 
-/// [`WorkerRef::set_message_handler()`](wasm_worker::WorkerRef::set_message_handler).
+/// [`WorkerRef::set_message_handler()`](wasm_worker::dedicated::WorkerRef::set_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_message_handler() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -368,7 +369,7 @@ async fn builder_message_handler_async() -> Result<()> {
 	Ok(())
 }
 
-/// [`Worker::set_message_handler_async()`](wasm_worker::Worker::set_message_handler_async).
+/// [`Worker::set_message_handler_async()`](wasm_worker::dedicated::Worker::set_message_handler_async).
 #[wasm_bindgen_test]
 async fn handle_message_handler_async() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -398,7 +399,7 @@ async fn handle_message_handler_async() {
 	response.await;
 }
 
-/// [`WorkerRef::set_message_handler()`](wasm_worker::WorkerRef::set_message_handler).
+/// [`WorkerRef::set_message_handler()`](wasm_worker::dedicated::WorkerRef::set_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_message_handler_async() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -460,8 +461,8 @@ async fn context_message_handler_async() {
 	worker.terminate();
 }
 
-/// [`WorkerBuilder::message_handler()`] when [`Worker`](wasm_worker::Worker) is
-/// dropped.
+/// [`WorkerBuilder::message_handler()`] when
+/// [`Worker`](wasm_worker::dedicated::Worker) is dropped.
 #[wasm_bindgen_test]
 async fn builder_drop_message_handler() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -493,8 +494,8 @@ async fn builder_drop_message_handler() -> Result<()> {
 	Ok(())
 }
 
-/// [`Worker::set_message_handler()`](wasm_worker::Worker::set_message_handler)
-/// when [`Worker`](wasm_worker::Worker) is dropped.
+/// [`Worker::set_message_handler()`](wasm_worker::dedicated::Worker::set_message_handler)
+/// when [`Worker`](wasm_worker::dedicated::Worker) is dropped.
 #[wasm_bindgen_test]
 async fn handle_drop_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -525,7 +526,7 @@ async fn handle_drop_message_handler() {
 }
 
 /// Multiple messages in
-/// [`Worker::transfer_messages()`](wasm_worker::Worker::transfer_messages).
+/// [`Worker::transfer_messages()`](wasm_worker::dedicated::Worker::transfer_messages).
 #[wasm_bindgen_test]
 async fn handle_multi_message() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -583,7 +584,7 @@ async fn handle_multi_message() {
 }
 
 /// Multiple messages in
-/// [`WorkerRef::transfer_messages()`](wasm_worker::WorkerRef::transfer_messages).
+/// [`WorkerRef::transfer_messages()`](wasm_worker::dedicated::WorkerRef::transfer_messages).
 #[wasm_bindgen_test]
 async fn handle_ref_multi_message() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());

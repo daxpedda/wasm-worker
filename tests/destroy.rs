@@ -18,7 +18,7 @@ use self::util::{Flag, SIGNAL_DURATION};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`Worker::destroy()`](wasm_worker::Worker::destroy).
+/// [`Worker::destroy()`](wasm_worker::dedicated::Worker::destroy).
 #[wasm_bindgen_test]
 async fn handle() {
 	let request = Flag::new();
@@ -48,8 +48,8 @@ async fn handle() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// Calling [`Worker::destroy()`](wasm_worker::Worker::destroy) twice on the
-/// same worker.
+/// Calling [`Worker::destroy()`](wasm_worker::dedicated::Worker::destroy) twice
+/// on the same worker.
 #[wasm_bindgen_test]
 async fn handle_twice() {
 	let (sender, receiver) = oneshot::channel();
@@ -65,8 +65,8 @@ async fn handle_twice() {
 	));
 }
 
-/// Calling [`Worker::destroy()`](wasm_worker::Worker::destroy) with the wrong
-/// [`Tls`](wasm_worker::Tls).
+/// Calling [`Worker::destroy()`](wasm_worker::dedicated::Worker::destroy) with
+/// the wrong [`Tls`](wasm_worker::common::Tls).
 #[wasm_bindgen_test]
 async fn handle_wrong() {
 	let (sender_wrong, receiver_wrong) = oneshot::channel();
@@ -97,7 +97,7 @@ async fn handle_wrong() {
 	));
 }
 
-/// [`WorkerRef::destroy()`](wasm_worker::WorkerRef::destroy).
+/// [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy).
 #[wasm_bindgen_test]
 async fn handle_ref() -> Result<()> {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -147,8 +147,8 @@ async fn handle_ref() -> Result<()> {
 	Ok(())
 }
 
-/// Calling [`WorkerRef::destroy()`](wasm_worker::WorkerRef::destroy) twice on
-/// the same worker.
+/// Calling [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy)
+/// twice on the same worker.
 #[wasm_bindgen_test]
 async fn handle_ref_twice() -> Result<()> {
 	let flag = Flag::new();
@@ -191,8 +191,8 @@ async fn handle_ref_twice() -> Result<()> {
 	Ok(())
 }
 
-/// Calling [`WorkerRef::destroy()`](wasm_worker::WorkerRef::destroy) with the
-/// wrong [`Tls`](wasm_worker::Tls).
+/// Calling [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy)
+/// with the wrong [`Tls`](wasm_worker::common::Tls).
 #[wasm_bindgen_test]
 async fn handle_ref_wrong() -> Result<()> {
 	let flag = Flag::new();

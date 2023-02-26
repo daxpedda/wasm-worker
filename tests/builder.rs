@@ -52,18 +52,17 @@ async fn spawn_async() -> Result<()> {
 async fn url() -> Result<()> {
 	let flag = Flag::new();
 
-	// Ideally we would built a custom JS that can receive an atomic.
-	// Instead we will just use the regular `WorkerUrl` but build it ourselves.
-	let url = WorkerUrl::new(
-		&wasm_bindgen::shim_url().unwrap(),
-		&match &wasm_bindgen::shim_format().unwrap() {
-			wasm_bindgen::ShimFormat::EsModule => ShimFormat::EsModule,
-			wasm_bindgen::ShimFormat::NoModules { global_name } => ShimFormat::Classic {
-				global: global_name.into(),
-			},
-			_ => unreachable!("expected shim to be built for browsers"),
+	// We will just use the default `WorkerUrl` but build it ourselves.
+	let url = wasm_bindgen::shim_url().unwrap();
+	let format = match wasm_bindgen::shim_format().unwrap() {
+		wasm_bindgen::ShimFormat::EsModule => ShimFormat::EsModule,
+		wasm_bindgen::ShimFormat::NoModules { global_name } => ShimFormat::Classic {
+			global: global_name.into(),
 		},
-	);
+		_ => unreachable!("expected shim to be built for browsers"),
+	};
+
+	let url = WorkerUrl::new(&url, &format);
 
 	WorkerBuilder::new_with_url(&url)?.spawn({
 		let flag = flag.clone();
