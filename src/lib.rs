@@ -19,16 +19,13 @@
 //! - Note workaround for missing ports on worklet creation: <https://github.com/WebAudio/web-audio-api/issues/2456>.
 //!
 //! TODO:
-//! - Implement `PainWorklet`.
 //! - Implement initial message handler for the worker side in builders.
 //! - Test that all functions (e.g. support checks) also work in workers in
 //!   worklets and adjust appropriately.
 //! - Implement support for `MessagePort`.
 //! - Support sending additional messages that are not transfered.
 //! - Support sending initial messages in Worker and Worklet.
-//! - Remove polyfill by fixing it in `wasm-bindgen`.
 //! - Implement a higher level implementation of this library.
-//! - Explore supporting widestring.
 
 pub mod common;
 pub mod dedicated;
@@ -39,4 +36,4 @@ pub mod worklet;
 
 pub use self::dedicated::{spawn, spawn_async, WorkerBuilder};
 #[cfg(feature = "worklet")]
-pub use self::worklet::audio::AudioWorkletExt;
+pub use self::worklet::WorkletExt;

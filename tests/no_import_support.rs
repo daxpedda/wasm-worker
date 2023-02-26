@@ -5,15 +5,15 @@
 
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::common::ShimFormat;
-use wasm_worker::worklet::{WorkletModule, WorkletModuleError};
-use wasm_worker::AudioWorkletExt;
+use wasm_worker::worklet::{WorkletUrl, WorkletUrlError};
+use wasm_worker::WorkletExt;
 use web_sys::OfflineAudioContext;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`AudioWorkletExt::init_wasm`].
+/// [`WorkletExt::init_wasm`].
 #[wasm_bindgen_test]
-async fn audio_init() {
+async fn init() {
 	assert!(matches!(
 		wasm_bindgen::shim_format(),
 		Some(wasm_bindgen::ShimFormat::EsModule)
@@ -24,7 +24,7 @@ async fn audio_init() {
 			.unwrap();
 	let result = context.init_wasm(|_| ()).unwrap().await;
 
-	assert!(matches!(result.unwrap_err(), WorkletModuleError::Support));
+	assert!(matches!(result.unwrap_err(), WorkletUrlError::Support));
 }
 
 /// [`WorkletModule::has_import_support()`].
@@ -35,7 +35,7 @@ async fn check() {
 		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
-	assert!(!WorkletModule::has_import_support().await);
+	assert!(!WorkletUrl::has_import_support().await);
 }
 
 /// [`WorkletModule::new())`].
@@ -46,6 +46,6 @@ async fn url() {
 		Some(wasm_bindgen::ShimFormat::EsModule)
 	));
 
-	let result = WorkletModule::new(&wasm_bindgen::shim_url().unwrap(), ShimFormat::EsModule).await;
-	assert!(matches!(result.unwrap_err(), WorkletModuleError::Support));
+	let result = WorkletUrl::new(&wasm_bindgen::shim_url().unwrap(), ShimFormat::EsModule).await;
+	assert!(matches!(result.unwrap_err(), WorkletUrlError::Support));
 }

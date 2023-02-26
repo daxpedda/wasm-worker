@@ -1,23 +1,21 @@
 use once_cell::unsync::OnceCell;
-use wasm_bindgen::JsCast;
-use web_sys::{AudioWorkletGlobalScope, WorkletGlobalScope};
+use web_sys::AudioWorkletGlobalScope;
 
 use crate::common::{Tls, EXPORTS};
 
 #[derive(Clone, Debug)]
-pub struct AudioWorkletContext {
+pub struct WorkletContext {
 	context: AudioWorkletGlobalScope,
 	id: usize,
 }
 
-impl AudioWorkletContext {
+impl WorkletContext {
 	thread_local! {
 		#[allow(clippy::use_self)]
-		static BACKUP: OnceCell<AudioWorkletContext>  = OnceCell::new();
+		static BACKUP: OnceCell<WorkletContext>  = OnceCell::new();
 	}
 
-	pub(super) fn init(global: WorkletGlobalScope, id: usize) -> Self {
-		let context = global.unchecked_into();
+	pub(super) fn init(context: AudioWorkletGlobalScope, id: usize) -> Self {
 		let context = Self { context, id };
 
 		Self::BACKUP.with(|once| once.set(context.clone())).unwrap();

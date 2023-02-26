@@ -6,16 +6,15 @@ use futures_util::future::{self, Either};
 use util::Flag;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::common::ShimFormat;
-use wasm_worker::worklet::audio::AudioWorkletUrl;
-use wasm_worker::worklet::{WorkletInitError, WorkletModule};
-use wasm_worker::AudioWorkletExt;
+use wasm_worker::worklet::{WorkletInitError, WorkletUrl};
+use wasm_worker::WorkletExt;
 use web_sys::OfflineAudioContext;
 
 use crate::util::SIGNAL_DURATION;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`AudioWorkletExt::init_wasm`].
+/// [`WorkletExt::init_wasm`].
 #[wasm_bindgen_test]
 async fn basic() {
 	let flag = Flag::new();
@@ -35,7 +34,7 @@ async fn basic() {
 	flag.await;
 }
 
-/// [`AudioWorkletExt::init_wasm`] returning [`WorkletInitError`].
+/// [`WorkletExt::init_wasm`] returning [`WorkletInitError`].
 #[wasm_bindgen_test]
 async fn failure() {
 	let context =
@@ -67,8 +66,8 @@ async fn failure() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// [`WorkletModule::new()`], [`AudioWorkletUrl::new()`] and
-/// [`AudioWorkletExt::init_wasm_with_url()`].
+/// [`WorkletModule::new()`], [`WorkletUrl::new()`] and
+/// [`WorkletExt::init_wasm_with_url()`].
 #[wasm_bindgen_test]
 async fn url() {
 	// We will just use the default `WorkletModule` but build it ourselves.
@@ -81,9 +80,7 @@ async fn url() {
 		_ => unreachable!("expected shim to be built for browsers"),
 	};
 
-	let module = WorkletModule::new(&url, format).await.unwrap();
-
-	let url = AudioWorkletUrl::new(&module);
+	let url = WorkletUrl::new(&url, format).await.unwrap();
 
 	let flag = Flag::new();
 

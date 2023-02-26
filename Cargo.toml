@@ -18,7 +18,6 @@ worklet = [
 	"web-sys/RequestCache",
 	"web-sys/RequestInit",
 	"web-sys/Response",
-	"web-sys/WorkletGlobalScope",
 ]
 
 [dependencies]
@@ -68,10 +67,6 @@ web-sys = { version = "0.3", features = [
 ] }
 
 [[test]]
-name = "audio_worklet"
-required-features = ["worklet"]
-
-[[test]]
 name = "no_import_support"
 required-features = ["worklet"]
 test = false
@@ -86,6 +81,10 @@ required-features = ["worklet"]
 
 [[test]]
 name = "race_worklet_module_has_support"
+required-features = ["worklet"]
+
+[[test]]
+name = "worklet"
 required-features = ["worklet"]
 
 [patch.crates-io]

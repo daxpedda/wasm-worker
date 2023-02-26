@@ -1,23 +1,98 @@
-pub mod audio;
-mod module;
+mod context;
+mod future;
+mod url;
 
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
+use js_sys::Reflect;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
-use web_sys::WorkletGlobalScope;
+use web_sys::{AudioWorkletGlobalScope, BaseAudioContext};
 
-pub use self::audio::AudioWorkletExt;
-pub use self::module::{
-	ImportSupportFuture, WorkletModule, WorkletModuleError, WorkletModuleFuture,
-};
+pub use self::context::WorkletContext;
+pub use self::future::WorkletFuture;
+pub use self::url::{ImportSupportFuture, WorkletUrl, WorkletUrlError, WorkletUrlFuture};
+
+pub trait WorkletExt: sealed::Sealed {
+	fn init_wasm<F>(&self, f: F) -> Result<WorkletFuture<'_>, WorkletInitError>
+	where
+		F: 'static + FnOnce(WorkletContext) + Send;
+
+	fn init_wasm_with_url<F>(
+		&self,
+		url: &WorkletUrl,
+		f: F,
+	) -> Result<WorkletFuture<'_>, WorkletInitError>
+	where
+		F: 'static + FnOnce(WorkletContext) + Send;
+}
+
+impl WorkletExt for BaseAudioContext {
+	fn init_wasm<F>(&self, f: F) -> Result<WorkletFuture<'_>, WorkletInitError>
+	where
+		F: 'static + FnOnce(WorkletContext) + Send,
+	{
+		init_wasm_internal(self)?;
+
+		Ok(WorkletFuture::new_url(
+			Cow::Borrowed(self),
+			Box::new(|global, id| {
+				let context = WorkletContext::init(global, id);
+				f(context);
+			}),
+			WorkletUrl::default(),
+		))
+	}
+
+	fn init_wasm_with_url<F>(
+		&self,
+		url: &WorkletUrl,
+		f: F,
+	) -> Result<WorkletFuture<'_>, WorkletInitError>
+	where
+		F: 'static + FnOnce(WorkletContext) + Send,
+	{
+		init_wasm_internal(self)?;
+
+		Ok(WorkletFuture::new_add(
+			Cow::Borrowed(self),
+			Box::new(|global, id| {
+				let context = WorkletContext::init(global, id);
+				f(context);
+			}),
+			url,
+		))
+	}
+}
+
+fn init_wasm_internal(this: &BaseAudioContext) -> Result<(), WorkletInitError> {
+	let init = Reflect::get(this, &"__wasm_worker_init".into()).unwrap();
+
+	if let Some(init) = init.as_bool() {
+		debug_assert!(init);
+
+		return Err(WorkletInitError);
+	}
+
+	debug_assert!(init.is_undefined());
+	Reflect::set(this, &"__wasm_worker_init".into(), &true.into()).unwrap();
+
+	Ok(())
+}
+
+mod sealed {
+	pub trait Sealed {}
+
+	impl Sealed for web_sys::BaseAudioContext {}
+}
 
 #[doc(hidden)]
 #[allow(missing_debug_implementations, unreachable_pub)]
 pub struct Data {
 	id: usize,
-	task: Box<dyn 'static + FnOnce(WorkletGlobalScope, usize) + Send>,
+	task: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, usize) + Send>,
 }
 
 #[doc(hidden)]
@@ -25,7 +100,7 @@ pub struct Data {
 pub unsafe fn __wasm_worker_worklet_entry(data: *mut Data) {
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
 	// `__wasm_worker_worklet_entry` from `worklet.js`. The data sent to it should
-	// only come from `AudioWorkletExt::init_wasm()`.
+	// only come from `WorkletExt::init_wasm_internal()`.
 	let data = *unsafe { Box::from_raw(data) };
 
 	let global = js_sys::global().unchecked_into();
