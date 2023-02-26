@@ -10,23 +10,6 @@ use web_sys::OfflineAudioContext;
 
 static SUPPORT: OnceCell<bool> = OnceCell::new();
 
-pub fn has_import_support() -> ImportSupportFuture {
-	if let Some(support) = SUPPORT.get() {
-		ImportSupportFuture(Some(State::Ready(*support)))
-	} else {
-		let context = OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
-			1, 1, 8000.,
-		)
-		.unwrap();
-		let worklet = context.audio_worklet().unwrap();
-		let promise = worklet
-			.add_module("data:text/javascript,import'data:text/javascript,'")
-			.unwrap();
-
-		ImportSupportFuture(Some(State::Create(JsFuture::from(promise))))
-	}
-}
-
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
 pub struct ImportSupportFuture(Option<State>);
@@ -38,6 +21,24 @@ enum State {
 }
 
 impl ImportSupportFuture {
+	pub(super) fn new() -> Self {
+		if let Some(support) = SUPPORT.get() {
+			Self(Some(State::Ready(*support)))
+		} else {
+			let context =
+				OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
+					1, 1, 8000.,
+				)
+				.unwrap();
+			let worklet = context.audio_worklet().unwrap();
+			let promise = worklet
+				.add_module("data:text/javascript,import'data:text/javascript,'")
+				.unwrap();
+
+			Self(Some(State::Create(JsFuture::from(promise))))
+		}
+	}
+
 	#[track_caller]
 	pub fn into_inner(&mut self) -> Option<bool> {
 		let state = self.0.as_ref().expect("polled after `Ready`");

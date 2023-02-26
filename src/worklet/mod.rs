@@ -1,6 +1,5 @@
 pub mod audio;
 mod module;
-mod support;
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -10,8 +9,9 @@ use wasm_bindgen::JsCast;
 use web_sys::WorkletGlobalScope;
 
 pub use self::audio::AudioWorkletExt;
-pub use self::module::{WorkletModule, WorkletModuleError, WorkletModuleFuture};
-pub use self::support::{has_import_support, ImportSupportFuture};
+pub use self::module::{
+	ImportSupportFuture, WorkletModule, WorkletModuleError, WorkletModuleFuture,
+};
 
 #[doc(hidden)]
 #[allow(missing_debug_implementations, unreachable_pub)]

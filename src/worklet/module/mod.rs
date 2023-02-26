@@ -1,5 +1,6 @@
 mod future;
 mod polyfill;
+mod support;
 
 use std::borrow::Cow;
 use std::error::Error;
@@ -12,7 +13,7 @@ use wasm_bindgen::JsValue;
 
 pub use self::future::WorkletModuleFuture;
 use self::polyfill::{PolyfillImport, PolyfillInline};
-use super::ImportSupportFuture;
+pub use self::support::ImportSupportFuture;
 use crate::common::{ShimFormat, SHIM_URL};
 
 static DEFAULT_MODULE: OnceCell<Option<WorkletModule>> = OnceCell::new();
@@ -51,7 +52,7 @@ impl WorkletModule {
 
 		match format {
 			ShimFormat::EsModule => {
-				let mut support = super::has_import_support();
+				let mut support = Self::has_import_support();
 
 				match support.into_inner() {
 					Some(true) => WorkletModuleFuture::new_ready(Type::import(&url)),
@@ -85,6 +86,10 @@ impl WorkletModule {
 				&worklet.into(),
 			),
 		}
+	}
+
+	pub fn has_import_support() -> ImportSupportFuture {
+		ImportSupportFuture::new()
 	}
 }
 
