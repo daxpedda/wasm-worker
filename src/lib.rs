@@ -37,6 +37,6 @@ pub mod message;
 #[cfg(feature = "worklet")]
 pub mod worklet;
 
-pub use self::dedicated::{spawn, spawn_async};
+pub use self::dedicated::{spawn, spawn_async, WorkerBuilder};
 #[cfg(feature = "worklet")]
 pub use self::worklet::audio::AudioWorkletExt;

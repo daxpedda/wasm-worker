@@ -11,8 +11,9 @@ use anyhow::Result;
 use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::dedicated::{WorkerBuilder, WorkerContext};
+use wasm_worker::dedicated::WorkerContext;
 use wasm_worker::message::Message;
+use wasm_worker::WorkerBuilder;
 
 use self::util::{Flag, SIGNAL_DURATION};
 
