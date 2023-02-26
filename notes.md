@@ -16,6 +16,6 @@
 
 `CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis CHROMEDRIVER=chromedriver WASM_BINDGEN_USE_NO_MODULE=1 cargo test --all-features`
 `CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis GECKODRIVER=geckodriver WASM_BINDGEN_USE_NO_MODULE=1 cargo test --all-features`
-`CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis GECKODRIVER=geckodriver cargo test --test no_module_support --all-features`
+`CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis GECKODRIVER=geckodriver cargo test --test no_module_support --test no_import_support --all-features`
 `CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis NO_HEADLESS=1 WASM_BINDGEN_USE_NO_MODULE=1 cargo test --all-features`
-`CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis NO_HEADLESS=1 cargo test --test no_module_support --all-features`
+`CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS=--cfg=web_sys_unstable_apis NO_HEADLESS=1 cargo test --test no_module_support --test no_import_support --all-features`

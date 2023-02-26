@@ -1,5 +1,4 @@
-//! Tests behavior of [`Message::has_support()`] in with
-//! [`Message::ImageBitmap`].
+//! Tests behavior of [`Message::has_support()`] with [`Message::ImageBitmap`].
 
 use anyhow::Result;
 use wasm_bindgen::{JsCast, JsValue};

@@ -69,11 +69,24 @@ web-sys = { version = "0.3", features = [
 ] }
 
 [[test]]
+name = "audio_worklet"
+required-features = ["worklet"]
+
+[[test]]
+name = "no_import_support"
+required-features = ["worklet"]
+test = false
+
+[[test]]
 name = "no_module_support"
 test = false
 
 [[test]]
-name = "worklet"
+name = "race_worklet_module_default"
+required-features = ["worklet"]
+
+[[test]]
+name = "race_worklet_module_has_support"
 required-features = ["worklet"]
 
 [patch.crates-io]

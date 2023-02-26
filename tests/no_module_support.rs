@@ -1,5 +1,5 @@
-//! Tests for failures in various functions when ES modules are not supported
-//! but the ES module target was used when compiling the JS shim.
+//! Tests for failures in various functions when ES module workers are not
+//! supported but the ES module target was used when compiling the JS shim.
 //!
 //! Not tested by default!
 
