@@ -15,6 +15,7 @@ worklet = [
 	"web-sys/AudioWorkletNodeOptions",
 	"web-sys/BaseAudioContext",
 	"web-sys/OfflineAudioContext",
+	"web-sys/RequestCache",
 	"web-sys/RequestInit",
 	"web-sys/Response",
 	"web-sys/WorkletGlobalScope",

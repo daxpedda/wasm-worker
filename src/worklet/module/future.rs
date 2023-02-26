@@ -7,7 +7,7 @@ use std::task::{ready, Context, Poll};
 use futures_core::future::FusedFuture;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{AbortController, RequestInit, Response};
+use web_sys::{AbortController, RequestCache, RequestInit, Response};
 
 use super::{ImportSupportFuture, Type, WorkletModule, WorkletModuleError, DEFAULT_MODULE};
 use crate::global::WindowOrWorker;
@@ -268,6 +268,7 @@ impl<'format> State<'_, 'format> {
 		let abort = AbortController::new().unwrap();
 		let mut init = RequestInit::new();
 		init.signal(Some(&abort.signal()));
+		init.cache(RequestCache::ForceCache);
 
 		let promise = WindowOrWorker::with(|global| {
 			let global = global.expect("expected `Window` or `WorkerGlobalScope`");
