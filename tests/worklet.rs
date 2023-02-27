@@ -14,7 +14,7 @@ use crate::util::SIGNAL_DURATION;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`WorkletExt::init_wasm`].
+/// [`WorkletExt::add_wasm`].
 #[wasm_bindgen_test]
 async fn basic() {
 	let flag = Flag::new();
@@ -23,7 +23,7 @@ async fn basic() {
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 			.unwrap();
 	context
-		.init_wasm({
+		.add_wasm({
 			let flag = flag.clone();
 			move |_| flag.signal()
 		})
@@ -34,7 +34,7 @@ async fn basic() {
 	flag.await;
 }
 
-/// [`WorkletExt::init_wasm`] returning [`WorkletInitError`].
+/// [`WorkletExt::add_wasm`] returning [`WorkletInitError`].
 #[wasm_bindgen_test]
 async fn failure() {
 	let context =
@@ -43,7 +43,7 @@ async fn failure() {
 
 	let flag = Flag::new();
 	context
-		.init_wasm({
+		.add_wasm({
 			let flag = flag.clone();
 			move |_| flag.signal()
 		})
@@ -54,7 +54,7 @@ async fn failure() {
 	flag.await;
 
 	let flag = Flag::new();
-	let result = context.init_wasm({
+	let result = context.add_wasm({
 		let flag = flag.clone();
 		move |_| flag.signal()
 	});
@@ -67,7 +67,7 @@ async fn failure() {
 }
 
 /// [`WorkletModule::new()`], [`WorkletUrl::new()`] and
-/// [`WorkletExt::init_wasm_with_url()`].
+/// [`WorkletExt::add_wasm_with_url()`].
 #[wasm_bindgen_test]
 async fn url() {
 	// We will just use the default `WorkletModule` but build it ourselves.
@@ -88,7 +88,7 @@ async fn url() {
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 			.unwrap();
 	context
-		.init_wasm_with_url(&url, {
+		.add_wasm_with_url(&url, {
 			let flag = flag.clone();
 			move |_| flag.signal()
 		})

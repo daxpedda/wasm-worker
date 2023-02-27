@@ -16,11 +16,11 @@ pub use self::future::WorkletFuture;
 pub use self::url::{ImportSupportFuture, WorkletUrl, WorkletUrlError, WorkletUrlFuture};
 
 pub trait WorkletExt: sealed::Sealed {
-	fn init_wasm<F>(&self, f: F) -> Result<WorkletFuture<'_>, WorkletInitError>
+	fn add_wasm<F>(&self, f: F) -> Result<WorkletFuture<'_>, WorkletInitError>
 	where
 		F: 'static + FnOnce(WorkletContext) + Send;
 
-	fn init_wasm_with_url<F>(
+	fn add_wasm_with_url<F>(
 		&self,
 		url: &WorkletUrl,
 		f: F,
@@ -30,11 +30,11 @@ pub trait WorkletExt: sealed::Sealed {
 }
 
 impl WorkletExt for BaseAudioContext {
-	fn init_wasm<F>(&self, f: F) -> Result<WorkletFuture<'_>, WorkletInitError>
+	fn add_wasm<F>(&self, f: F) -> Result<WorkletFuture<'_>, WorkletInitError>
 	where
 		F: 'static + FnOnce(WorkletContext) + Send,
 	{
-		init_wasm_internal(self)?;
+		add_wasm_internal(self)?;
 
 		Ok(WorkletFuture::new_url(
 			Cow::Borrowed(self),
@@ -46,7 +46,7 @@ impl WorkletExt for BaseAudioContext {
 		))
 	}
 
-	fn init_wasm_with_url<F>(
+	fn add_wasm_with_url<F>(
 		&self,
 		url: &WorkletUrl,
 		f: F,
@@ -54,7 +54,7 @@ impl WorkletExt for BaseAudioContext {
 	where
 		F: 'static + FnOnce(WorkletContext) + Send,
 	{
-		init_wasm_internal(self)?;
+		add_wasm_internal(self)?;
 
 		Ok(WorkletFuture::new_add(
 			Cow::Borrowed(self),
@@ -67,7 +67,7 @@ impl WorkletExt for BaseAudioContext {
 	}
 }
 
-fn init_wasm_internal(this: &BaseAudioContext) -> Result<(), WorkletInitError> {
+fn add_wasm_internal(this: &BaseAudioContext) -> Result<(), WorkletInitError> {
 	let init = Reflect::get(this, &"__wasm_worker_init".into()).unwrap();
 
 	if let Some(init) = init.as_bool() {
@@ -100,7 +100,7 @@ pub struct Data {
 pub unsafe fn __wasm_worker_worklet_entry(data: *mut Data) {
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
 	// `__wasm_worker_worklet_entry` from `worklet.js`. The data sent to it should
-	// only come from `WorkletExt::init_wasm_internal()`.
+	// only come from `WorkletExt::add_wasm_internal()`.
 	let data = *unsafe { Box::from_raw(data) };
 
 	let global = js_sys::global().unchecked_into();
