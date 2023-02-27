@@ -11,7 +11,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 
 use super::{ModuleSupportError, Worker, WorkerContext, WorkerRef, WorkerUrl};
-use crate::common::{Closure, ID_COUNTER};
+use crate::common::{MessageHandler, ID_COUNTER};
 use crate::message::MessageEvent;
 
 #[must_use = "does nothing unless spawned"]
@@ -20,7 +20,7 @@ pub struct WorkerBuilder<'url> {
 	url: &'url WorkerUrl,
 	options: Option<WorkerOptions>,
 	id: Rc<Cell<Option<usize>>>,
-	message_handler: Rc<RefCell<Option<Closure>>>,
+	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
 
 impl WorkerBuilder<'_> {
@@ -58,7 +58,7 @@ impl WorkerBuilder<'_> {
 	{
 		let id_handle = Rc::clone(&self.id);
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
-		RefCell::borrow_mut(&self.message_handler).replace(Closure::classic({
+		RefCell::borrow_mut(&self.message_handler).replace(MessageHandler::classic({
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
@@ -80,7 +80,7 @@ impl WorkerBuilder<'_> {
 		F2: 'static + Future<Output = ()>,
 	{
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
-		RefCell::borrow_mut(&self.message_handler).replace(Closure::future({
+		RefCell::borrow_mut(&self.message_handler).replace(MessageHandler::future({
 			let id_handle = Rc::clone(&self.id);
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {

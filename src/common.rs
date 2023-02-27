@@ -6,7 +6,7 @@ use std::sync::atomic::AtomicUsize;
 use js_sys::WebAssembly::Global;
 use js_sys::{Function, Number, Object, Promise, Reflect};
 use once_cell::sync::Lazy;
-use wasm_bindgen::closure::Closure as JsClosure;
+use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 
@@ -36,12 +36,12 @@ impl ShimFormat<'_> {
 pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| wasm_bindgen::shim_url().expect(ERROR));
 
 #[derive(Debug)]
-pub(crate) enum Closure {
-	Classic(JsClosure<dyn FnMut(web_sys::MessageEvent)>),
-	Future(JsClosure<dyn FnMut(web_sys::MessageEvent) -> Promise>),
+pub(crate) enum MessageHandler {
+	Classic(Closure<dyn FnMut(web_sys::MessageEvent)>),
+	Future(Closure<dyn FnMut(web_sys::MessageEvent) -> Promise>),
 }
 
-impl Deref for Closure {
+impl Deref for MessageHandler {
 	type Target = Function;
 
 	fn deref(&self) -> &Self::Target {
@@ -53,15 +53,15 @@ impl Deref for Closure {
 	}
 }
 
-impl Closure {
+impl MessageHandler {
 	pub(crate) fn classic(closure: impl 'static + FnMut(web_sys::MessageEvent)) -> Self {
-		Self::Classic(JsClosure::new(closure))
+		Self::Classic(Closure::new(closure))
 	}
 
 	pub(crate) fn future<F: 'static + Future<Output = ()>>(
 		mut closure: impl 'static + FnMut(web_sys::MessageEvent) -> F,
 	) -> Self {
-		let closure = JsClosure::new({
+		let closure = Closure::new({
 			move |event| {
 				let closure = closure(event);
 				wasm_bindgen_futures::future_to_promise(async move {

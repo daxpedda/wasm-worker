@@ -5,14 +5,14 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::rc::{Rc, Weak};
 
-use crate::common::{Closure, Tls, EXPORTS};
+use crate::common::{MessageHandler, Tls, EXPORTS};
 use crate::message::{Message, MessageEvent, SendMessages, TransferError};
 
 #[derive(Clone, Debug)]
 pub struct Worker {
 	worker: web_sys::Worker,
 	id: Rc<Cell<Option<usize>>>,
-	message_handler: Rc<RefCell<Option<Closure>>>,
+	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
 
 impl Drop for Worker {
@@ -48,7 +48,7 @@ impl WorkerOrRef for Worker {
 		&self.id
 	}
 
-	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<Closure>>>>> {
+	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Some(Cow::Borrowed(&self.message_handler))
 	}
 }
@@ -57,7 +57,7 @@ impl Worker {
 	pub(super) fn new(
 		worker: web_sys::Worker,
 		id: Rc<Cell<Option<usize>>>,
-		message_handler: Rc<RefCell<Option<Closure>>>,
+		message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
 			worker,
@@ -123,7 +123,7 @@ impl Worker {
 pub struct WorkerRef {
 	worker: web_sys::Worker,
 	id: Rc<Cell<Option<usize>>>,
-	message_handler: Weak<RefCell<Option<Closure>>>,
+	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
 
 impl WorkerOrRef for WorkerRef {
@@ -139,7 +139,7 @@ impl WorkerOrRef for WorkerRef {
 		&self.id
 	}
 
-	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<Closure>>>>> {
+	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Weak::upgrade(&self.message_handler).map(Cow::Owned)
 	}
 }
@@ -148,7 +148,7 @@ impl WorkerRef {
 	pub(super) fn new(
 		worker: web_sys::Worker,
 		id: Rc<Cell<Option<usize>>>,
-		message_handler: Weak<RefCell<Option<Closure>>>,
+		message_handler: Weak<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
 			worker,
@@ -217,7 +217,7 @@ trait WorkerOrRef: Debug + Sized {
 
 	fn id(&self) -> &Rc<Cell<Option<usize>>>;
 
-	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<Closure>>>>>;
+	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;
 
 	fn has_message_handler(&self) -> bool {
 		self.message_handler().map_or(false, |message_handler| {
@@ -240,7 +240,7 @@ trait WorkerOrRef: Debug + Sized {
 			let handle = self.handle_ref();
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
-			let message_handler = message_handler.insert(Closure::classic(move |event| {
+			let message_handler = message_handler.insert(MessageHandler::classic(move |event| {
 				new_message_handler(&handle, MessageEvent::new(event));
 			}));
 
@@ -259,7 +259,7 @@ trait WorkerOrRef: Debug + Sized {
 			let handle = self.handle_ref();
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
-			let message_handler = message_handler.insert(Closure::future(move |event| {
+			let message_handler = message_handler.insert(MessageHandler::future(move |event| {
 				new_message_handler(&handle, MessageEvent::new(event))
 			}));
 

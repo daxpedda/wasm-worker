@@ -4,7 +4,7 @@ use std::future::Future;
 use once_cell::unsync::OnceCell;
 use web_sys::DedicatedWorkerGlobalScope;
 
-use crate::common::{Closure, Tls, EXPORTS};
+use crate::common::{MessageHandler, Tls, EXPORTS};
 use crate::message::{Message, MessageEvent, SendMessages, TransferError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -15,7 +15,7 @@ pub struct WorkerContext {
 
 impl WorkerContext {
 	thread_local! {
-		static MESSAGE_HANDLER: RefCell<Option<Closure>> = RefCell::new(None);
+		static MESSAGE_HANDLER: RefCell<Option<MessageHandler>> = RefCell::new(None);
 		#[allow(clippy::use_self)]
 		static BACKUP: OnceCell<WorkerContext> = OnceCell::new();
 	}
@@ -74,7 +74,7 @@ impl WorkerContext {
 			let mut message_handler = message_handler.borrow_mut();
 
 			let context = self.clone();
-			let message_handler = message_handler.insert(Closure::classic(move |event| {
+			let message_handler = message_handler.insert(MessageHandler::classic(move |event| {
 				new_message_handler(&context, MessageEvent::new(event));
 			}));
 
@@ -91,7 +91,7 @@ impl WorkerContext {
 			let mut message_handler = message_handler.borrow_mut();
 
 			let context = self.clone();
-			let message_handler = message_handler.insert(Closure::future(move |event| {
+			let message_handler = message_handler.insert(MessageHandler::future(move |event| {
 				new_message_handler(&context, MessageEvent::new(event))
 			}));
 
