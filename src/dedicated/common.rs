@@ -1,54 +1,11 @@
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
-use std::future::Future;
-use std::ops::Deref;
 
-use js_sys::{Array, Function, Promise};
-use wasm_bindgen::closure::Closure as JsClosure;
-use wasm_bindgen::{JsCast, JsValue};
+use js_sys::Array;
+use wasm_bindgen::JsValue;
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
 use crate::message::{Message, Messages, RawMessages};
-
-#[derive(Debug)]
-pub(super) enum Closure {
-	Classic(JsClosure<dyn FnMut(web_sys::MessageEvent)>),
-	Future(JsClosure<dyn FnMut(web_sys::MessageEvent) -> Promise>),
-}
-
-impl Deref for Closure {
-	type Target = Function;
-
-	fn deref(&self) -> &Self::Target {
-		match self {
-			Self::Classic(closure) => closure.as_ref(),
-			Self::Future(closure) => closure.as_ref(),
-		}
-		.unchecked_ref()
-	}
-}
-
-impl Closure {
-	pub(super) fn classic(closure: impl 'static + FnMut(web_sys::MessageEvent)) -> Self {
-		Self::Classic(JsClosure::new(closure))
-	}
-
-	pub(super) fn future<F: 'static + Future<Output = ()>>(
-		mut closure: impl 'static + FnMut(web_sys::MessageEvent) -> F,
-	) -> Self {
-		let closure = JsClosure::new({
-			move |event| {
-				let closure = closure(event);
-				wasm_bindgen_futures::future_to_promise(async move {
-					closure.await;
-					Ok(JsValue::UNDEFINED)
-				})
-			}
-		});
-
-		Self::Future(closure)
-	}
-}
 
 pub(super) enum WorkerOrContext<'this> {
 	Worker(&'this Worker),

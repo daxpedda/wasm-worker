@@ -1,11 +1,14 @@
 use std::borrow::Cow;
+use std::future::Future;
+use std::ops::Deref;
 use std::sync::atomic::AtomicUsize;
 
 use js_sys::WebAssembly::Global;
-use js_sys::{Number, Object, Reflect};
+use js_sys::{Function, Number, Object, Promise, Reflect};
 use once_cell::sync::Lazy;
+use wasm_bindgen::closure::Closure as JsClosure;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 
 const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
 
@@ -31,6 +34,46 @@ impl ShimFormat<'_> {
 }
 
 pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| wasm_bindgen::shim_url().expect(ERROR));
+
+#[derive(Debug)]
+pub(crate) enum Closure {
+	Classic(JsClosure<dyn FnMut(web_sys::MessageEvent)>),
+	Future(JsClosure<dyn FnMut(web_sys::MessageEvent) -> Promise>),
+}
+
+impl Deref for Closure {
+	type Target = Function;
+
+	fn deref(&self) -> &Self::Target {
+		match self {
+			Self::Classic(closure) => closure.as_ref(),
+			Self::Future(closure) => closure.as_ref(),
+		}
+		.unchecked_ref()
+	}
+}
+
+impl Closure {
+	pub(crate) fn classic(closure: impl 'static + FnMut(web_sys::MessageEvent)) -> Self {
+		Self::Classic(JsClosure::new(closure))
+	}
+
+	pub(crate) fn future<F: 'static + Future<Output = ()>>(
+		mut closure: impl 'static + FnMut(web_sys::MessageEvent) -> F,
+	) -> Self {
+		let closure = JsClosure::new({
+			move |event| {
+				let closure = closure(event);
+				wasm_bindgen_futures::future_to_promise(async move {
+					closure.await;
+					Ok(JsValue::UNDEFINED)
+				})
+			}
+		});
+
+		Self::Future(closure)
+	}
+}
 
 thread_local! {
 	pub(crate) static EXPORTS: Lazy<Exports> = Lazy::new(|| wasm_bindgen::exports().unchecked_into());
@@ -62,7 +105,7 @@ pub(crate) static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 #[derive(Debug)]
 #[allow(missing_copy_implementations)]
 pub struct Tls {
-	pub(super) id: usize,
+	pub(crate) id: usize,
 	tls_base: f64,
 	stack_alloc: f64,
 }
@@ -76,7 +119,7 @@ impl Tls {
 		});
 	}
 
-	pub(super) fn new(id: usize, tls_base: &Global, stack_alloc: &Global) -> Self {
+	pub(crate) fn new(id: usize, tls_base: &Global, stack_alloc: &Global) -> Self {
 		let tls_base = Number::unchecked_from_js(tls_base.value()).value_of();
 		let stack_alloc = Number::unchecked_from_js(stack_alloc.value()).value_of();
 
@@ -87,11 +130,11 @@ impl Tls {
 		}
 	}
 
-	pub(super) fn tls_base(&self) -> Global {
+	pub(crate) fn tls_base(&self) -> Global {
 		Self::DESCRIPTOR.with(|descriptor| Global::new(descriptor, &self.tls_base.into()).unwrap())
 	}
 
-	pub(super) fn stack_alloc(&self) -> Global {
+	pub(crate) fn stack_alloc(&self) -> Global {
 		Self::DESCRIPTOR
 			.with(|descriptor| Global::new(descriptor, &self.stack_alloc.into()).unwrap())
 	}

@@ -10,8 +10,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 
-use super::{Closure, ModuleSupportError, Worker, WorkerContext, WorkerRef, WorkerUrl};
-use crate::common::ID_COUNTER;
+use super::{ModuleSupportError, Worker, WorkerContext, WorkerRef, WorkerUrl};
+use crate::common::{Closure, ID_COUNTER};
 use crate::message::MessageEvent;
 
 #[must_use = "does nothing unless spawned"]
