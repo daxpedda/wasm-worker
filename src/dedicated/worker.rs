@@ -6,7 +6,7 @@ use std::future::Future;
 use std::rc::{Rc, Weak};
 
 use crate::common::{Closure, Tls, EXPORTS};
-use crate::message::{Message, MessageEvent, TransferError, WorkerOrContext};
+use crate::message::{Message, MessageEvent, SendMessages, TransferError};
 
 #[derive(Clone, Debug)]
 pub struct Worker {
@@ -271,7 +271,7 @@ trait WorkerOrRef: Debug + Sized {
 		&self,
 		messages: M,
 	) -> Result<(), TransferError> {
-		WorkerOrContext::Worker(self.worker()).transfer_messages(messages)
+		self.worker().transfer_messages(messages)
 	}
 
 	fn terminate(&self) {

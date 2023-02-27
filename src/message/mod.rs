@@ -19,8 +19,8 @@ use web_sys::{
 
 pub use self::event::MessageEvent;
 pub use self::raw::{MessageError, RawMessage, RawMessages};
+pub(crate) use self::send::SendMessages;
 pub use self::send::TransferError;
-pub(crate) use self::send::WorkerOrContext;
 pub use self::support::{ImageBitmapSupportFuture, MessageSupportFuture, SupportError};
 
 #[derive(Debug, Eq, PartialEq)]

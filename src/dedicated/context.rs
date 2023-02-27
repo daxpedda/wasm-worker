@@ -5,7 +5,7 @@ use once_cell::unsync::OnceCell;
 use web_sys::DedicatedWorkerGlobalScope;
 
 use crate::common::{Closure, Tls, EXPORTS};
-use crate::message::{Message, MessageEvent, TransferError, WorkerOrContext};
+use crate::message::{Message, MessageEvent, SendMessages, TransferError};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerContext {
@@ -104,7 +104,7 @@ impl WorkerContext {
 		M: IntoIterator<Item = I>,
 		I: Into<Message>,
 	{
-		WorkerOrContext::Context(&self.context).transfer_messages(messages)
+		self.context.transfer_messages(messages)
 	}
 
 	#[must_use]
