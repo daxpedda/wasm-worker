@@ -5,9 +5,8 @@ use std::fmt::{self, Debug, Display, Formatter};
 use std::future::Future;
 use std::rc::{Rc, Weak};
 
-use super::{TransferError, WorkerOrContext};
 use crate::common::{Closure, Tls, EXPORTS};
-use crate::message::{Message, MessageEvent};
+use crate::message::{Message, MessageEvent, TransferError, WorkerOrContext};
 
 #[derive(Clone, Debug)]
 pub struct Worker {

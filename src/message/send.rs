@@ -1,13 +1,14 @@
 use std::error::Error;
-use std::fmt::{self, Display, Formatter};
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 use js_sys::Array;
 use wasm_bindgen::JsValue;
 use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
 
-use crate::message::{Message, Messages, RawMessages};
+use super::{Message, Messages, RawMessages};
 
-pub(super) enum WorkerOrContext<'this> {
+pub(crate) enum WorkerOrContext<'this> {
 	Worker(&'this Worker),
 	Context(&'this DedicatedWorkerGlobalScope),
 }
@@ -26,7 +27,7 @@ impl WorkerOrContext<'_> {
 		}
 	}
 
-	pub(super) fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
+	pub(crate) fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
 		self,
 		messages: M,
 	) -> Result<(), TransferError> {

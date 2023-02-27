@@ -4,9 +4,8 @@ use std::future::Future;
 use once_cell::unsync::OnceCell;
 use web_sys::DedicatedWorkerGlobalScope;
 
-use super::{TransferError, WorkerOrContext};
 use crate::common::{Closure, Tls, EXPORTS};
-use crate::message::{Message, MessageEvent};
+use crate::message::{Message, MessageEvent, TransferError, WorkerOrContext};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerContext {
