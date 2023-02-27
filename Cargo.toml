@@ -96,6 +96,7 @@ required-features = ["worklet"]
 # https://github.com/rustwasm/wasm-bindgen/pull/3296
 # https://github.com/rustwasm/wasm-bindgen/pull/3299
 # https://github.com/rustwasm/wasm-bindgen/pull/3302 (merged)
+# https://github.com/rustwasm/wasm-bindgen/pull/3329 (merged)
 js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
 wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }

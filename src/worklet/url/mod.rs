@@ -1,5 +1,4 @@
 mod future;
-mod polyfill;
 mod support;
 
 use std::borrow::Cow;
@@ -13,7 +12,6 @@ use wasm_bindgen::JsValue;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 pub use self::future::WorkletUrlFuture;
-use self::polyfill::{PolyfillImport, PolyfillInline};
 pub use self::support::ImportSupportFuture;
 use crate::common::{ShimFormat, SHIM_URL};
 
@@ -41,11 +39,7 @@ impl WorkletUrl {
 
 	fn new_import(url: &str) -> Array {
 		let import = format!("import {{initSync, __wasm_worker_worklet_entry}} from '{url}';\n\n");
-		Array::of3(
-			&PolyfillImport::import().into(),
-			&import.into(),
-			&include_str!("worklet.js").into(),
-		)
+		Array::of2(&import.into(), &include_str!("worklet.js").into())
 	}
 
 	fn new_inline(shim: JsString, global: &str) -> Array {
@@ -54,8 +48,7 @@ impl WorkletUrl {
 			\nconst initSync = {global}.initSync;\n\
 			const __wasm_worker_worklet_entry = {global}.__wasm_worker_worklet_entry;\n\n\
 		");
-		Array::of4(
-			&PolyfillInline::script().into(),
+		Array::of3(
 			&shim.into(),
 			&imports.into(),
 			&include_str!("worklet.js").into(),
