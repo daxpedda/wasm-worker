@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 
 use js_sys::Array;
 use wasm_bindgen::JsValue;
-use web_sys::{DedicatedWorkerGlobalScope, DomException, Worker};
+use web_sys::{DedicatedWorkerGlobalScope, DomException, MessagePort, Worker};
 
 use super::{Message, Messages, RawMessages};
 
@@ -82,6 +82,16 @@ impl SendMessages for DedicatedWorkerGlobalScope {
 		transfer: &JsValue,
 	) -> Result<(), JsValue> {
 		self.post_message_with_transfer(message, transfer)
+	}
+}
+
+impl SendMessages for MessagePort {
+	fn post_message_with_transfer(
+		&self,
+		message: &JsValue,
+		transfer: &JsValue,
+	) -> Result<(), JsValue> {
+		self.post_message_with_transferable(message, transfer)
 	}
 }
 

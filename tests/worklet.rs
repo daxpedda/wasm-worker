@@ -7,7 +7,7 @@ use util::Flag;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::common::ShimFormat;
 use wasm_worker::worklet::{WorkletInitError, WorkletUrl};
-use wasm_worker::WorkletExt;
+use wasm_worker::{WorkletBuilder, WorkletExt};
 use web_sys::OfflineAudioContext;
 
 use crate::util::SIGNAL_DURATION;
@@ -69,7 +69,7 @@ async fn failure() {
 /// [`WorkletModule::new()`], [`WorkletUrl::new()`] and
 /// [`WorkletExt::add_wasm_with_url()`].
 #[wasm_bindgen_test]
-async fn url() {
+async fn builder_url() {
 	// We will just use the default `WorkletModule` but build it ourselves.
 	let url = wasm_bindgen::shim_url().unwrap();
 	let format = match wasm_bindgen::shim_format().unwrap() {
@@ -87,8 +87,8 @@ async fn url() {
 	let context =
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 			.unwrap();
-	context
-		.add_wasm_with_url(&url, {
+	WorkletBuilder::new_with_url(&url)
+		.add(&context, {
 			let flag = flag.clone();
 			move |_| flag.signal()
 		})
