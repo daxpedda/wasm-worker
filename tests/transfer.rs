@@ -237,7 +237,7 @@ async fn audio_data() {
 /// [`ImageBitmap`].
 #[wasm_bindgen_test]
 async fn image_bitmap() {
-	let _ = Message::has_image_bitmap_support().await;
+	let _: Result<(), SupportError> = Message::has_image_bitmap_support().await;
 
 	test_transfer(
 		Message::has_image_bitmap_support,
