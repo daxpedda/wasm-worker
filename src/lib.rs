@@ -28,12 +28,12 @@
 //! - Implement a higher level implementation of this library.
 
 pub mod common;
-pub mod dedicated;
 mod global;
 pub mod message;
+pub mod worker;
 #[cfg(feature = "worklet")]
 pub mod worklet;
 
-pub use self::dedicated::{spawn, spawn_async, WorkerBuilder};
+pub use self::worker::{spawn, spawn_async, WorkerBuilder};
 #[cfg(feature = "worklet")]
 pub use self::worklet::WorkletExt;

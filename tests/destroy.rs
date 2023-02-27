@@ -10,15 +10,15 @@ use futures_channel::oneshot;
 use futures_util::future::{self, Either};
 use js_sys::ArrayBuffer;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::dedicated::DestroyError;
 use wasm_worker::message::Message;
+use wasm_worker::worker::DestroyError;
 use wasm_worker::WorkerBuilder;
 
 use self::util::{Flag, SIGNAL_DURATION};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`Worker::destroy()`](wasm_worker::dedicated::Worker::destroy).
+/// [`Worker::destroy()`](wasm_worker::worker::Worker::destroy).
 #[wasm_bindgen_test]
 async fn handle() {
 	let request = Flag::new();
@@ -48,7 +48,7 @@ async fn handle() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// Calling [`Worker::destroy()`](wasm_worker::dedicated::Worker::destroy) twice
+/// Calling [`Worker::destroy()`](wasm_worker::worker::Worker::destroy) twice
 /// on the same worker.
 #[wasm_bindgen_test]
 async fn handle_twice() {
@@ -65,7 +65,7 @@ async fn handle_twice() {
 	));
 }
 
-/// Calling [`Worker::destroy()`](wasm_worker::dedicated::Worker::destroy) with
+/// Calling [`Worker::destroy()`](wasm_worker::worker::Worker::destroy) with
 /// the wrong [`Tls`](wasm_worker::common::Tls).
 #[wasm_bindgen_test]
 async fn handle_wrong() {
@@ -97,7 +97,7 @@ async fn handle_wrong() {
 	));
 }
 
-/// [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy).
+/// [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy).
 #[wasm_bindgen_test]
 async fn handle_ref() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -146,7 +146,7 @@ async fn handle_ref() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// Calling [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy)
+/// Calling [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy)
 /// twice on the same worker.
 #[wasm_bindgen_test]
 async fn handle_ref_twice() {
@@ -189,7 +189,7 @@ async fn handle_ref_twice() {
 	flag.await;
 }
 
-/// Calling [`WorkerRef::destroy()`](wasm_worker::dedicated::WorkerRef::destroy)
+/// Calling [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy)
 /// with the wrong [`Tls`](wasm_worker::common::Tls).
 #[wasm_bindgen_test]
 async fn handle_ref_wrong() {

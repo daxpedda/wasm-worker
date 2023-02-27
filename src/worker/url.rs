@@ -41,7 +41,7 @@ impl WorkerUrl {
 				}
 
 				format!(
-					"import {{initSync, __wasm_worker_dedicated_entry}} from '{}';\n\n{}",
+					"import {{initSync, __wasm_worker_worker_entry}} from '{}';\n\n{}",
 					url,
 					include_str!("worker.js")
 				)
@@ -52,7 +52,7 @@ impl WorkerUrl {
 					"\
 						importScripts('{}');\n\
 						const initSync = {global}.initSync;\n\
-						const __wasm_worker_dedicated_entry = {global}.__wasm_worker_dedicated_entry;\n\
+						const __wasm_worker_worker_entry = {global}.__wasm_worker_worker_entry;\n\
 						\n\
 						{}\
 					",
