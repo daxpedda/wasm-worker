@@ -79,25 +79,19 @@ thread_local! {
 	pub(crate) static EXPORTS: Lazy<Exports> = Lazy::new(|| wasm_bindgen::exports().unchecked_into());
 }
 
-pub(crate) type Exports = __wasm_worker_Exports;
-
 #[wasm_bindgen]
 extern "C" {
 	#[allow(non_camel_case_types)]
-	pub(crate) type __wasm_worker_Exports;
+	pub(crate) type Exports;
 
 	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
-	pub(crate) unsafe fn thread_destroy(
-		this: &__wasm_worker_Exports,
-		tls_base: &Global,
-		stack_alloc: &Global,
-	);
+	pub(crate) unsafe fn thread_destroy(this: &Exports, tls_base: &Global, stack_alloc: &Global);
 
 	#[wasm_bindgen(method, getter, js_name = __tls_base)]
-	pub(crate) fn tls_base(this: &__wasm_worker_Exports) -> Global;
+	pub(crate) fn tls_base(this: &Exports) -> Global;
 
 	#[wasm_bindgen(method, getter, js_name = __stack_alloc)]
-	pub(crate) fn stack_alloc(this: &__wasm_worker_Exports) -> Global;
+	pub(crate) fn stack_alloc(this: &Exports) -> Global;
 }
 
 pub(crate) static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
