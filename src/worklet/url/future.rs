@@ -4,7 +4,7 @@ use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 #[cfg(feature = "futures")]
-use futures_core::future::FusedFuture;
+use futures_core::FusedFuture;
 use js_sys::Array;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
