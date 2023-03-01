@@ -3,8 +3,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Window, WorkerGlobalScope};
 
-pub(crate) type Global = Global;
-
 impl Global {
 	pub(crate) fn new() -> Self {
 		js_sys::global().unchecked_into()
