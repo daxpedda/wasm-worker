@@ -67,6 +67,11 @@ impl WorkletUrl {
 	pub fn has_import_support() -> ImportSupportFuture {
 		ImportSupportFuture::new()
 	}
+
+	#[must_use]
+	pub fn as_raw(&self) -> &str {
+		&self.0
+	}
 }
 
 impl Drop for WorkletUrl {
