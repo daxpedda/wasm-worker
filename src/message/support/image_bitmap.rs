@@ -29,8 +29,8 @@ impl ImageBitmapSupportFuture {
 		if let Some(support) = SUPPORT.get() {
 			Self(Some(State::Ready(*support)))
 		} else {
-			WindowOrWorker::with(|global| {
-				if let Some(global) = global {
+			Self(Some(
+				WindowOrWorker::with(|global| {
 					let image = ImageData::new_with_sw(1, 1).unwrap();
 
 					let promise = match global {
@@ -43,11 +43,10 @@ impl ImageBitmapSupportFuture {
 					}
 					.unwrap();
 
-					Self(Some(State::Create(JsFuture::from(promise))))
-				} else {
-					Self(Some(State::Ready(Err(SupportError::Undetermined))))
-				}
-			})
+					State::Create(JsFuture::from(promise))
+				})
+				.unwrap_or(State::Ready(Err(MessageSupportError::Undetermined))),
+			))
 		}
 	}
 

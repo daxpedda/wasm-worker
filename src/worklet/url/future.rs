@@ -291,14 +291,11 @@ impl<'format> State<'_, 'format> {
 		init.signal(Some(&abort.signal()));
 		init.cache(RequestCache::ForceCache);
 
-		let promise = WindowOrWorker::with(|global| {
-			let global = global.expect("expected `Window` or `WorkerGlobalScope`");
-
-			match global {
-				WindowOrWorker::Window(window) => window.fetch_with_str_and_init(url, &init),
-				WindowOrWorker::Worker(worker) => worker.fetch_with_str_and_init(url, &init),
-			}
-		});
+		let promise = WindowOrWorker::with(|global| match global {
+			WindowOrWorker::Window(window) => window.fetch_with_str_and_init(url, &init),
+			WindowOrWorker::Worker(worker) => worker.fetch_with_str_and_init(url, &init),
+		})
+		.expect("expected `Window` or `WorkerGlobalScope`");
 		let future = JsFuture::from(promise);
 
 		State::Fetch {

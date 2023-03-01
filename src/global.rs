@@ -30,8 +30,8 @@ impl WindowOrWorker {
 		});
 	}
 
-	pub(crate) fn with<R>(f: impl FnOnce(Option<&Self>) -> R) -> R {
-		Self::THIS.with(|this| f(this.as_ref()))
+	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> Option<R> {
+		Self::THIS.with(|this| this.as_ref().map(f))
 	}
 }
 
