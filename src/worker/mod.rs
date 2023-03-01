@@ -1,5 +1,6 @@
 mod builder;
 mod context;
+mod support;
 mod url;
 mod worker;
 
@@ -7,6 +8,7 @@ use std::future::Future;
 
 pub use self::builder::WorkerBuilder;
 pub use self::context::WorkerContext;
+pub use self::support::{has_async_support, AsyncSupportError, AsyncSupportFuture};
 pub use self::url::{ModuleSupportError, WorkerUrl};
 pub use self::worker::{DestroyError, Worker, WorkerRef};
 

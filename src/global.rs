@@ -22,7 +22,7 @@ impl WindowOrWorker {
 
 			if !global.window().is_undefined() {
 				Some(WindowOrWorker::Window(global.unchecked_into()))
-			} else if !global.worker().is_undefined() {
+			} else if !global.worker_global_scope().is_undefined() {
 				Some(WindowOrWorker::Worker(global.unchecked_into()))
 			} else {
 				None
@@ -44,7 +44,10 @@ extern "C" {
 	fn window(this: &Global) -> JsValue;
 
 	#[wasm_bindgen(method, getter, js_name = WorkerGlobalScope)]
-	fn worker(this: &Global) -> JsValue;
+	fn worker_global_scope(this: &Global) -> JsValue;
+
+	#[wasm_bindgen(method, getter, js_name = Worker)]
+	pub(crate) fn worker(this: &Global) -> JsValue;
 
 	#[wasm_bindgen(method, getter, js_name = AudioData)]
 	pub(crate) fn audio_data(this: &Global) -> JsValue;

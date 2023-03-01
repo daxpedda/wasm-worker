@@ -5,12 +5,15 @@ use utf16_lit::utf16;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
+use wasm_worker::worker;
 use wasm_worker::worklet::{WorkletExt, WorkletUrl};
 use web_sys::{console, AudioContext, Response};
 
 #[wasm_bindgen(main)]
 async fn main() {
 	console_error_panic_hook::set_once();
+
+	console::log_1(&worker::has_async_support().await.unwrap().into());
 
 	console::log_1(&WorkletUrl::has_import_support().await.into());
 
