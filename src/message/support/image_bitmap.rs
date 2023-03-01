@@ -103,7 +103,10 @@ impl Future for ImageBitmapSupportFuture {
 
 				let support = super::test_support(&bitmap);
 
-				SUPPORT.set(support).unwrap();
+				if let Err((old_support, _)) = SUPPORT.try_insert(support) {
+					debug_assert_eq!(support, *old_support);
+				}
+
 				Poll::Ready(support)
 			}
 		}
