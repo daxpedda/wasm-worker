@@ -6,7 +6,7 @@ use futures_util::future::{self, Either};
 use util::Flag;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::common::ShimFormat;
-use wasm_worker::worklet::{WorkletInitError, WorkletUrl};
+use wasm_worker::worklet::{WorkletContext, WorkletInitError, WorkletUrl};
 use wasm_worker::{WorkletBuilder, WorkletExt};
 use web_sys::OfflineAudioContext;
 
@@ -64,6 +64,36 @@ async fn failure() {
 	// The worklet will never signal if not re-initialized.
 	let result = future::select(flag, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
+}
+
+/// [`WorkletContext::new()`].
+#[wasm_bindgen_test]
+async fn context() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let flag = Flag::new();
+	context
+		.add_wasm({
+			let flag = flag.clone();
+			move |_| {
+				WorkletContext::new().unwrap();
+				// Flag will never signal if `WorkerContext::new` panics.
+				flag.signal();
+			}
+		})
+		.unwrap()
+		.await
+		.unwrap();
+
+	flag.await;
+}
+
+/// [`WorkletContext::new()`] fails outside worker.
+#[wasm_bindgen_test]
+fn context_fail() {
+	assert!(WorkletContext::new().is_none());
 }
 
 /// [`WorkletUrl::new()`], [`WorkletUrl::new()`] and

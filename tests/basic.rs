@@ -187,9 +187,9 @@ async fn close() {
 async fn context() {
 	let flag = Flag::new();
 
-	wasm_worker::spawn_async({
+	wasm_worker::spawn({
 		let flag = flag.clone();
-		|context| async move {
+		move |context| {
 			WorkerContext::new().unwrap();
 			// Flag will never signal if `WorkerContext::new` panics.
 			flag.signal();
@@ -212,9 +212,9 @@ fn context_fail() {
 async fn name() {
 	let flag = Flag::new();
 
-	wasm_worker::spawn_async({
+	wasm_worker::spawn({
 		let flag = flag.clone();
-		|context| async move {
+		move |context| {
 			assert!(context.name().is_none());
 			// Flag will never signal if `assert!` panics.
 			flag.signal();
