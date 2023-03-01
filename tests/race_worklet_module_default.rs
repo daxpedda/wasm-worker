@@ -1,12 +1,12 @@
-//! Tests behavior of [`WorkletModule::default()`].
+//! Tests behavior of [`WorkletUrl::default()`].
 
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::worklet::WorkletUrl;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`WorkletModule::default()`] and
-/// [`WorkletModuleFuture::into_inner()`](wasm_worker::worklet::WorkletModuleFuture::into_inner).
+/// [`WorkletUrl::default()`] and
+/// [`WorkletUrlFuture::into_inner()`](wasm_worker::worklet::WorkletUrlFuture::into_inner).
 #[wasm_bindgen_test]
 async fn module() {
 	if !matches!(
@@ -39,8 +39,8 @@ async fn module() {
 	assert!(support.into_inner().is_some());
 }
 
-/// [`WorkletModule::default()`] and
-/// [`WorkletModuleFuture::into_inner()`](wasm_worker::worklet::WorkletModuleFuture::into_inner).
+/// [`WorkletUrl::default()`] and
+/// [`WorkletUrlFuture::into_inner()`](wasm_worker::worklet::WorkletUrlFuture::into_inner).
 #[wasm_bindgen_test]
 async fn classic() {
 	if !matches!(

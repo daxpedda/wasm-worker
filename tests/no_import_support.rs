@@ -27,7 +27,7 @@ async fn init() {
 	assert!(matches!(result.unwrap_err(), WorkletUrlError::Support));
 }
 
-/// [`WorkletModule::has_import_support()`].
+/// [`WorkletUrl::has_import_support()`].
 #[wasm_bindgen_test]
 async fn check() {
 	assert!(matches!(
@@ -38,7 +38,7 @@ async fn check() {
 	assert!(!WorkletUrl::has_import_support().await);
 }
 
-/// [`WorkletModule::new())`].
+/// [`WorkletUrl::new())`].
 #[wasm_bindgen_test]
 async fn url() {
 	assert!(matches!(

@@ -66,11 +66,11 @@ async fn failure() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// [`WorkletModule::new()`], [`WorkletUrl::new()`] and
+/// [`WorkletUrl::new()`], [`WorkletUrl::new()`] and
 /// [`WorkletExt::add_wasm_with_url()`].
 #[wasm_bindgen_test]
 async fn builder_url() {
-	// We will just use the default `WorkletModule` but build it ourselves.
+	// We will just use the default `WorkletUrl` but build it ourselves.
 	let url = wasm_bindgen::shim_url().unwrap();
 	let format = match wasm_bindgen::shim_format().unwrap() {
 		wasm_bindgen::ShimFormat::EsModule => ShimFormat::EsModule,

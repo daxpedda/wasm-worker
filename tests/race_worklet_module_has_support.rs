@@ -1,13 +1,13 @@
 //! Tests behavior of
-//! [`WorkletModuleFuture::into_inner()`](wasm_worker::worklet::WorkletModuleFuture::into_inner).
+//! [`WorkletUrlFuture::into_inner()`](wasm_worker::worklet::WorkletUrlFuture::into_inner).
 
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::worklet::WorkletUrl;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`WorkletModuleFuture::into_inner()`](wasm_worker::worklet::WorkletModuleFuture::into_inner)
-/// and [`WorkletModule::default()`].
+/// [`WorkletUrlFuture::into_inner()`](wasm_worker::worklet::WorkletUrlFuture::into_inner)
+/// and [`WorkletUrl::default()`].
 #[wasm_bindgen_test]
 async fn module() {
 	if !matches!(
@@ -40,8 +40,8 @@ async fn module() {
 	assert!(support.into_inner().is_some());
 }
 
-/// [`WorkletModuleFuture::into_inner()`](wasm_worker::worklet::WorkletModuleFuture::into_inner)
-/// and [`WorkletModule::default()`].
+/// [`WorkletUrlFuture::into_inner()`](wasm_worker::worklet::WorkletUrlFuture::into_inner)
+/// and [`WorkletUrl::default()`].
 #[wasm_bindgen_test]
 async fn classic() {
 	if !matches!(
