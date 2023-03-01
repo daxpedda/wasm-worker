@@ -1,18 +1,24 @@
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::future::Future;
-use std::ops::Deref;
 use std::pin::Pin;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use std::sync::atomic::Ordering;
 
 use js_sys::Array;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
+#[cfg(feature = "message")]
+use {
+	super::WorkerRef,
+	crate::message::{MessageEvent, MessageHandler},
+	std::cell::RefCell,
+	std::ops::Deref,
+	std::rc::Weak,
+};
 
-use super::{ModuleSupportError, Worker, WorkerContext, WorkerRef, WorkerUrl};
-use crate::common::{MessageHandler, ID_COUNTER};
-use crate::message::MessageEvent;
+use super::{ModuleSupportError, Worker, WorkerContext, WorkerUrl};
+use crate::common::ID_COUNTER;
 
 #[must_use = "does nothing unless spawned"]
 #[derive(Debug)]
@@ -20,6 +26,7 @@ pub struct WorkerBuilder<'url> {
 	url: &'url WorkerUrl,
 	options: Option<WorkerOptions>,
 	id: Rc<Cell<Option<usize>>>,
+	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
 
@@ -41,6 +48,7 @@ impl WorkerBuilder<'_> {
 			url,
 			options,
 			id: Rc::new(Cell::new(None)),
+			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 		}
 	}
@@ -52,6 +60,7 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
+	#[cfg(feature = "message")]
 	pub fn message_handler<F>(self, mut message_handler: F) -> Self
 	where
 		F: 'static + FnMut(&WorkerRef, MessageEvent),
@@ -74,6 +83,7 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
+	#[cfg(feature = "message")]
 	pub fn message_handler_async<F1, F2>(self, mut message_handler: F1) -> Self
 	where
 		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
@@ -132,6 +142,7 @@ impl WorkerBuilder<'_> {
 		}
 		.unwrap();
 
+		#[cfg(feature = "message")]
 		if let Some(message_handler) = RefCell::borrow(&self.message_handler).deref() {
 			worker.set_onmessage(Some(message_handler));
 		}
@@ -144,7 +155,12 @@ impl WorkerBuilder<'_> {
 
 		worker.post_message(&init).unwrap();
 
-		Worker::new(worker, self.id, self.message_handler)
+		Worker::new(
+			worker,
+			self.id,
+			#[cfg(feature = "message")]
+			self.message_handler,
+		)
 	}
 }
 

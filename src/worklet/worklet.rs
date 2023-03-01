@@ -1,25 +1,32 @@
-use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
-use std::future::Future;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use web_sys::AudioWorkletNode;
+#[cfg(feature = "message")]
+use {
+	crate::message::{Message, MessageEvent, MessageHandler, SendMessages, TransferError},
+	std::borrow::Cow,
+	std::cell::RefCell,
+	std::future::Future,
+	std::rc::Weak,
+};
 
-use crate::common::{MessageHandler, Tls, EXPORTS};
-use crate::message::{Message, MessageEvent, SendMessages, TransferError};
+use crate::common::{Tls, EXPORTS};
 
 #[derive(Clone, Debug)]
 pub struct Worklet {
 	worklet: AudioWorkletNode,
 	id: Rc<Cell<Option<usize>>>,
+	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
 
 impl Drop for Worklet {
 	fn drop(&mut self) {
+		#[cfg(feature = "message")]
 		if Rc::strong_count(&self.message_handler) == 1 {
 			self.worklet.port().unwrap().set_onmessage(None);
 		}
@@ -35,10 +42,12 @@ impl PartialEq for Worklet {
 }
 
 impl WorkletOrRef for Worklet {
+	#[cfg(feature = "message")]
 	fn handle_ref(&self) -> WorkletRef {
 		WorkletRef {
 			worklet: self.worklet.clone(),
 			id: Rc::clone(&self.id),
+			#[cfg(feature = "message")]
 			message_handler: Rc::downgrade(&self.message_handler),
 		}
 	}
@@ -51,6 +60,7 @@ impl WorkletOrRef for Worklet {
 		&self.id
 	}
 
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Some(Cow::Borrowed(&self.message_handler))
 	}
@@ -60,11 +70,12 @@ impl Worklet {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
 		id: Rc<Cell<Option<usize>>>,
-		message_handler: Rc<RefCell<Option<MessageHandler>>>,
+		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
 			worklet,
 			id,
+			#[cfg(feature = "message")]
 			message_handler,
 		}
 	}
@@ -76,16 +87,19 @@ impl Worklet {
 
 	#[must_use]
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn has_message_handler(&self) -> bool {
 		<Self as WorkletOrRef>::has_message_handler(self)
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn clear_message_handler(&self) {
 		<Self as WorkletOrRef>::clear_message_handler(self);
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn set_message_handler<F>(&self, new_message_handler: F)
 	where
 		F: 'static + FnMut(&WorkletRef, MessageEvent),
@@ -94,6 +108,7 @@ impl Worklet {
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn set_message_handler_async<F1, F2>(&self, new_message_handler: F1)
 	where
 		F1: 'static + FnMut(&WorkletRef, MessageEvent) -> F2,
@@ -103,6 +118,7 @@ impl Worklet {
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
 	where
 		M: IntoIterator<Item = I>,
@@ -122,12 +138,15 @@ impl Worklet {
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "message")]
 pub struct WorkletRef {
 	worklet: AudioWorkletNode,
 	id: Rc<Cell<Option<usize>>>,
+	#[cfg(feature = "message")]
 	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
 
+#[cfg(feature = "message")]
 impl WorkletOrRef for WorkletRef {
 	fn handle_ref(&self) -> WorkletRef {
 		self.clone()
@@ -141,11 +160,13 @@ impl WorkletOrRef for WorkletRef {
 		&self.id
 	}
 
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Weak::upgrade(&self.message_handler).map(Cow::Owned)
 	}
 }
 
+#[cfg(feature = "message")]
 impl WorkletRef {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
@@ -212,20 +233,24 @@ impl WorkletRef {
 }
 
 trait WorkletOrRef: Debug + Sized {
+	#[cfg(feature = "message")]
 	fn handle_ref(&self) -> WorkletRef;
 
 	fn worklet(&self) -> &AudioWorkletNode;
 
 	fn id(&self) -> &Rc<Cell<Option<usize>>>;
 
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;
 
+	#[cfg(feature = "message")]
 	fn has_message_handler(&self) -> bool {
 		self.message_handler().map_or(false, |message_handler| {
 			RefCell::borrow(&message_handler).is_some()
 		})
 	}
 
+	#[cfg(feature = "message")]
 	fn clear_message_handler(&self) {
 		if let Some(message_handler) = self.message_handler() {
 			message_handler.take();
@@ -233,6 +258,7 @@ trait WorkletOrRef: Debug + Sized {
 		}
 	}
 
+	#[cfg(feature = "message")]
 	fn set_message_handler<F: 'static + FnMut(&WorkletRef, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
@@ -252,6 +278,7 @@ trait WorkletOrRef: Debug + Sized {
 		}
 	}
 
+	#[cfg(feature = "message")]
 	fn set_message_handler_async<
 		F1: 'static + FnMut(&WorkletRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
@@ -274,6 +301,7 @@ trait WorkletOrRef: Debug + Sized {
 		}
 	}
 
+	#[cfg(feature = "message")]
 	fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
 		&self,
 		messages: M,

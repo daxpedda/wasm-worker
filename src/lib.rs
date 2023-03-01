@@ -29,6 +29,7 @@
 
 pub mod common;
 mod global;
+#[cfg(feature = "message")]
 pub mod message;
 pub mod worker;
 #[cfg(feature = "worklet")]

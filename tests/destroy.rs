@@ -2,17 +2,15 @@
 
 mod util;
 
-use std::cell::RefCell;
-use std::ops::DerefMut;
-use std::rc::Rc;
-
 use futures_channel::oneshot;
 use futures_util::future::{self, Either};
-use js_sys::ArrayBuffer;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::message::Message;
 use wasm_worker::worker::DestroyError;
-use wasm_worker::WorkerBuilder;
+#[cfg(feature = "message")]
+use {
+	js_sys::ArrayBuffer, std::cell::RefCell, std::ops::DerefMut, std::rc::Rc,
+	wasm_worker::message::Message, wasm_worker::WorkerBuilder,
+};
 
 use self::util::{Flag, SIGNAL_DURATION};
 
@@ -99,6 +97,7 @@ async fn handle_wrong() {
 
 /// [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy).
 #[wasm_bindgen_test]
+#[cfg(feature = "message")]
 async fn handle_ref() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
@@ -149,6 +148,7 @@ async fn handle_ref() {
 /// Calling [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy)
 /// twice on the same worker.
 #[wasm_bindgen_test]
+#[cfg(feature = "message")]
 async fn handle_ref_twice() {
 	let flag = Flag::new();
 	let (sender, receiver) = oneshot::channel();
@@ -192,6 +192,7 @@ async fn handle_ref_twice() {
 /// Calling [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy)
 /// with the wrong [`Tls`](wasm_worker::common::Tls).
 #[wasm_bindgen_test]
+#[cfg(feature = "message")]
 async fn handle_ref_wrong() {
 	let flag = Flag::new();
 	let (sender_wrong, receiver_wrong) = oneshot::channel();

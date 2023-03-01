@@ -9,6 +9,7 @@ impl Global {
 	}
 }
 
+#[cfg_attr(not(feature = "worklet"), allow(unused_tuple_struct_fields))]
 pub(crate) enum WindowOrWorker {
 	Window(Window),
 	Worker(WorkerGlobalScope),

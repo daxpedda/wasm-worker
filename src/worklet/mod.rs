@@ -8,7 +8,9 @@ use web_sys::BaseAudioContext;
 pub use self::builder::{WorkletBuilder, WorkletFuture, WorkletInitError};
 pub use self::context::WorkletContext;
 pub use self::url::{ImportSupportFuture, WorkletUrl, WorkletUrlError, WorkletUrlFuture};
-pub use self::worklet::{Worklet, WorkletRef};
+pub use self::worklet::Worklet;
+#[cfg(feature = "message")]
+pub use self::worklet::WorkletRef;
 use crate::common::WAIT_ASYNC_SUPPORT;
 
 pub trait WorkletExt: sealed::Sealed {

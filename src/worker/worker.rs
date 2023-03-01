@@ -1,22 +1,30 @@
-use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::future::Future;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
-use crate::common::{MessageHandler, Tls, EXPORTS};
-use crate::message::{Message, MessageEvent, SendMessages, TransferError};
+#[cfg(feature = "message")]
+use {
+	crate::message::{Message, MessageEvent, MessageHandler, SendMessages, TransferError},
+	std::borrow::Cow,
+	std::cell::RefCell,
+	std::future::Future,
+	std::rc::Weak,
+};
+
+use crate::common::{Tls, EXPORTS};
 
 #[derive(Clone, Debug)]
 pub struct Worker {
 	worker: web_sys::Worker,
 	id: Rc<Cell<Option<usize>>>,
+	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
 
 impl Drop for Worker {
 	fn drop(&mut self) {
+		#[cfg(feature = "message")]
 		if Rc::strong_count(&self.message_handler) == 1 {
 			self.worker.set_onmessage(None);
 		}
@@ -32,10 +40,12 @@ impl PartialEq for Worker {
 }
 
 impl WorkerOrRef for Worker {
+	#[cfg(feature = "message")]
 	fn handle_ref(&self) -> WorkerRef {
 		WorkerRef {
 			worker: self.worker.clone(),
 			id: Rc::clone(&self.id),
+			#[cfg(feature = "message")]
 			message_handler: Rc::downgrade(&self.message_handler),
 		}
 	}
@@ -48,6 +58,7 @@ impl WorkerOrRef for Worker {
 		&self.id
 	}
 
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Some(Cow::Borrowed(&self.message_handler))
 	}
@@ -57,11 +68,12 @@ impl Worker {
 	pub(super) fn new(
 		worker: web_sys::Worker,
 		id: Rc<Cell<Option<usize>>>,
-		message_handler: Rc<RefCell<Option<MessageHandler>>>,
+		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
 			worker,
 			id,
+			#[cfg(feature = "message")]
 			message_handler,
 		}
 	}
@@ -73,16 +85,19 @@ impl Worker {
 
 	#[must_use]
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn has_message_handler(&self) -> bool {
 		<Self as WorkerOrRef>::has_message_handler(self)
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn clear_message_handler(&self) {
 		<Self as WorkerOrRef>::clear_message_handler(self);
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn set_message_handler<F>(&self, new_message_handler: F)
 	where
 		F: 'static + FnMut(&WorkerRef, MessageEvent),
@@ -91,6 +106,7 @@ impl Worker {
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn set_message_handler_async<F1, F2>(&self, new_message_handler: F1)
 	where
 		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
@@ -100,6 +116,7 @@ impl Worker {
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
 	where
 		M: IntoIterator<Item = I>,
@@ -120,12 +137,15 @@ impl Worker {
 }
 
 #[derive(Clone, Debug)]
+#[cfg(feature = "message")]
 pub struct WorkerRef {
 	worker: web_sys::Worker,
 	id: Rc<Cell<Option<usize>>>,
+	#[cfg(feature = "message")]
 	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
 
+#[cfg(feature = "message")]
 impl WorkerOrRef for WorkerRef {
 	fn handle_ref(&self) -> WorkerRef {
 		self.clone()
@@ -139,20 +159,23 @@ impl WorkerOrRef for WorkerRef {
 		&self.id
 	}
 
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Weak::upgrade(&self.message_handler).map(Cow::Owned)
 	}
 }
 
+#[cfg(feature = "message")]
 impl WorkerRef {
 	pub(super) fn new(
 		worker: web_sys::Worker,
 		id: Rc<Cell<Option<usize>>>,
-		message_handler: Weak<RefCell<Option<MessageHandler>>>,
+		#[cfg(feature = "message")] message_handler: Weak<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
 			worker,
 			id,
+			#[cfg(feature = "message")]
 			message_handler,
 		}
 	}
@@ -164,16 +187,19 @@ impl WorkerRef {
 
 	#[must_use]
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn has_message_handler(&self) -> bool {
 		<Self as WorkerOrRef>::has_message_handler(self)
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn clear_message_handler(&self) {
 		<Self as WorkerOrRef>::clear_message_handler(self);
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn set_message_handler<F>(&self, new_message_handler: F)
 	where
 		F: 'static + FnMut(&Self, MessageEvent),
@@ -182,6 +208,7 @@ impl WorkerRef {
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn set_message_handler_async<F1, F2>(&self, new_message_handler: F1)
 	where
 		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
@@ -191,6 +218,7 @@ impl WorkerRef {
 	}
 
 	#[allow(clippy::same_name_method)]
+	#[cfg(feature = "message")]
 	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
 	where
 		M: IntoIterator<Item = I>,
@@ -211,20 +239,24 @@ impl WorkerRef {
 }
 
 trait WorkerOrRef: Debug + Sized {
+	#[cfg(feature = "message")]
 	fn handle_ref(&self) -> WorkerRef;
 
 	fn worker(&self) -> &web_sys::Worker;
 
 	fn id(&self) -> &Rc<Cell<Option<usize>>>;
 
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;
 
+	#[cfg(feature = "message")]
 	fn has_message_handler(&self) -> bool {
 		self.message_handler().map_or(false, |message_handler| {
 			RefCell::borrow(&message_handler).is_some()
 		})
 	}
 
+	#[cfg(feature = "message")]
 	fn clear_message_handler(&self) {
 		if let Some(message_handler) = self.message_handler() {
 			message_handler.take();
@@ -232,6 +264,7 @@ trait WorkerOrRef: Debug + Sized {
 		}
 	}
 
+	#[cfg(feature = "message")]
 	fn set_message_handler<F: 'static + FnMut(&WorkerRef, MessageEvent)>(
 		&self,
 		mut new_message_handler: F,
@@ -248,6 +281,7 @@ trait WorkerOrRef: Debug + Sized {
 		}
 	}
 
+	#[cfg(feature = "message")]
 	fn set_message_handler_async<
 		F1: 'static + FnMut(&WorkerRef, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
@@ -267,6 +301,7 @@ trait WorkerOrRef: Debug + Sized {
 		}
 	}
 
+	#[cfg(feature = "message")]
 	fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
 		&self,
 		messages: M,

@@ -1,11 +1,13 @@
-use std::cell::RefCell;
-use std::future::Future;
-
 use once_cell::unsync::OnceCell;
 use web_sys::DedicatedWorkerGlobalScope;
+#[cfg(feature = "message")]
+use {
+	crate::message::{Message, MessageEvent, MessageHandler, SendMessages, TransferError},
+	std::cell::RefCell,
+	std::future::Future,
+};
 
-use crate::common::{MessageHandler, Tls, EXPORTS};
-use crate::message::{Message, MessageEvent, SendMessages, TransferError};
+use crate::common::{Tls, EXPORTS};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerContext {
@@ -15,6 +17,7 @@ pub struct WorkerContext {
 
 impl WorkerContext {
 	thread_local! {
+		#[cfg(feature = "message")]
 		static MESSAGE_HANDLER: RefCell<Option<MessageHandler>> = RefCell::new(None);
 		#[allow(clippy::use_self)]
 		static BACKUP: OnceCell<WorkerContext> = OnceCell::new();
@@ -56,16 +59,19 @@ impl WorkerContext {
 	}
 
 	#[must_use]
+	#[cfg(feature = "message")]
 	pub fn has_message_handler(&self) -> bool {
 		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow().is_some())
 	}
 
 	#[allow(clippy::must_use_candidate)]
+	#[cfg(feature = "message")]
 	pub fn clear_message_handler(&self) {
 		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());
 		self.context.set_onmessage(None);
 	}
 
+	#[cfg(feature = "message")]
 	pub fn set_message_handler<F>(&self, mut new_message_handler: F)
 	where
 		F: 'static + FnMut(&Self, MessageEvent),
@@ -82,6 +88,7 @@ impl WorkerContext {
 		});
 	}
 
+	#[cfg(feature = "message")]
 	pub fn set_message_handler_async<F1, F2>(&self, mut new_message_handler: F1)
 	where
 		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
@@ -99,6 +106,7 @@ impl WorkerContext {
 		});
 	}
 
+	#[cfg(feature = "message")]
 	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
 	where
 		M: IntoIterator<Item = I>,

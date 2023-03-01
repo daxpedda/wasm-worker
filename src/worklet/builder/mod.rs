@@ -1,27 +1,34 @@
 mod future;
 
 use std::borrow::Cow;
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::future::Future;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 use js_sys::Reflect;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletGlobalScope, BaseAudioContext};
+#[cfg(feature = "message")]
+use {
+	super::WorkletRef,
+	crate::message::{MessageEvent, MessageHandler},
+	std::cell::RefCell,
+	std::future::Future,
+	std::rc::Weak,
+};
 
 pub use self::future::WorkletFuture;
-use super::{WorkletContext, WorkletRef, WorkletUrl, WorkletUrlFuture};
-use crate::common::MessageHandler;
-use crate::message::MessageEvent;
+use super::{WorkletContext, WorkletUrl, WorkletUrlFuture};
 
 #[must_use = "does nothing unless spawned"]
 #[derive(Debug)]
 pub struct WorkletBuilder<'url> {
 	url: DefaultOrUrl<'url>,
+	#[cfg(feature = "message")]
 	id: Rc<Cell<Option<usize>>>,
+	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
 
@@ -35,19 +42,25 @@ impl WorkletBuilder<'_> {
 	pub fn new() -> WorkletBuilder<'static> {
 		WorkletBuilder {
 			url: DefaultOrUrl::Default(WorkletUrl::default()),
+			#[cfg(feature = "message")]
 			id: Rc::new(Cell::new(None)),
+			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 		}
 	}
 
+	#[cfg_attr(not(feature = "message"), allow(clippy::missing_const_for_fn))]
 	pub fn new_with_url(url: &WorkletUrl) -> WorkletBuilder<'_> {
 		WorkletBuilder {
 			url: DefaultOrUrl::Url(url),
+			#[cfg(feature = "message")]
 			id: Rc::new(Cell::new(None)),
+			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 		}
 	}
 
+	#[cfg(feature = "message")]
 	pub fn message_handler<F>(self, mut message_handler: F) -> Self
 	where
 		F: 'static + FnMut(&WorkletRef, MessageEvent),
@@ -70,6 +83,7 @@ impl WorkletBuilder<'_> {
 		self
 	}
 
+	#[cfg(feature = "message")]
 	pub fn message_handler_async<F1, F2>(self, mut message_handler: F1) -> Self
 	where
 		F1: 'static + FnMut(&WorkletRef, MessageEvent) -> F2,
@@ -119,6 +133,7 @@ impl WorkletBuilder<'_> {
 				f(context);
 			}),
 			Rc::new(Cell::new(None)),
+			#[cfg(feature = "message")]
 			Rc::new(RefCell::new(None)),
 			self.url,
 		))
