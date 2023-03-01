@@ -133,3 +133,15 @@ impl Tls {
 			.with(|descriptor| Global::new(descriptor, &self.stack_alloc.into()).unwrap())
 	}
 }
+
+pub(crate) static WAIT_ASYNC_SUPPORT: Lazy<bool> = Lazy::new(|| {
+	#[wasm_bindgen]
+	extern "C" {
+		type Atomics;
+
+		#[wasm_bindgen(static_method_of = Atomics, js_name = waitAsync, getter)]
+		fn wait_async() -> JsValue;
+	}
+
+	!Atomics::wait_async().is_undefined()
+});

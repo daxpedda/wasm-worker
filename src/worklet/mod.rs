@@ -9,6 +9,7 @@ pub use self::builder::{WorkletBuilder, WorkletFuture, WorkletInitError};
 pub use self::context::WorkletContext;
 pub use self::url::{ImportSupportFuture, WorkletUrl, WorkletUrlError, WorkletUrlFuture};
 pub use self::worklet::{Worklet, WorkletRef};
+use crate::common::WAIT_ASYNC_SUPPORT;
 
 pub trait WorkletExt: sealed::Sealed {
 	fn add_wasm<F>(&self, f: F) -> Result<WorkletFuture<'_>, WorkletInitError>
@@ -23,6 +24,11 @@ impl WorkletExt for BaseAudioContext {
 	{
 		WorkletBuilder::new().add(self, f)
 	}
+}
+
+#[must_use]
+pub fn has_async_support() -> bool {
+	*WAIT_ASYNC_SUPPORT
 }
 
 mod sealed {
