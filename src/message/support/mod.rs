@@ -29,12 +29,12 @@ use web_sys::{DomException, Worker};
 use super::Message;
 
 impl Message {
-	pub fn has_array_buffer_support() -> Result<(), SupportError> {
+	pub fn has_array_buffer_support() -> Result<(), MessageSupportError> {
 		array_buffer::support()
 	}
 
 	#[cfg(web_sys_unstable_apis)]
-	pub fn has_audio_data_support() -> Result<(), SupportError> {
+	pub fn has_audio_data_support() -> Result<(), MessageSupportError> {
 		audio_data::support()
 	}
 
@@ -42,40 +42,40 @@ impl Message {
 		ImageBitmapSupportFuture::new()
 	}
 
-	pub fn has_message_port_support() -> Result<(), SupportError> {
+	pub fn has_message_port_support() -> Result<(), MessageSupportError> {
 		message_port::support()
 	}
 
-	pub fn has_offscreen_canvas_support() -> Result<(), SupportError> {
+	pub fn has_offscreen_canvas_support() -> Result<(), MessageSupportError> {
 		offscreen_canvas::support()
 	}
 
 	#[cfg(web_sys_unstable_apis)]
-	pub fn has_readable_stream_support() -> Result<(), SupportError> {
+	pub fn has_readable_stream_support() -> Result<(), MessageSupportError> {
 		readable_stream::support()
 	}
 
-	pub fn has_rtc_data_channel_support() -> Result<(), SupportError> {
+	pub fn has_rtc_data_channel_support() -> Result<(), MessageSupportError> {
 		rtc_data_channel::support()
 	}
 
 	#[cfg(web_sys_unstable_apis)]
-	pub fn has_transform_stream_support() -> Result<(), SupportError> {
+	pub fn has_transform_stream_support() -> Result<(), MessageSupportError> {
 		transform_stream::support()
 	}
 
 	#[cfg(web_sys_unstable_apis)]
-	pub fn has_video_frame_support() -> Result<(), SupportError> {
+	pub fn has_video_frame_support() -> Result<(), MessageSupportError> {
 		video_frame::support()
 	}
 
 	#[cfg(web_sys_unstable_apis)]
-	pub fn has_writable_stream_support() -> Result<(), SupportError> {
+	pub fn has_writable_stream_support() -> Result<(), MessageSupportError> {
 		writable_stream::support()
 	}
 }
 
-fn test_support(data: &JsValue) -> Result<(), SupportError> {
+fn test_support(data: &JsValue) -> Result<(), MessageSupportError> {
 	let worker = Worker::new("data:,").unwrap();
 	let result = worker.post_message_with_transfer(data, &Array::of1(data));
 	worker.terminate();
@@ -84,9 +84,9 @@ fn test_support(data: &JsValue) -> Result<(), SupportError> {
 		let error: DomException = error.unchecked_into();
 
 		if error.code() == DomException::DATA_CLONE_ERR {
-			Err(SupportError::Unsupported)
+			Err(MessageSupportError::Unsupported)
 		} else {
-			Err(SupportError::Undetermined)
+			Err(MessageSupportError::Undetermined)
 		}
 	} else {
 		Ok(())
@@ -94,12 +94,12 @@ fn test_support(data: &JsValue) -> Result<(), SupportError> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SupportError {
+pub enum MessageSupportError {
 	Unsupported,
 	Undetermined,
 }
 
-impl Display for SupportError {
+impl Display for MessageSupportError {
 	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Unsupported => write!(f, "type is not transferable"),
@@ -108,4 +108,4 @@ impl Display for SupportError {
 	}
 }
 
-impl Error for SupportError {}
+impl Error for MessageSupportError {}

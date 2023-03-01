@@ -6,7 +6,7 @@ use std::task::{ready, Context, Poll};
 use futures_core::future::FusedFuture;
 
 use super::super::Message;
-use super::{ImageBitmapSupportFuture, SupportError};
+use super::{ImageBitmapSupportFuture, MessageSupportError};
 
 impl Message {
 	pub fn has_support(&self) -> MessageSupportFuture {
@@ -20,7 +20,7 @@ pub struct MessageSupportFuture(Option<State>);
 
 #[derive(Debug)]
 enum State {
-	Ready(Result<(), SupportError>),
+	Ready(Result<(), MessageSupportError>),
 	ImageBitmap(ImageBitmapSupportFuture),
 }
 
@@ -43,12 +43,12 @@ impl MessageSupportFuture {
 			#[cfg(web_sys_unstable_apis)]
 			Message::WritableStream(_) => State::Ready(Message::has_writable_stream_support()),
 			#[cfg(not(web_sys_unstable_apis))]
-			_ => State::Ready(Err(SupportError::Undetermined)),
+			_ => State::Ready(Err(MessageSupportError::Undetermined)),
 		}))
 	}
 
 	#[track_caller]
-	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
+	pub fn into_inner(&mut self) -> Option<Result<(), MessageSupportError>> {
 		match self.0.as_mut().expect("polled after `Ready`") {
 			State::Ready(support) => {
 				let support = *support;
@@ -67,7 +67,7 @@ impl MessageSupportFuture {
 }
 
 impl Future for MessageSupportFuture {
-	type Output = Result<(), SupportError>;
+	type Output = Result<(), MessageSupportError>;
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

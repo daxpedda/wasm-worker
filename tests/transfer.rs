@@ -13,7 +13,7 @@ use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::message::{Message, SupportError};
+use wasm_worker::message::{Message, MessageSupportError};
 use wasm_worker::WorkerBuilder;
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{
@@ -87,7 +87,7 @@ async fn test_transfer<T, F1, F2, F3>(
 	T: Clone + JsCast + TryFrom<Message>,
 	Message: From<T>,
 	<T as TryFrom<Message>>::Error: Debug,
-	F1: Future<Output = Result<(), SupportError>>,
+	F1: Future<Output = Result<(), MessageSupportError>>,
 	F2: Future<Output = T>,
 	F3: Future<Output = ()>,
 {
@@ -237,7 +237,7 @@ async fn audio_data() {
 /// [`ImageBitmap`].
 #[wasm_bindgen_test]
 async fn image_bitmap() {
-	let _: Result<(), SupportError> = Message::has_image_bitmap_support().await;
+	let _: Result<(), MessageSupportError> = Message::has_image_bitmap_support().await;
 
 	test_transfer(
 		Message::has_image_bitmap_support,

@@ -1,13 +1,13 @@
 use once_cell::sync::Lazy;
 use web_sys::{VideoFrame, VideoFrameBufferInit, VideoPixelFormat};
 
-use super::super::SupportError;
+use super::super::MessageSupportError;
 use crate::global::Global;
 
-pub(in super::super) fn support() -> Result<(), SupportError> {
-	static SUPPORT: Lazy<Result<(), SupportError>> = Lazy::new(|| {
+pub(in super::super) fn support() -> Result<(), MessageSupportError> {
+	static SUPPORT: Lazy<Result<(), MessageSupportError>> = Lazy::new(|| {
 		if Global::new().video_frame().is_undefined() {
-			return Err(SupportError::Unsupported);
+			return Err(MessageSupportError::Unsupported);
 		}
 
 		let frame = VideoFrame::new_with_u8_array_and_video_frame_buffer_init(

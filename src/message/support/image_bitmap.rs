@@ -9,10 +9,10 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{ImageBitmap, ImageData};
 
-use super::super::SupportError;
+use super::super::MessageSupportError;
 use crate::global::WindowOrWorker;
 
-static SUPPORT: OnceCell<Result<(), SupportError>> = OnceCell::new();
+static SUPPORT: OnceCell<Result<(), MessageSupportError>> = OnceCell::new();
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
@@ -20,7 +20,7 @@ pub struct ImageBitmapSupportFuture(Option<State>);
 
 #[derive(Debug)]
 enum State {
-	Ready(Result<(), SupportError>),
+	Ready(Result<(), MessageSupportError>),
 	Create(JsFuture),
 }
 
@@ -52,7 +52,7 @@ impl ImageBitmapSupportFuture {
 	}
 
 	#[track_caller]
-	pub fn into_inner(&mut self) -> Option<Result<(), SupportError>> {
+	pub fn into_inner(&mut self) -> Option<Result<(), MessageSupportError>> {
 		let state = self.0.as_ref().expect("polled after `Ready`");
 
 		if let Some(support) = SUPPORT.get() {
@@ -75,7 +75,7 @@ impl ImageBitmapSupportFuture {
 }
 
 impl Future for ImageBitmapSupportFuture {
-	type Output = Result<(), SupportError>;
+	type Output = Result<(), MessageSupportError>;
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
