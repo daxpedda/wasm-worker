@@ -5,7 +5,6 @@
 mod util;
 
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
@@ -15,6 +14,7 @@ use wasm_worker::worker::WorkerContext;
 use wasm_worker::WorkerBuilder;
 
 use self::util::{Flag, SIGNAL_DURATION};
+use crate::util::YIELD_DURATION;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
@@ -720,7 +720,7 @@ async fn message_handler_race() {
 	});
 
 	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
-	util::sleep(Duration::from_secs(5)).await;
+	util::sleep(YIELD_DURATION).await;
 	drop(lock);
 
 	// The message handler will never signal if event was missed.
