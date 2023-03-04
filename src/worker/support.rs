@@ -19,48 +19,49 @@ use crate::global::{Global, WindowOrWorker};
 
 static SUPPORT: OnceCell<bool> = OnceCell::new();
 
-pub fn has_async_support() -> AsyncSupportFuture {
+pub fn has_async_support() -> Result<AsyncSupportFuture, AsyncSupportError> {
 	if let Some(support) = SUPPORT.get() {
-		return AsyncSupportFuture(Some(State::Ready(Ok(*support))));
+		return Ok(AsyncSupportFuture(Some(State::Ready(*support))));
 	}
 
 	let state = if *WAIT_ASYNC_SUPPORT {
-		State::Ready(Ok(true))
-	} else {
-		WindowOrWorker::with(|global| match global {
-			WindowOrWorker::Window(_) => {
-				let worker = web_sys::Worker::new(
-					"data:,postMessage%28typeof%20Worker%21%3D%3D%27undefined%27%29",
-				)
-				.unwrap();
-				let oneshot = Oneshot::new();
-				let closure = Closure::new({
-					let oneshot = oneshot.clone();
-					move |event: MessageEvent| {
-						let data: Boolean = event.data().unchecked_into();
-						oneshot.set(data.value_of());
-					}
-				});
-				worker.set_onmessage(Some(closure.as_ref().unchecked_ref()));
-
-				State::Worker {
-					worker,
-					_message_handler: closure,
-					oneshot,
+		State::Ready(true)
+	} else if let Some(state) = WindowOrWorker::with(|global| match global {
+		WindowOrWorker::Window(_) => {
+			let worker = web_sys::Worker::new(
+				"data:,postMessage%28typeof%20Worker%21%3D%3D%27undefined%27%29",
+			)
+			.unwrap();
+			let oneshot = Oneshot::new();
+			let closure = Closure::new({
+				let oneshot = oneshot.clone();
+				move |event: MessageEvent| {
+					let data: Boolean = event.data().unchecked_into();
+					oneshot.set(data.value_of());
 				}
+			});
+			worker.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+
+			State::Worker {
+				worker,
+				_message_handler: closure,
+				oneshot,
 			}
-			WindowOrWorker::Worker(_) => State::Ready(Ok(Global::new().worker().is_undefined())),
-		})
-		.unwrap_or(State::Ready(Err(AsyncSupportError)))
+		}
+		WindowOrWorker::Worker(_) => State::Ready(!Global::new().worker().is_undefined()),
+	}) {
+		state
+	} else {
+		return Err(AsyncSupportError);
 	};
 
-	if let State::Ready(Ok(support)) = state {
+	if let State::Ready(support) = state {
 		if let Err((old_support, _)) = SUPPORT.try_insert(support) {
 			debug_assert_eq!(support, *old_support);
 		}
 	}
 
-	AsyncSupportFuture(Some(state))
+	Ok(AsyncSupportFuture(Some(state)))
 }
 
 #[derive(Debug)]
@@ -69,7 +70,7 @@ pub struct AsyncSupportFuture(Option<State>);
 
 #[derive(Debug)]
 enum State {
-	Ready(Result<bool, AsyncSupportError>),
+	Ready(bool),
 	Worker {
 		worker: web_sys::Worker,
 		_message_handler: Closure<dyn Fn(MessageEvent)>,
@@ -78,40 +79,72 @@ enum State {
 }
 
 impl AsyncSupportFuture {
-	pub fn into_inner(&mut self) -> Option<Result<bool, AsyncSupportError>> {
+	pub fn into_inner(&mut self) -> Option<bool> {
 		let state = self.0.as_ref().expect("polled after `Ready`");
 
 		if let Some(support) = SUPPORT.get() {
-			if let State::Ready(Ok(new_support)) = self.0.take().unwrap() {
+			if let Some(new_support) = self.abort() {
 				debug_assert_eq!(*support, new_support);
 			}
 
-			return Some(Ok(*support));
+			return Some(*support);
 		}
 
-		if let State::Ready(support) = state {
-			let support = *support;
-			self.0.take();
+		match state {
+			State::Ready(support) => {
+				let support = *support;
+				self.0.take();
 
-			Some(support)
-		} else {
-			None
+				Some(support)
+			}
+			State::Worker {
+				worker, oneshot, ..
+			} => {
+				if let Some(support) = oneshot.get() {
+					worker.terminate();
+					worker.set_onmessage(None);
+
+					Some(support)
+				} else {
+					None
+				}
+			}
+		}
+	}
+
+	fn abort(&mut self) -> Option<bool> {
+		match self.0.take()? {
+			State::Ready(support) => Some(support),
+			State::Worker {
+				worker, oneshot, ..
+			} => {
+				worker.terminate();
+				worker.set_onmessage(None);
+
+				oneshot.get()
+			}
 		}
 	}
 }
 
+impl Drop for AsyncSupportFuture {
+	fn drop(&mut self) {
+		self.abort();
+	}
+}
+
 impl Future for AsyncSupportFuture {
-	type Output = Result<bool, AsyncSupportError>;
+	type Output = bool;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		let state = self.0.as_mut().expect("polled after `Ready`");
 
 		if let Some(support) = SUPPORT.get() {
-			if let State::Ready(Ok(new_support)) = self.0.take().unwrap() {
+			if let Some(new_support) = self.abort() {
 				debug_assert_eq!(*support, new_support);
 			}
 
-			return Poll::Ready(Ok(*support));
+			return Poll::Ready(*support);
 		}
 
 		match state {
@@ -132,7 +165,7 @@ impl Future for AsyncSupportFuture {
 					debug_assert_eq!(support, *old_support);
 				}
 
-				Poll::Ready(Ok(support))
+				Poll::Ready(support)
 			}
 		}
 	}
@@ -171,6 +204,10 @@ impl Oneshot {
 			waker: RefCell::default(),
 			result: Cell::default(),
 		}))
+	}
+
+	fn get(&self) -> Option<bool> {
+		self.0.result.get()
 	}
 
 	fn set(&self, result: bool) {

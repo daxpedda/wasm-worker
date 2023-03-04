@@ -13,7 +13,7 @@ use web_sys::{console, AudioContext, Response};
 async fn main() {
 	console_error_panic_hook::set_once();
 
-	console::log_1(&worker::has_async_support().await.unwrap().into());
+	console::log_1(&worker::has_async_support().unwrap().await.into());
 
 	console::log_1(&WorkletUrl::has_import_support().await.into());
 
