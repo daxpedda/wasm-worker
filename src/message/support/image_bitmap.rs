@@ -10,9 +10,9 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{ImageBitmap, ImageData};
 
 use super::super::MessageSupportError;
-use crate::global::WindowOrWorker;
+use crate::global::{Global, WindowOrWorker};
 
-static SUPPORT: OnceCell<Result<(), MessageSupportError>> = OnceCell::new();
+static SUPPORT: OnceCell<bool> = OnceCell::new();
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
@@ -20,38 +20,42 @@ pub struct ImageBitmapSupportFuture(Option<State>);
 
 #[derive(Debug)]
 enum State {
-	Ready(Result<(), MessageSupportError>),
+	Ready(bool),
 	Create(JsFuture),
 }
 
 impl ImageBitmapSupportFuture {
-	pub(in super::super) fn new() -> Self {
+	pub(in super::super) fn new() -> Result<Self, MessageSupportError> {
 		if let Some(support) = SUPPORT.get() {
-			Self(Some(State::Ready(*support)))
+			Ok(Self(Some(State::Ready(*support))))
 		} else {
-			Self(Some(
-				WindowOrWorker::with(|global| {
-					let image = ImageData::new_with_sw(1, 1).unwrap();
-
-					let promise = match global {
-						WindowOrWorker::Window(window) => {
-							window.create_image_bitmap_with_image_data(&image)
-						}
-						WindowOrWorker::Worker(worker) => {
-							worker.create_image_bitmap_with_image_data(&image)
-						}
+			WindowOrWorker::with(|global| {
+				if let WindowOrWorker::Worker(_) = global {
+					if Global::new().worker().is_undefined() {
+						return Err(MessageSupportError);
 					}
-					.unwrap();
+				}
 
-					State::Create(JsFuture::from(promise))
-				})
-				.unwrap_or(State::Ready(Err(MessageSupportError::Undetermined))),
-			))
+				let image = ImageData::new_with_sw(1, 1).unwrap();
+
+				let promise = match global {
+					WindowOrWorker::Window(window) => {
+						window.create_image_bitmap_with_image_data(&image)
+					}
+					WindowOrWorker::Worker(worker) => {
+						worker.create_image_bitmap_with_image_data(&image)
+					}
+				}
+				.unwrap();
+
+				Ok(Self(Some(State::Create(JsFuture::from(promise)))))
+			})
+			.unwrap_or(Err(MessageSupportError))
 		}
 	}
 
 	#[track_caller]
-	pub fn into_inner(&mut self) -> Option<Result<(), MessageSupportError>> {
+	pub fn into_inner(&mut self) -> Option<bool> {
 		let state = self.0.as_ref().expect("polled after `Ready`");
 
 		if let Some(support) = SUPPORT.get() {
@@ -74,7 +78,7 @@ impl ImageBitmapSupportFuture {
 }
 
 impl Future for ImageBitmapSupportFuture {
-	type Output = Result<(), MessageSupportError>;
+	type Output = bool;
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

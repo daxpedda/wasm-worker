@@ -1,23 +1,39 @@
 use js_sys::ArrayBuffer;
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 use web_sys::{AudioData, AudioDataInit, AudioSampleFormat};
 
 use super::super::MessageSupportError;
-use crate::global::Global;
+use crate::global::{Global, WindowOrWorker};
 
-pub(in super::super) fn support() -> Result<(), MessageSupportError> {
-	static SUPPORT: Lazy<Result<(), MessageSupportError>> = Lazy::new(|| {
-		let global = Global::new();
+pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
+	static SUPPORT: OnceCell<bool> = OnceCell::new();
 
-		if global.audio_data().is_undefined() {
-			return Err(MessageSupportError::Unsupported);
-		}
+	SUPPORT
+		.get_or_try_init(|| {
+			WindowOrWorker::with(|global| {
+				if Global::new().audio_data().is_undefined() {
+					return Ok(false);
+				}
 
-		let init = AudioDataInit::new(&ArrayBuffer::new(1), AudioSampleFormat::U8, 1, 1, 3000., 0.);
-		let data = AudioData::new(&init).unwrap();
+				if let WindowOrWorker::Worker(_) = global {
+					if Global::new().worker().is_undefined() {
+						return Err(MessageSupportError);
+					}
+				}
 
-		super::test_support(&data)
-	});
+				let init = AudioDataInit::new(
+					&ArrayBuffer::new(1),
+					AudioSampleFormat::U8,
+					1,
+					1,
+					3000.,
+					0.,
+				);
+				let data = AudioData::new(&init).unwrap();
 
-	*SUPPORT
+				Ok(super::test_support(&data))
+			})
+			.unwrap_or(Err(MessageSupportError))
+		})
+		.copied()
 }

@@ -1,15 +1,27 @@
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 use web_sys::RtcPeerConnection;
 
 use super::super::MessageSupportError;
+use crate::global::{Global, WindowOrWorker};
 
-pub(in super::super) fn support() -> Result<(), MessageSupportError> {
-	static SUPPORT: Lazy<Result<(), MessageSupportError>> = Lazy::new(|| {
-		let connection = RtcPeerConnection::new().unwrap();
-		let channel = connection.create_data_channel("");
+pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
+	static SUPPORT: OnceCell<bool> = OnceCell::new();
 
-		super::test_support(&channel)
-	});
+	SUPPORT
+		.get_or_try_init(|| {
+			WindowOrWorker::with(|global| {
+				if let WindowOrWorker::Worker(_) = global {
+					if Global::new().worker().is_undefined() {
+						return Err(MessageSupportError);
+					}
+				}
 
-	*SUPPORT
+				let connection = RtcPeerConnection::new().unwrap();
+				let channel = connection.create_data_channel("");
+
+				Ok(super::test_support(&channel))
+			})
+			.unwrap_or(Err(MessageSupportError))
+		})
+		.copied()
 }

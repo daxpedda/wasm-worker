@@ -1,14 +1,26 @@
 use js_sys::ArrayBuffer;
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 
-use super::super::MessageSupportError;
+use crate::global::{Global, WindowOrWorker};
+use crate::message::MessageSupportError;
 
-pub(in super::super) fn support() -> Result<(), MessageSupportError> {
-	static SUPPORT: Lazy<Result<(), MessageSupportError>> = Lazy::new(|| {
-		let buffer = ArrayBuffer::new(1);
+pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
+	static SUPPORT: OnceCell<bool> = OnceCell::new();
 
-		super::test_support(&buffer)
-	});
+	SUPPORT
+		.get_or_try_init(|| {
+			WindowOrWorker::with(|global| {
+				if let WindowOrWorker::Worker(_) = global {
+					if Global::new().worker().is_undefined() {
+						return Err(MessageSupportError);
+					}
+				}
 
-	*SUPPORT
+				let buffer = ArrayBuffer::new(1);
+
+				Ok(super::test_support(&buffer))
+			})
+			.unwrap_or(Err(MessageSupportError))
+		})
+		.copied()
 }

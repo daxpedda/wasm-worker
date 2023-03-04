@@ -1,23 +1,34 @@
-use once_cell::sync::Lazy;
+use once_cell::sync::OnceCell;
 use web_sys::{VideoFrame, VideoFrameBufferInit, VideoPixelFormat};
 
 use super::super::MessageSupportError;
-use crate::global::Global;
+use crate::global::{Global, WindowOrWorker};
 
-pub(in super::super) fn support() -> Result<(), MessageSupportError> {
-	static SUPPORT: Lazy<Result<(), MessageSupportError>> = Lazy::new(|| {
-		if Global::new().video_frame().is_undefined() {
-			return Err(MessageSupportError::Unsupported);
-		}
+pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
+	static SUPPORT: OnceCell<bool> = OnceCell::new();
 
-		let frame = VideoFrame::new_with_u8_array_and_video_frame_buffer_init(
-			&mut [0; 4],
-			&VideoFrameBufferInit::new(1, 1, VideoPixelFormat::Rgba, 0.),
-		)
-		.unwrap();
+	SUPPORT
+		.get_or_try_init(|| {
+			WindowOrWorker::with(|global| {
+				if Global::new().video_frame().is_undefined() {
+					return Ok(false);
+				}
 
-		super::test_support(&frame)
-	});
+				if let WindowOrWorker::Worker(_) = global {
+					if Global::new().worker().is_undefined() {
+						return Err(MessageSupportError);
+					}
+				}
 
-	*SUPPORT
+				let frame = VideoFrame::new_with_u8_array_and_video_frame_buffer_init(
+					&mut [0; 4],
+					&VideoFrameBufferInit::new(1, 1, VideoPixelFormat::Rgba, 0.),
+				)
+				.unwrap();
+
+				Ok(super::test_support(&frame))
+			})
+			.unwrap_or(Err(MessageSupportError))
+		})
+		.copied()
 }

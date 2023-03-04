@@ -9,7 +9,7 @@ use super::super::Message;
 use super::{ImageBitmapSupportFuture, MessageSupportError};
 
 impl Message {
-	pub fn has_support(&self) -> MessageSupportFuture {
+	pub fn has_support(&self) -> Result<MessageSupportFuture, MessageSupportError> {
 		MessageSupportFuture::new(self)
 	}
 }
@@ -20,35 +20,30 @@ pub struct MessageSupportFuture(Option<State>);
 
 #[derive(Debug)]
 enum State {
-	Ready(Result<(), MessageSupportError>),
+	Ready(bool),
 	ImageBitmap(ImageBitmapSupportFuture),
 }
 
 impl MessageSupportFuture {
-	fn new(message: &Message) -> Self {
-		Self(Some(match message {
-			Message::ArrayBuffer(_) => State::Ready(Message::has_array_buffer_support()),
+	fn new(message: &Message) -> Result<Self, MessageSupportError> {
+		Ok(Self(Some(match message {
+			Message::ArrayBuffer(_) => State::Ready(Message::has_array_buffer_support()?),
 			#[cfg(web_sys_unstable_apis)]
-			Message::AudioData(_) => State::Ready(Message::has_audio_data_support()),
-			Message::ImageBitmap(_) => State::ImageBitmap(Message::has_image_bitmap_support()),
-			Message::MessagePort(_) => State::Ready(Message::has_message_port_support()),
-			Message::OffscreenCanvas(_) => State::Ready(Message::has_offscreen_canvas_support()),
+			Message::AudioData(_) => State::Ready(Message::has_audio_data_support()?),
+			Message::ImageBitmap(_) => State::ImageBitmap(Message::has_image_bitmap_support()?),
+			Message::MessagePort(_) => State::Ready(Message::has_message_port_support()?),
+			Message::OffscreenCanvas(_) => State::Ready(Message::has_offscreen_canvas_support()?),
+			Message::ReadableStream(_) => State::Ready(Message::has_readable_stream_support()?),
+			Message::RtcDataChannel(_) => State::Ready(Message::has_rtc_data_channel_support()?),
+			Message::TransformStream(_) => State::Ready(Message::has_transform_stream_support()?),
 			#[cfg(web_sys_unstable_apis)]
-			Message::ReadableStream(_) => State::Ready(Message::has_readable_stream_support()),
-			Message::RtcDataChannel(_) => State::Ready(Message::has_rtc_data_channel_support()),
-			#[cfg(web_sys_unstable_apis)]
-			Message::TransformStream(_) => State::Ready(Message::has_transform_stream_support()),
-			#[cfg(web_sys_unstable_apis)]
-			Message::VideoFrame(_) => State::Ready(Message::has_video_frame_support()),
-			#[cfg(web_sys_unstable_apis)]
-			Message::WritableStream(_) => State::Ready(Message::has_writable_stream_support()),
-			#[cfg(not(web_sys_unstable_apis))]
-			_ => State::Ready(Err(MessageSupportError::Undetermined)),
-		}))
+			Message::VideoFrame(_) => State::Ready(Message::has_video_frame_support()?),
+			Message::WritableStream(_) => State::Ready(Message::has_writable_stream_support()?),
+		})))
 	}
 
 	#[track_caller]
-	pub fn into_inner(&mut self) -> Option<Result<(), MessageSupportError>> {
+	pub fn into_inner(&mut self) -> Option<bool> {
 		match self.0.as_mut().expect("polled after `Ready`") {
 			State::Ready(support) => {
 				let support = *support;
@@ -67,7 +62,7 @@ impl MessageSupportFuture {
 }
 
 impl Future for MessageSupportFuture {
-	type Output = Result<(), MessageSupportError>;
+	type Output = bool;
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {

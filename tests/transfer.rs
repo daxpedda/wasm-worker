@@ -10,6 +10,8 @@ use futures_util::future::{self, Either};
 use futures_util::FutureExt;
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::closure::Closure;
+#[cfg(not(web_sys_unstable_apis))]
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -87,22 +89,19 @@ async fn test_transfer<T, F1, F2, F3>(
 	T: Clone + JsCast + TryFrom<Message>,
 	Message: From<T>,
 	<T as TryFrom<Message>>::Error: Debug,
-	F1: Future<Output = Result<(), MessageSupportError>>,
+	F1: Future<Output = Result<bool, MessageSupportError>>,
 	F2: Future<Output = T>,
 	F3: Future<Output = ()>,
 {
 	let message = Message::from(JsValue::UNDEFINED.unchecked_into());
-	let mut future = message.has_support();
+	let mut future = message.has_support().unwrap();
 	assert!(future.into_inner().is_some());
 
-	match support().await {
-		Ok(()) => (),
-		Err(_) => {
-			if force {
-				panic!("type unsupported in this browser")
-			} else {
-				return;
-			}
+	if !support().await.unwrap() {
+		if force {
+			panic!("type unsupported in this browser")
+		} else {
+			return;
 		}
 	}
 
@@ -164,12 +163,6 @@ async fn test_transfer<T, F1, F2, F3>(
 
 	request.await;
 
-	assert!(Message::from(init().await)
-		.has_support()
-		.into_inner()
-		.unwrap()
-		.is_ok());
-
 	let value_1 = init().await;
 	let value_2 = init().await;
 
@@ -180,6 +173,12 @@ async fn test_transfer<T, F1, F2, F3>(
 	response.await;
 
 	worker.terminate();
+
+	assert!(Message::from(init().await)
+		.has_support()
+		.unwrap()
+		.into_inner()
+		.unwrap());
 }
 
 /// [`ArrayBuffer`].
@@ -237,10 +236,10 @@ async fn audio_data() {
 /// [`ImageBitmap`].
 #[wasm_bindgen_test]
 async fn image_bitmap() {
-	let _: Result<(), MessageSupportError> = Message::has_image_bitmap_support().await;
+	let _: bool = Message::has_image_bitmap_support().unwrap().await;
 
 	test_transfer(
-		Message::has_image_bitmap_support,
+		|| async { Ok(Message::has_image_bitmap_support().unwrap().await) },
 		true,
 		|| {
 			let image = ImageData::new_with_sw(1, 1).unwrap();
@@ -330,12 +329,28 @@ async fn offscreen_canvas() {
 
 /// [`ReadableStream`].
 #[wasm_bindgen_test]
-#[cfg(web_sys_unstable_apis)]
 async fn readable_stream() {
+	#[cfg(not(web_sys_unstable_apis))]
+	#[wasm_bindgen]
+	extern "C" {
+		#[wasm_bindgen(js_name = ReadableStream)]
+		type ReadableStreamTest;
+
+		#[wasm_bindgen(catch, constructor, js_class = "ReadableStream")]
+		fn new_test() -> Result<ReadableStreamTest, JsValue>;
+	}
+
 	test_transfer(
 		|| ready(Message::has_readable_stream_support()),
 		false,
+		#[cfg(web_sys_unstable_apis)]
 		|| async { ReadableStream::new().unwrap() },
+		#[cfg(not(web_sys_unstable_apis))]
+		|| async {
+			ReadableStreamTest::new_test()
+				.unwrap()
+				.unchecked_into::<ReadableStream>()
+		},
 		|stream| assert!(stream.locked()),
 		|stream| {
 			assert!(!stream.locked());
@@ -368,12 +383,28 @@ async fn rtc_data_channel() {
 
 /// [`TransformStream`].
 #[wasm_bindgen_test]
-#[cfg(web_sys_unstable_apis)]
 async fn transform_stream() {
+	#[cfg(not(web_sys_unstable_apis))]
+	#[wasm_bindgen]
+	extern "C" {
+		#[wasm_bindgen(js_name = TransformStream)]
+		type TransformStreamTest;
+
+		#[wasm_bindgen(catch, constructor, js_class = "TransformStream")]
+		fn new_test() -> Result<TransformStreamTest, JsValue>;
+	}
+
 	test_transfer(
 		|| ready(Message::has_transform_stream_support()),
 		false,
+		#[cfg(web_sys_unstable_apis)]
 		|| async { TransformStream::new().unwrap() },
+		#[cfg(not(web_sys_unstable_apis))]
+		|| async {
+			TransformStreamTest::new_test()
+				.unwrap()
+				.unchecked_into::<TransformStream>()
+		},
 		|stream| {
 			assert!(stream.readable().locked());
 			assert!(stream.writable().locked());
@@ -420,12 +451,28 @@ async fn video_frame() {
 
 /// [`WritableStream`].
 #[wasm_bindgen_test]
-#[cfg(web_sys_unstable_apis)]
 async fn writable_stream() {
+	#[cfg(not(web_sys_unstable_apis))]
+	#[wasm_bindgen]
+	extern "C" {
+		#[wasm_bindgen(js_name = WritableStream)]
+		type WritableStreamTest;
+
+		#[wasm_bindgen(catch, constructor, js_class = "WritableStream")]
+		fn new_test() -> Result<WritableStreamTest, JsValue>;
+	}
+
 	test_transfer(
 		|| ready(Message::has_writable_stream_support()),
 		false,
+		#[cfg(web_sys_unstable_apis)]
 		|| async { WritableStream::new().unwrap() },
+		#[cfg(not(web_sys_unstable_apis))]
+		|| async {
+			WritableStreamTest::new_test()
+				.unwrap()
+				.unchecked_into::<WritableStream>()
+		},
 		|stream| assert!(stream.locked()),
 		|stream| {
 			assert!(!stream.locked());

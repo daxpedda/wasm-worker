@@ -11,26 +11,26 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// and [`Message::has_support`].
 #[wasm_bindgen_test]
 async fn test() {
-	let mut future_1 = Message::has_image_bitmap_support();
+	let mut future_1 = Message::has_image_bitmap_support().unwrap();
 	assert!(future_1.into_inner().is_none());
 
-	let mut future_2 = Message::has_image_bitmap_support();
+	let mut future_2 = Message::has_image_bitmap_support().unwrap();
 	assert!(future_2.into_inner().is_none());
 	assert!(future_1.into_inner().is_none());
 
 	let message = Message::ImageBitmap(JsValue::UNDEFINED.unchecked_into());
-	let mut support = message.has_support();
+	let mut support = message.has_support().unwrap();
 	assert!(support.into_inner().is_none());
 	assert!(future_2.into_inner().is_none());
 	assert!(future_1.into_inner().is_none());
 
-	future_2.await.unwrap();
+	future_2.await;
 	assert!(future_1.into_inner().is_some());
 	assert!(support.into_inner().is_some());
 
-	let mut future_3 = Message::has_image_bitmap_support();
+	let mut future_3 = Message::has_image_bitmap_support().unwrap();
 	assert!(future_3.into_inner().is_some());
 
-	let mut support = message.has_support();
+	let mut support = message.has_support().unwrap();
 	assert!(support.into_inner().is_some());
 }
