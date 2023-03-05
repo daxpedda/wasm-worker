@@ -47,11 +47,7 @@ impl RawMessage {
 		T: JsCast,
 		Message: From<T>,
 	{
-		if self.0.is_instance_of::<T>() {
-			Ok(self.0.unchecked_into::<T>())
-		} else {
-			Err(MessageError(self))
-		}
+		self.0.dyn_into().map_err(Self).map_err(MessageError)
 	}
 }
 
