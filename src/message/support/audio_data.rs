@@ -11,12 +11,12 @@ pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
 	SUPPORT
 		.get_or_try_init(|| {
 			WindowOrWorker::with(|global| {
-				if Global::new().audio_data().is_undefined() {
+				if Global::with(Global::audio_data).is_undefined() {
 					return Ok(false);
 				}
 
 				if let WindowOrWorker::Worker(_) = global {
-					if Global::new().worker().is_undefined() {
+					if !Global::has_worker() {
 						return Err(MessageSupportError);
 					}
 				}

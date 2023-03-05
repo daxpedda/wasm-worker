@@ -48,7 +48,7 @@ pub fn has_async_support() -> Result<AsyncSupportFuture, AsyncSupportError> {
 				oneshot,
 			}
 		}
-		WindowOrWorker::Worker(_) => State::Ready(!Global::new().worker().is_undefined()),
+		WindowOrWorker::Worker(_) => State::Ready(Global::has_worker()),
 	}) {
 		state
 	} else {

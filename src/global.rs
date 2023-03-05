@@ -1,11 +1,26 @@
+use std::ops::Deref;
+
 use once_cell::unsync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Window, WorkerGlobalScope};
 
 impl Global {
-	pub(crate) fn new() -> Self {
-		js_sys::global().unchecked_into()
+	thread_local! {
+		#[allow(clippy::use_self)]
+		static GLOBAL: Lazy<Global> = Lazy::new(|| js_sys::global().unchecked_into());
+	}
+
+	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> R {
+		Self::GLOBAL.with(|global| f(global))
+	}
+
+	pub(crate) fn has_worker() -> bool {
+		thread_local! {
+			static WORKER: Lazy<bool> = Lazy::new(|| !Global::with(Global::worker).is_undefined())
+		}
+
+		WORKER.with(|worker| *worker.deref())
 	}
 }
 
@@ -19,15 +34,15 @@ impl WindowOrWorker {
 	thread_local! {
 		#[allow(clippy::use_self)]
 		static THIS: Lazy<Option<WindowOrWorker>> = Lazy::new(|| {
-			let global = Global::new();
-
-			if !global.window().is_undefined() {
-				Some(WindowOrWorker::Window(global.unchecked_into()))
-			} else if !global.worker_global_scope().is_undefined() {
-				Some(WindowOrWorker::Worker(global.unchecked_into()))
-			} else {
-				None
-			}
+			Global::with(|global| {
+				if !global.window().is_undefined() {
+					Some(WindowOrWorker::Window(global.clone().unchecked_into()))
+				} else if !global.worker_global_scope().is_undefined() {
+					Some(WindowOrWorker::Worker(global.clone().unchecked_into()))
+				} else {
+					None
+				}
+			})
 		});
 	}
 
@@ -38,7 +53,7 @@ impl WindowOrWorker {
 
 #[wasm_bindgen]
 extern "C" {
-	#[allow(non_camel_case_types)]
+	#[derive(Clone)]
 	pub(crate) type Global;
 
 	#[wasm_bindgen(method, getter, js_name = Window)]
@@ -48,7 +63,7 @@ extern "C" {
 	fn worker_global_scope(this: &Global) -> JsValue;
 
 	#[wasm_bindgen(method, getter, js_name = Worker)]
-	pub(crate) fn worker(this: &Global) -> JsValue;
+	fn worker(this: &Global) -> JsValue;
 
 	#[wasm_bindgen(method, getter, js_name = AudioData)]
 	pub(crate) fn audio_data(this: &Global) -> JsValue;

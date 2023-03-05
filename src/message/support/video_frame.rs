@@ -10,12 +10,12 @@ pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
 	SUPPORT
 		.get_or_try_init(|| {
 			WindowOrWorker::with(|global| {
-				if Global::new().video_frame().is_undefined() {
+				if Global::with(Global::video_frame).is_undefined() {
 					return Ok(false);
 				}
 
 				if let WindowOrWorker::Worker(_) = global {
-					if Global::new().worker().is_undefined() {
+					if !Global::has_worker() {
 						return Err(MessageSupportError);
 					}
 				}

@@ -24,7 +24,7 @@ pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
 		.get_or_try_init(|| {
 			WindowOrWorker::with(|global| {
 				if let WindowOrWorker::Worker(_) = global {
-					if Global::new().worker().is_undefined() {
+					if !Global::has_worker() {
 						return Err(MessageSupportError);
 					}
 				}
