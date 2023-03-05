@@ -90,7 +90,6 @@ impl WorkerUrl {
 	pub fn has_module_support() -> bool {
 		static HAS_MODULE_SUPPORT: Lazy<bool> = Lazy::new(|| {
 			#[wasm_bindgen]
-			#[allow(non_camel_case_types)]
 			struct ModuleSupport(Rc<Cell<bool>>);
 
 			#[wasm_bindgen]

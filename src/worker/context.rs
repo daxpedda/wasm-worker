@@ -64,7 +64,6 @@ impl WorkerContext {
 		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow().is_some())
 	}
 
-	#[allow(clippy::must_use_candidate)]
 	#[cfg(feature = "message")]
 	pub fn clear_message_handler(&self) {
 		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow_mut().take());

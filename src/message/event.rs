@@ -41,8 +41,8 @@ impl MessageEvent {
 		&self.event
 	}
 
-	#[allow(clippy::missing_const_for_fn)]
 	#[must_use]
+	#[allow(clippy::missing_const_for_fn)]
 	pub fn into_raw(self) -> web_sys::MessageEvent {
 		self.event
 	}

@@ -38,7 +38,6 @@ thread_local! {
 
 #[wasm_bindgen]
 extern "C" {
-	#[allow(non_camel_case_types)]
 	pub(crate) type Exports;
 
 	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]

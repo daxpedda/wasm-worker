@@ -141,7 +141,7 @@ impl WorkletBuilder<'_> {
 }
 
 #[doc(hidden)]
-#[allow(missing_debug_implementations, unreachable_pub)]
+#[allow(unreachable_pub)]
 pub struct Data {
 	id: usize,
 	task: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, usize) + Send>,
