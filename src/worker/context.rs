@@ -7,7 +7,7 @@ use {
 	std::future::Future,
 };
 
-use crate::common::{Tls, EXPORTS};
+use crate::common::{Exports, Tls};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerContext {
@@ -116,7 +116,7 @@ impl WorkerContext {
 
 	#[must_use]
 	pub fn tls(&self) -> Tls {
-		EXPORTS.with(|exports| Tls::new(self.id, &exports.tls_base(), &exports.stack_alloc()))
+		Exports::with(|exports| Tls::new(self.id, &exports.tls_base(), &exports.stack_alloc()))
 	}
 
 	#[must_use]

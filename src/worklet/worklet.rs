@@ -12,7 +12,7 @@ use {
 	std::rc::Weak,
 };
 
-use crate::common::{DestroyError, Tls, EXPORTS};
+use crate::common::{DestroyError, Exports, Tls};
 
 #[derive(Clone, Debug)]
 pub struct Worklet {
@@ -312,7 +312,7 @@ trait WorkletOrRef: Debug + Sized {
 			if id == tls.id {
 				self.id().take();
 
-				EXPORTS.with(|exports| {
+				Exports::with(|exports| {
 					// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
 					// through an `AtomicUsize` counter. It then is saved here and sent to the
 					// worker and used in generating `Tls`. The ids are then compared above and if

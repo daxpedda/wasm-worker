@@ -11,7 +11,7 @@ use {
 	std::rc::Weak,
 };
 
-use crate::common::{DestroyError, Tls, EXPORTS};
+use crate::common::{DestroyError, Exports, Tls};
 
 #[derive(Clone, Debug)]
 pub struct Worker {
@@ -318,7 +318,7 @@ trait WorkerOrRef: Debug + Sized {
 				self.id().take();
 				self.terminate();
 
-				EXPORTS.with(|exports| {
+				Exports::with(|exports| {
 					// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
 					// through an `AtomicUsize` counter. It then is saved here and sent to the
 					// worker and used in generating `Tls`. The ids are then compared above and if

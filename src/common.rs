@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
+use std::ops::Deref;
 use std::sync::atomic::AtomicU64;
 
 use js_sys::WebAssembly::Global;
@@ -34,10 +35,6 @@ impl ShimFormat<'_> {
 
 pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| wasm_bindgen::shim_url().expect(ERROR));
 
-thread_local! {
-	pub(crate) static EXPORTS: Lazy<Exports> = Lazy::new(|| wasm_bindgen::exports().unchecked_into());
-}
-
 #[wasm_bindgen]
 extern "C" {
 	pub(crate) type Exports;
@@ -50,6 +47,17 @@ extern "C" {
 
 	#[wasm_bindgen(method, getter, js_name = __stack_alloc)]
 	pub(crate) fn stack_alloc(this: &Exports) -> Global;
+}
+
+impl Exports {
+	thread_local! {
+		#[allow(clippy::use_self)]
+		static EXPORTS: Lazy<Exports> = Lazy::new(|| wasm_bindgen::exports().unchecked_into());
+	}
+
+	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> R {
+		Self::EXPORTS.with(|exports| f(exports.deref()))
+	}
 }
 
 pub(crate) static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
