@@ -25,7 +25,7 @@ use crate::common::ID_COUNTER;
 pub struct WorkerBuilder<'url> {
 	url: &'url WorkerUrl,
 	options: Option<WorkerOptions>,
-	id: Rc<Cell<Option<u64>>>,
+	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -47,7 +47,7 @@ impl WorkerBuilder<'_> {
 		WorkerBuilder {
 			url,
 			options,
-			id: Rc::new(Cell::new(None)),
+			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 		}
@@ -131,7 +131,7 @@ impl WorkerBuilder<'_> {
 
 	fn spawn_internal(self, task: Task) -> Worker {
 		let id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-		self.id.set(Some(id));
+		self.id.set(Ok(id));
 
 		let data = Box::into_raw(Box::new(Data { id, task }));
 

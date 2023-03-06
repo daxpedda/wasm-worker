@@ -27,7 +27,7 @@ use super::{WorkletContext, WorkletUrl, WorkletUrlFuture};
 pub struct WorkletBuilder<'url> {
 	url: DefaultOrUrl<'url>,
 	#[cfg(feature = "message")]
-	id: Rc<Cell<Option<u64>>>,
+	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -43,7 +43,7 @@ impl WorkletBuilder<'_> {
 		WorkletBuilder {
 			url: DefaultOrUrl::Default(WorkletUrl::default()),
 			#[cfg(feature = "message")]
-			id: Rc::new(Cell::new(None)),
+			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 		}
@@ -54,7 +54,7 @@ impl WorkletBuilder<'_> {
 		WorkletBuilder {
 			url: DefaultOrUrl::Url(url),
 			#[cfg(feature = "message")]
-			id: Rc::new(Cell::new(None)),
+			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 		}
@@ -132,9 +132,9 @@ impl WorkletBuilder<'_> {
 				let context = WorkletContext::init(global, id);
 				f(context);
 			}),
-			Rc::new(Cell::new(None)),
+			self.id,
 			#[cfg(feature = "message")]
-			Rc::new(RefCell::new(None)),
+			self.message_handler,
 			self.url,
 		))
 	}

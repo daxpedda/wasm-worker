@@ -17,7 +17,7 @@ use crate::common::{DestroyError, Exports, Tls};
 #[derive(Clone, Debug)]
 pub struct Worklet {
 	worklet: AudioWorkletNode,
-	id: Rc<Cell<Option<u64>>>,
+	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -54,7 +54,7 @@ impl WorkletOrRef for Worklet {
 		&self.worklet
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<u64>>> {
+	fn id(&self) -> &Rc<Cell<Result<u64, u64>>> {
 		&self.id
 	}
 
@@ -67,7 +67,7 @@ impl WorkletOrRef for Worklet {
 impl Worklet {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
-		id: Rc<Cell<Option<u64>>>,
+		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -125,6 +125,18 @@ impl Worklet {
 		<Self as WorkletOrRef>::transfer_messages(self, messages)
 	}
 
+	#[must_use]
+	#[allow(clippy::same_name_method)]
+	pub fn id(&self) -> u64 {
+		let (Ok(id) | Err(id)) = self.id.get();
+		id
+	}
+
+	#[must_use]
+	pub fn destroyed(&self) -> bool {
+		self.id.get().is_ok()
+	}
+
 	/// # Safety
 	///
 	/// Must only be called if the worklet has finished running.
@@ -139,7 +151,7 @@ impl Worklet {
 #[cfg(feature = "message")]
 pub struct WorkletRef {
 	worklet: AudioWorkletNode,
-	id: Rc<Cell<Option<u64>>>,
+	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
@@ -154,7 +166,7 @@ impl WorkletOrRef for WorkletRef {
 		&self.worklet
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<u64>>> {
+	fn id(&self) -> &Rc<Cell<Result<u64, u64>>> {
 		&self.id
 	}
 
@@ -168,7 +180,7 @@ impl WorkletOrRef for WorkletRef {
 impl WorkletRef {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
-		id: Rc<Cell<Option<u64>>>,
+		id: Rc<Cell<Result<u64, u64>>>,
 		message_handler: Weak<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -220,6 +232,18 @@ impl WorkletRef {
 		<Self as WorkletOrRef>::transfer_messages(self, messages)
 	}
 
+	#[must_use]
+	#[allow(clippy::same_name_method)]
+	pub fn id(&self) -> u64 {
+		let (Ok(id) | Err(id)) = self.id.get();
+		id
+	}
+
+	#[must_use]
+	pub fn destroyed(&self) -> bool {
+		self.id.get().is_ok()
+	}
+
 	/// # Safety
 	///
 	/// Must only be called if the worklet has finished running.
@@ -236,7 +260,7 @@ trait WorkletOrRef: Debug + Sized {
 
 	fn worklet(&self) -> &AudioWorkletNode;
 
-	fn id(&self) -> &Rc<Cell<Option<u64>>>;
+	fn id(&self) -> &Rc<Cell<Result<u64, u64>>>;
 
 	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;
@@ -308,9 +332,9 @@ trait WorkletOrRef: Debug + Sized {
 	}
 
 	unsafe fn destroy(self, tls: Tls) -> Result<(), DestroyError<Self>> {
-		if let Some(id) = self.id().get() {
+		if let Ok(id) = self.id().get() {
 			if id == tls.id {
-				self.id().take();
+				self.id().set(Err(id));
 
 				Exports::with(|exports| {
 					// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`

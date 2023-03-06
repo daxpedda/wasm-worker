@@ -16,7 +16,7 @@ use crate::common::{DestroyError, Exports, Tls};
 #[derive(Clone, Debug)]
 pub struct Worker {
 	worker: web_sys::Worker,
-	id: Rc<Cell<Option<u64>>>,
+	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -53,7 +53,7 @@ impl WorkerOrRef for Worker {
 		&self.worker
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<u64>>> {
+	fn id(&self) -> &Rc<Cell<Result<u64, u64>>> {
 		&self.id
 	}
 
@@ -66,7 +66,7 @@ impl WorkerOrRef for Worker {
 impl Worker {
 	pub(super) fn new(
 		worker: web_sys::Worker,
-		id: Rc<Cell<Option<u64>>>,
+		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -124,6 +124,18 @@ impl Worker {
 		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
 
+	#[must_use]
+	#[allow(clippy::same_name_method)]
+	pub fn id(&self) -> u64 {
+		let (Ok(id) | Err(id)) = self.id.get();
+		id
+	}
+
+	#[must_use]
+	pub fn destroyed(&self) -> bool {
+		self.id.get().is_ok()
+	}
+
 	#[allow(clippy::same_name_method)]
 	pub fn terminate(&self) {
 		<Self as WorkerOrRef>::terminate(self);
@@ -139,7 +151,7 @@ impl Worker {
 #[cfg(feature = "message")]
 pub struct WorkerRef {
 	worker: web_sys::Worker,
-	id: Rc<Cell<Option<u64>>>,
+	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
@@ -154,7 +166,7 @@ impl WorkerOrRef for WorkerRef {
 		&self.worker
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<u64>>> {
+	fn id(&self) -> &Rc<Cell<Result<u64, u64>>> {
 		&self.id
 	}
 
@@ -168,7 +180,7 @@ impl WorkerOrRef for WorkerRef {
 impl WorkerRef {
 	pub(super) fn new(
 		worker: web_sys::Worker,
-		id: Rc<Cell<Option<u64>>>,
+		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Weak<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -226,6 +238,18 @@ impl WorkerRef {
 		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
 
+	#[must_use]
+	#[allow(clippy::same_name_method)]
+	pub fn id(&self) -> u64 {
+		let (Ok(id) | Err(id)) = self.id.get();
+		id
+	}
+
+	#[must_use]
+	pub fn destroyed(&self) -> bool {
+		self.id.get().is_ok()
+	}
+
 	#[allow(clippy::same_name_method)]
 	pub fn terminate(&self) {
 		<Self as WorkerOrRef>::terminate(self);
@@ -243,7 +267,7 @@ trait WorkerOrRef: Debug + Sized {
 
 	fn worker(&self) -> &web_sys::Worker;
 
-	fn id(&self) -> &Rc<Cell<Option<u64>>>;
+	fn id(&self) -> &Rc<Cell<Result<u64, u64>>>;
 
 	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;
@@ -313,9 +337,9 @@ trait WorkerOrRef: Debug + Sized {
 	}
 
 	fn destroy(self, tls: Tls) -> Result<(), DestroyError<Self>> {
-		if let Some(id) = self.id().get() {
+		if let Ok(id) = self.id().get() {
 			if id == tls.id {
-				self.id().take();
+				self.id().set(Err(id));
 				self.terminate();
 
 				Exports::with(|exports| {

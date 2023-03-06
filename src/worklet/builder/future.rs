@@ -29,7 +29,7 @@ pub struct WorkletFuture<'context>(Option<Inner<'context>>);
 struct Inner<'context> {
 	context: Cow<'context, BaseAudioContext>,
 	f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
-	id: Rc<Cell<Option<u64>>>,
+	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	state: State,
@@ -45,7 +45,7 @@ impl<'context> WorkletFuture<'context> {
 	pub(super) fn new(
 		context: Cow<'context, BaseAudioContext>,
 		f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
-		id: Rc<Cell<Option<u64>>>,
+		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 		url: DefaultOrUrl<'_>,
 	) -> Self {
@@ -126,7 +126,7 @@ impl Future for WorkletFuture<'_> {
 					debug_assert!(result.is_undefined());
 
 					let new_id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-					id.set(Some(new_id));
+					id.set(Ok(new_id));
 					let data = Box::into_raw(Box::new(Data {
 						id: new_id,
 						task: f,
