@@ -119,7 +119,7 @@ impl WorkerContext {
 		EXPORTS.with(|exports| Tls::new(self.id, &exports.tls_base(), &exports.stack_alloc()))
 	}
 
-	pub fn close(self) {
+	pub fn close(&self) {
 		self.context.close();
 	}
 }

@@ -10,7 +10,6 @@ use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::message::Message;
-use wasm_worker::worker::WorkerContext;
 use wasm_worker::WorkerBuilder;
 
 use self::util::{Flag, SIGNAL_DURATION};
@@ -158,7 +157,7 @@ fn builder_has_message_handler() {
 	let worker = WorkerBuilder::new()
 		.unwrap()
 		.message_handler(|_, _| ())
-		.spawn(WorkerContext::close);
+		.spawn(|context| context.close());
 	assert!(worker.has_message_handler());
 	worker.clear_message_handler();
 	assert!(!worker.has_message_handler());
@@ -168,7 +167,7 @@ fn builder_has_message_handler() {
 /// with [`Worker::has_message_handler()`](wasm_worker::worker::Worker::has_message_handler).
 #[wasm_bindgen_test]
 fn handle_has_message_handler() {
-	let worker = wasm_worker::spawn(WorkerContext::close);
+	let worker = wasm_worker::spawn(|context| context.close());
 
 	assert!(!worker.has_message_handler());
 	worker.set_message_handler(|_, _| ());
