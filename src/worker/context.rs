@@ -12,7 +12,7 @@ use crate::common::{Tls, EXPORTS};
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WorkerContext {
 	context: DedicatedWorkerGlobalScope,
-	id: usize,
+	id: u64,
 }
 
 impl WorkerContext {
@@ -23,7 +23,7 @@ impl WorkerContext {
 		static BACKUP: OnceCell<WorkerContext> = OnceCell::new();
 	}
 
-	pub(super) fn init(context: DedicatedWorkerGlobalScope, id: usize) -> Self {
+	pub(super) fn init(context: DedicatedWorkerGlobalScope, id: u64) -> Self {
 		let context = Self { context, id };
 
 		Self::BACKUP.with(|once| once.set(context.clone())).unwrap();
@@ -117,6 +117,11 @@ impl WorkerContext {
 	#[must_use]
 	pub fn tls(&self) -> Tls {
 		EXPORTS.with(|exports| Tls::new(self.id, &exports.tls_base(), &exports.stack_alloc()))
+	}
+
+	#[must_use]
+	pub const fn id(&self) -> u64 {
+		self.id
 	}
 
 	pub fn close(&self) {

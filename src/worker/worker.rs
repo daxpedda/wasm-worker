@@ -16,7 +16,7 @@ use crate::common::{DestroyError, Tls, EXPORTS};
 #[derive(Clone, Debug)]
 pub struct Worker {
 	worker: web_sys::Worker,
-	id: Rc<Cell<Option<usize>>>,
+	id: Rc<Cell<Option<u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -53,7 +53,7 @@ impl WorkerOrRef for Worker {
 		&self.worker
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<usize>>> {
+	fn id(&self) -> &Rc<Cell<Option<u64>>> {
 		&self.id
 	}
 
@@ -66,7 +66,7 @@ impl WorkerOrRef for Worker {
 impl Worker {
 	pub(super) fn new(
 		worker: web_sys::Worker,
-		id: Rc<Cell<Option<usize>>>,
+		id: Rc<Cell<Option<u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -139,7 +139,7 @@ impl Worker {
 #[cfg(feature = "message")]
 pub struct WorkerRef {
 	worker: web_sys::Worker,
-	id: Rc<Cell<Option<usize>>>,
+	id: Rc<Cell<Option<u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
@@ -154,7 +154,7 @@ impl WorkerOrRef for WorkerRef {
 		&self.worker
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<usize>>> {
+	fn id(&self) -> &Rc<Cell<Option<u64>>> {
 		&self.id
 	}
 
@@ -168,7 +168,7 @@ impl WorkerOrRef for WorkerRef {
 impl WorkerRef {
 	pub(super) fn new(
 		worker: web_sys::Worker,
-		id: Rc<Cell<Option<usize>>>,
+		id: Rc<Cell<Option<u64>>>,
 		#[cfg(feature = "message")] message_handler: Weak<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -243,7 +243,7 @@ trait WorkerOrRef: Debug + Sized {
 
 	fn worker(&self) -> &web_sys::Worker;
 
-	fn id(&self) -> &Rc<Cell<Option<usize>>>;
+	fn id(&self) -> &Rc<Cell<Option<u64>>>;
 
 	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;

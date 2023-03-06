@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
-use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::AtomicU64;
 
 use js_sys::WebAssembly::Global;
 use js_sys::{Number, Object, Reflect};
@@ -52,12 +52,12 @@ extern "C" {
 	pub(crate) fn stack_alloc(this: &Exports) -> Global;
 }
 
-pub(crate) static ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+pub(crate) static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug)]
 #[allow(missing_copy_implementations)]
 pub struct Tls {
-	pub(crate) id: usize,
+	pub(crate) id: u64,
 	tls_base: f64,
 	stack_alloc: f64,
 }
@@ -71,7 +71,7 @@ impl Tls {
 		});
 	}
 
-	pub(crate) fn new(id: usize, tls_base: &Global, stack_alloc: &Global) -> Self {
+	pub(crate) fn new(id: u64, tls_base: &Global, stack_alloc: &Global) -> Self {
 		let tls_base = Number::unchecked_from_js(tls_base.value()).value_of();
 		let stack_alloc = Number::unchecked_from_js(stack_alloc.value()).value_of();
 

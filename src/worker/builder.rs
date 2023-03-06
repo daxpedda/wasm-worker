@@ -25,7 +25,7 @@ use crate::common::ID_COUNTER;
 pub struct WorkerBuilder<'url> {
 	url: &'url WorkerUrl,
 	options: Option<WorkerOptions>,
-	id: Rc<Cell<Option<usize>>>,
+	id: Rc<Cell<Option<u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -167,7 +167,7 @@ impl WorkerBuilder<'_> {
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 pub struct Data {
-	id: usize,
+	id: u64,
 	task: Task,
 }
 

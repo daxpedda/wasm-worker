@@ -17,7 +17,7 @@ use crate::common::{DestroyError, Tls, EXPORTS};
 #[derive(Clone, Debug)]
 pub struct Worklet {
 	worklet: AudioWorkletNode,
-	id: Rc<Cell<Option<usize>>>,
+	id: Rc<Cell<Option<u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -54,7 +54,7 @@ impl WorkletOrRef for Worklet {
 		&self.worklet
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<usize>>> {
+	fn id(&self) -> &Rc<Cell<Option<u64>>> {
 		&self.id
 	}
 
@@ -67,7 +67,7 @@ impl WorkletOrRef for Worklet {
 impl Worklet {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
-		id: Rc<Cell<Option<usize>>>,
+		id: Rc<Cell<Option<u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -139,7 +139,7 @@ impl Worklet {
 #[cfg(feature = "message")]
 pub struct WorkletRef {
 	worklet: AudioWorkletNode,
-	id: Rc<Cell<Option<usize>>>,
+	id: Rc<Cell<Option<u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
@@ -154,7 +154,7 @@ impl WorkletOrRef for WorkletRef {
 		&self.worklet
 	}
 
-	fn id(&self) -> &Rc<Cell<Option<usize>>> {
+	fn id(&self) -> &Rc<Cell<Option<u64>>> {
 		&self.id
 	}
 
@@ -168,7 +168,7 @@ impl WorkletOrRef for WorkletRef {
 impl WorkletRef {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
-		id: Rc<Cell<Option<usize>>>,
+		id: Rc<Cell<Option<u64>>>,
 		message_handler: Weak<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
@@ -236,7 +236,7 @@ trait WorkletOrRef: Debug + Sized {
 
 	fn worklet(&self) -> &AudioWorkletNode;
 
-	fn id(&self) -> &Rc<Cell<Option<usize>>>;
+	fn id(&self) -> &Rc<Cell<Option<u64>>>;
 
 	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;

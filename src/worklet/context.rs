@@ -6,7 +6,7 @@ use crate::common::{Tls, EXPORTS};
 #[derive(Clone, Debug)]
 pub struct WorkletContext {
 	context: AudioWorkletGlobalScope,
-	id: usize,
+	id: u64,
 }
 
 impl WorkletContext {
@@ -15,7 +15,7 @@ impl WorkletContext {
 		static BACKUP: OnceCell<WorkletContext>  = OnceCell::new();
 	}
 
-	pub(super) fn init(context: AudioWorkletGlobalScope, id: usize) -> Self {
+	pub(super) fn init(context: AudioWorkletGlobalScope, id: u64) -> Self {
 		let context = Self { context, id };
 
 		Self::BACKUP.with(|once| once.set(context.clone())).unwrap();
@@ -42,5 +42,10 @@ impl WorkletContext {
 	#[must_use]
 	pub fn tls(&self) -> Tls {
 		EXPORTS.with(|exports| Tls::new(self.id, &exports.tls_base(), &exports.stack_alloc()))
+	}
+
+	#[must_use]
+	pub const fn id(&self) -> u64 {
+		self.id
 	}
 }

@@ -28,8 +28,8 @@ pub struct WorkletFuture<'context>(Option<Inner<'context>>);
 
 struct Inner<'context> {
 	context: Cow<'context, BaseAudioContext>,
-	f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, usize) + Send>,
-	id: Rc<Cell<Option<usize>>>,
+	f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
+	id: Rc<Cell<Option<u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	state: State,
@@ -44,8 +44,8 @@ enum State {
 impl<'context> WorkletFuture<'context> {
 	pub(super) fn new(
 		context: Cow<'context, BaseAudioContext>,
-		f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, usize) + Send>,
-		id: Rc<Cell<Option<usize>>>,
+		f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
+		id: Rc<Cell<Option<u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 		url: DefaultOrUrl<'_>,
 	) -> Self {

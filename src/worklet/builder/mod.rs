@@ -27,7 +27,7 @@ use super::{WorkletContext, WorkletUrl, WorkletUrlFuture};
 pub struct WorkletBuilder<'url> {
 	url: DefaultOrUrl<'url>,
 	#[cfg(feature = "message")]
-	id: Rc<Cell<Option<usize>>>,
+	id: Rc<Cell<Option<u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
@@ -143,8 +143,8 @@ impl WorkletBuilder<'_> {
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 pub struct Data {
-	id: usize,
-	task: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, usize) + Send>,
+	id: u64,
+	task: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
 }
 
 #[doc(hidden)]
