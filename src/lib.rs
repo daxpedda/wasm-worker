@@ -35,6 +35,11 @@ pub mod worker;
 #[cfg(feature = "worklet")]
 pub mod worklet;
 
-pub use self::worker::{spawn, spawn_async, WorkerBuilder};
+#[doc(no_inline)]
+pub use self::worker::WorkerBuilder;
+pub use self::worker::{spawn, spawn_async};
+#[doc(no_inline)]
 #[cfg(feature = "worklet")]
-pub use self::worklet::{WorkletBuilder, WorkletExt};
+pub use self::worklet::WorkletBuilder;
+#[cfg(feature = "worklet")]
+pub use self::worklet::WorkletExt;
