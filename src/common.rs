@@ -66,7 +66,7 @@ impl Tls {
 	thread_local! {
 		static DESCRIPTOR: Lazy<Object> = Lazy::new(|| {
 			let descriptor = Object::new();
-			Reflect::set(&descriptor, &"value".into(), &"i32".into()).unwrap();
+			debug_assert!(Reflect::set(&descriptor, &"value".into(), &"i32".into()).unwrap());
 			descriptor
 		});
 	}

@@ -124,7 +124,7 @@ impl WorkletBuilder<'_> {
 		}
 
 		debug_assert!(init.is_undefined());
-		Reflect::set(context, &"__wasm_worker_init".into(), &true.into()).unwrap();
+		debug_assert!(Reflect::set(context, &"__wasm_worker_init".into(), &true.into()).unwrap());
 
 		Ok(WorkletFuture::new(
 			Cow::Borrowed(context),
