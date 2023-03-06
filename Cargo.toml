@@ -72,7 +72,7 @@ web-sys = { version = "0.3", features = [
 ] }
 
 [[example]]
-name = "basic"
+name = "testing"
 required-features = ["message", "worklet"]
 
 [[test]]
