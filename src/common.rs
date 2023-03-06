@@ -10,6 +10,9 @@ use once_cell::sync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 
+use crate::worker::WorkerContext;
+use crate::worklet::WorkletContext;
+
 const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
 
 #[derive(Clone, Debug)]
@@ -17,6 +20,8 @@ pub enum ShimFormat<'global> {
 	EsModule,
 	Classic { global: Cow<'global, str> },
 }
+
+pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| wasm_bindgen::shim_url().expect(ERROR));
 
 impl ShimFormat<'_> {
 	pub(crate) fn default() -> Self {
@@ -33,7 +38,35 @@ impl ShimFormat<'_> {
 	}
 }
 
-pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| wasm_bindgen::shim_url().expect(ERROR));
+#[derive(Debug)]
+pub enum Context {
+	Worker(WorkerContext),
+	Worklet(WorkletContext),
+}
+
+impl Context {
+	pub fn new() -> Option<Self> {
+		WorkerContext::new()
+			.map(Self::Worker)
+			.or_else(|| WorkletContext::new().map(Self::Worklet))
+	}
+
+	#[must_use]
+	pub fn tls(&self) -> Tls {
+		match self {
+			Self::Worker(worker) => worker.tls(),
+			Self::Worklet(worklet) => worklet.tls(),
+		}
+	}
+
+	#[must_use]
+	pub const fn id(&self) -> u64 {
+		match self {
+			Self::Worker(worker) => worker.id(),
+			Self::Worklet(worklet) => worklet.id(),
+		}
+	}
+}
 
 #[wasm_bindgen]
 extern "C" {
