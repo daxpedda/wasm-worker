@@ -1,7 +1,5 @@
 use std::cell::Cell;
-use std::error::Error;
-use std::fmt;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::Debug;
 use std::rc::Rc;
 
 use web_sys::AudioWorkletNode;
@@ -14,7 +12,7 @@ use {
 	std::rc::Weak,
 };
 
-use crate::common::{Tls, EXPORTS};
+use crate::common::{DestroyError, Tls, EXPORTS};
 
 #[derive(Clone, Debug)]
 pub struct Worklet {
@@ -331,28 +329,3 @@ trait WorkletOrRef: Debug + Sized {
 		}
 	}
 }
-
-#[derive(Debug)]
-pub enum DestroyError<T>
-where
-	T: Debug,
-{
-	Already(Tls),
-	Match { handle: T, tls: Tls },
-}
-
-impl<T> Display for DestroyError<T>
-where
-	T: Debug,
-{
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		match self {
-			Self::Already(_) => write!(f, "this worker was already destroyed"),
-			Self::Match { .. } => {
-				write!(f, "`Tls` value given does not belong to this worker")
-			}
-		}
-	}
-}
-
-impl<T> Error for DestroyError<T> where T: Debug {}

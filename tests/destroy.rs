@@ -5,7 +5,7 @@ mod util;
 use futures_channel::oneshot;
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::worker::DestroyError;
+use wasm_worker::common::DestroyError;
 #[cfg(feature = "message")]
 use {
 	js_sys::ArrayBuffer, std::cell::RefCell, std::ops::DerefMut, std::rc::Rc,

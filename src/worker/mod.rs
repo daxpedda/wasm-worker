@@ -10,9 +10,9 @@ pub use self::builder::WorkerBuilder;
 pub use self::context::WorkerContext;
 pub use self::support::{has_async_support, AsyncSupportError, AsyncSupportFuture};
 pub use self::url::{ModuleSupportError, WorkerUrl};
+pub use self::worker::Worker;
 #[cfg(feature = "message")]
 pub use self::worker::WorkerRef;
-pub use self::worker::{DestroyError, Worker};
 
 #[track_caller]
 pub fn spawn<F>(f: F) -> Worker

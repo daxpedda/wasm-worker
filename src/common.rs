@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+use std::error::Error;
+use std::fmt::{self, Debug, Display, Formatter};
 use std::sync::atomic::AtomicUsize;
 
 use js_sys::WebAssembly::Global;
@@ -89,6 +91,31 @@ impl Tls {
 			.with(|descriptor| Global::new(descriptor, &self.stack_alloc.into()).unwrap())
 	}
 }
+
+#[derive(Debug)]
+pub enum DestroyError<T>
+where
+	T: Debug,
+{
+	Already(Tls),
+	Match { handle: T, tls: Tls },
+}
+
+impl<T> Display for DestroyError<T>
+where
+	T: Debug,
+{
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Already(_) => write!(f, "this worker was already destroyed"),
+			Self::Match { .. } => {
+				write!(f, "`Tls` value given does not belong to this worker")
+			}
+		}
+	}
+}
+
+impl<T> Error for DestroyError<T> where T: Debug {}
 
 pub(crate) static WAIT_ASYNC_SUPPORT: Lazy<bool> = Lazy::new(|| {
 	#[wasm_bindgen]
