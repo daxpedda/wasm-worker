@@ -5,7 +5,7 @@ use web_sys::TransformStream;
 use {wasm_bindgen::prelude::wasm_bindgen, wasm_bindgen::JsValue};
 
 use super::super::MessageSupportError;
-use crate::global::{Global, WindowOrWorker};
+use crate::global::{Global, GlobalContext};
 
 pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
 	#[cfg(not(web_sys_unstable_apis))]
@@ -22,21 +22,24 @@ pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
 
 	SUPPORT
 		.get_or_try_init(|| {
-			WindowOrWorker::with(|global| {
-				if let WindowOrWorker::Worker(_) = global {
-					if !Global::has_worker() {
-						return Err(MessageSupportError);
+			GlobalContext::with(|global| match global {
+				GlobalContext::Window(_) => Ok(()),
+				GlobalContext::Worker(_) => {
+					if Global::has_worker() {
+						Ok(())
+					} else {
+						Err(MessageSupportError)
 					}
 				}
+				GlobalContext::Worklet => Err(MessageSupportError),
+			})?;
 
-				#[cfg(web_sys_unstable_apis)]
-				let stream = TransformStream::new().unwrap();
-				#[cfg(not(web_sys_unstable_apis))]
-				let stream = TransformStreamExt::new().unwrap();
+			#[cfg(web_sys_unstable_apis)]
+			let stream = TransformStream::new().unwrap();
+			#[cfg(not(web_sys_unstable_apis))]
+			let stream = TransformStreamExt::new().unwrap();
 
-				Ok(super::test_support(&stream))
-			})
-			.unwrap_or(Err(MessageSupportError))
+			Ok(super::test_support(&stream))
 		})
 		.copied()
 }

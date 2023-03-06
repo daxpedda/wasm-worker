@@ -28,29 +28,32 @@ impl Global {
 	not(any(feature = "message", feature = "worklet")),
 	allow(unused_tuple_struct_fields)
 )]
-pub(crate) enum WindowOrWorker {
+pub(crate) enum GlobalContext {
 	Window(Window),
 	Worker(WorkerGlobalScope),
+	Worklet,
 }
 
-impl WindowOrWorker {
+impl GlobalContext {
 	thread_local! {
 		#[allow(clippy::use_self)]
-		static THIS: Lazy<Option<WindowOrWorker>> = Lazy::new(|| {
+		static THIS: Lazy<GlobalContext> = Lazy::new(|| {
 			Global::with(|global| {
 				if !global.window().is_undefined() {
-					Some(WindowOrWorker::Window(global.clone().unchecked_into()))
+					GlobalContext::Window(global.clone().unchecked_into())
 				} else if !global.worker_global_scope().is_undefined() {
-					Some(WindowOrWorker::Worker(global.clone().unchecked_into()))
+					GlobalContext::Worker(global.clone().unchecked_into())
+				} else if !global.audio_worklet_global_scope().is_undefined() {
+					GlobalContext::Worklet
 				} else {
-					None
+					panic!("expected to be in a window, worker or audio worklet")
 				}
 			})
 		});
 	}
 
-	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> Option<R> {
-		Self::THIS.with(|this| this.as_ref().map(f))
+	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> R {
+		Self::THIS.with(|this| f(this.deref()))
 	}
 }
 
@@ -64,6 +67,9 @@ extern "C" {
 
 	#[wasm_bindgen(method, getter, js_name = WorkerGlobalScope)]
 	fn worker_global_scope(this: &Global) -> JsValue;
+
+	#[wasm_bindgen(method, getter, js_name = AudioWorkletGlobalScope)]
+	fn audio_worklet_global_scope(this: &Global) -> JsValue;
 
 	#[wasm_bindgen(method, getter, js_name = Worker)]
 	fn worker(this: &Global) -> JsValue;

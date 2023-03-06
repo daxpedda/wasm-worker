@@ -10,7 +10,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{ImageBitmap, ImageData};
 
 use super::super::MessageSupportError;
-use crate::global::{Global, WindowOrWorker};
+use crate::global::{Global, GlobalContext};
 
 static SUPPORT: OnceCell<bool> = OnceCell::new();
 
@@ -29,28 +29,32 @@ impl ImageBitmapSupportFuture {
 		if let Some(support) = SUPPORT.get() {
 			Ok(Self(Some(State::Ready(*support))))
 		} else {
-			WindowOrWorker::with(|global| {
-				if let WindowOrWorker::Worker(_) = global {
-					if !Global::has_worker() {
-						return Err(MessageSupportError);
+			GlobalContext::with(|global| {
+				match global {
+					GlobalContext::Window(_) => (),
+					GlobalContext::Worker(_) => {
+						if !Global::has_worker() {
+							return Err(MessageSupportError);
+						}
 					}
+					GlobalContext::Worklet => return Err(MessageSupportError),
 				}
 
 				let image = ImageData::new_with_sw(1, 1).unwrap();
 
 				let promise = match global {
-					WindowOrWorker::Window(window) => {
+					GlobalContext::Window(window) => {
 						window.create_image_bitmap_with_image_data(&image)
 					}
-					WindowOrWorker::Worker(worker) => {
+					GlobalContext::Worker(worker) => {
 						worker.create_image_bitmap_with_image_data(&image)
 					}
+					GlobalContext::Worklet => unreachable!(),
 				}
 				.unwrap();
 
 				Ok(Self(Some(State::Create(JsFuture::from(promise)))))
 			})
-			.unwrap_or(Err(MessageSupportError))
 		}
 	}
 

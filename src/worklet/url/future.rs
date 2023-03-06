@@ -12,7 +12,7 @@ use web_sys::{AbortController, RequestCache, RequestInit, Response};
 
 use super::{ImportSupportFuture, WorkletUrl, WorkletUrlError, DEFAULT_URL};
 use crate::common::ShimFormat;
-use crate::global::WindowOrWorker;
+use crate::global::GlobalContext;
 
 #[derive(Debug)]
 #[must_use = "does nothing if not polled"]
@@ -291,11 +291,11 @@ impl<'format> State<'_, 'format> {
 		init.signal(Some(&abort.signal()));
 		init.cache(RequestCache::ForceCache);
 
-		let promise = WindowOrWorker::with(|global| match global {
-			WindowOrWorker::Window(window) => window.fetch_with_str_and_init(url, &init),
-			WindowOrWorker::Worker(worker) => worker.fetch_with_str_and_init(url, &init),
-		})
-		.expect("expected `Window` or `WorkerGlobalScope`");
+		let promise = GlobalContext::with(|global| match global {
+			GlobalContext::Window(window) => window.fetch_with_str_and_init(url, &init),
+			GlobalContext::Worker(worker) => worker.fetch_with_str_and_init(url, &init),
+			GlobalContext::Worklet => panic!("expected `Window` or `WorkerGlobalScope`"),
+		});
 		let future = JsFuture::from(promise);
 
 		State::Fetch {

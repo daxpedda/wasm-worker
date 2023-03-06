@@ -15,7 +15,7 @@ use wasm_bindgen::JsCast;
 use web_sys::MessageEvent;
 
 use crate::common::WAIT_ASYNC_SUPPORT;
-use crate::global::{Global, WindowOrWorker};
+use crate::global::{Global, GlobalContext};
 
 static SUPPORT: OnceCell<bool> = OnceCell::new();
 
@@ -26,33 +26,32 @@ pub fn has_async_support() -> Result<AsyncSupportFuture, AsyncSupportError> {
 
 	let state = if *WAIT_ASYNC_SUPPORT {
 		State::Ready(true)
-	} else if let Some(state) = WindowOrWorker::with(|global| match global {
-		WindowOrWorker::Window(_) => {
-			let worker = web_sys::Worker::new(
-				"data:,postMessage%28typeof%20Worker%21%3D%3D%27undefined%27%29",
-			)
-			.unwrap();
-			let oneshot = Oneshot::new();
-			let closure = Closure::new({
-				let oneshot = oneshot.clone();
-				move |event: MessageEvent| {
-					let data: Boolean = event.data().unchecked_into();
-					oneshot.set(data.value_of());
-				}
-			});
-			worker.set_onmessage(Some(closure.as_ref().unchecked_ref()));
-
-			State::Worker {
-				worker,
-				_message_handler: closure,
-				oneshot,
-			}
-		}
-		WindowOrWorker::Worker(_) => State::Ready(Global::has_worker()),
-	}) {
-		state
 	} else {
-		return Err(AsyncSupportError);
+		GlobalContext::with(|global| match global {
+			GlobalContext::Window(_) => {
+				let worker = web_sys::Worker::new(
+					"data:,postMessage%28typeof%20Worker%21%3D%3D%27undefined%27%29",
+				)
+				.unwrap();
+				let oneshot = Oneshot::new();
+				let closure = Closure::new({
+					let oneshot = oneshot.clone();
+					move |event: MessageEvent| {
+						let data: Boolean = event.data().unchecked_into();
+						oneshot.set(data.value_of());
+					}
+				});
+				worker.set_onmessage(Some(closure.as_ref().unchecked_ref()));
+
+				Ok(State::Worker {
+					worker,
+					_message_handler: closure,
+					oneshot,
+				})
+			}
+			GlobalContext::Worker(_) => Ok(State::Ready(Global::has_worker())),
+			GlobalContext::Worklet => Err(AsyncSupportError),
+		})?
 	};
 
 	if let State::Ready(support) = state {
