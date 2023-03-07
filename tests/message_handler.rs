@@ -160,6 +160,34 @@ fn builder_has_message_handler() {
 	assert!(!worker.has_message_handler());
 }
 
+/// [`WorkerBuilder::worker_message_handler()`] with
+/// [`WorkerContext::has_message_handler()`](wasm_worker::worker::WorkerContext::has_message_handler).
+#[wasm_bindgen_test]
+async fn builder_worker_has_message_handler() {
+	let flag = Flag::new();
+
+	WorkerBuilder::new()
+		.unwrap()
+		.worker_message_handler(|_, _| ())
+		.spawn({
+			let flag = flag.clone();
+			move |context| {
+				assert!(context.has_message_handler());
+				context.clear_message_handler();
+				assert!(!context.has_message_handler());
+				context.set_message_handler(|_, _| ());
+				assert!(context.has_message_handler());
+
+				// Flag will never signal if `assert!`s panic.
+				flag.signal();
+
+				context.close();
+			}
+		});
+
+	flag.await;
+}
+
 /// [`Worker::set_message_handler()`](wasm_worker::worker::Worker::set_message_handler)
 /// with [`Worker::has_message_handler()`](wasm_worker::worker::Worker::has_message_handler).
 #[wasm_bindgen_test]
