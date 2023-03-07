@@ -32,11 +32,6 @@ impl MessageEvent {
 	}
 
 	#[must_use]
-	pub const fn raw(&self) -> &web_sys::MessageEvent {
-		&self.event
-	}
-
-	#[must_use]
 	pub const fn as_raw(&self) -> &web_sys::MessageEvent {
 		&self.event
 	}
