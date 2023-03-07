@@ -123,6 +123,11 @@ impl Tls {
 		}
 	}
 
+	#[must_use]
+	pub const fn id(&self) -> u64 {
+		self.id
+	}
+
 	pub(crate) fn tls_base(&self) -> Global {
 		Self::DESCRIPTOR.with(|descriptor| Global::new(descriptor, &self.tls_base.into()).unwrap())
 	}
