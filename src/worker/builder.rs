@@ -11,7 +11,7 @@ use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 #[cfg(feature = "message")]
 use {
 	super::WorkerRef,
-	crate::message::{MessageEvent, MessageHandler},
+	crate::message::{MessageEvent, MessageHandler, SendMessageHandler},
 	std::cell::RefCell,
 	std::ops::Deref,
 	std::rc::Weak,
@@ -28,6 +28,8 @@ pub struct WorkerBuilder<'url> {
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
+	#[cfg(feature = "message")]
+	worker_message_handler: Option<SendMessageHandler<WorkerContext>>,
 }
 
 impl WorkerBuilder<'_> {
@@ -50,6 +52,8 @@ impl WorkerBuilder<'_> {
 			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
+			#[cfg(feature = "message")]
+			worker_message_handler: None,
 		}
 	}
 
@@ -107,6 +111,31 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
+	#[cfg(feature = "message")]
+	pub fn worker_message_handler<F>(mut self, mut message_handler: F) -> Self
+	where
+		F: 'static + FnMut(&WorkerContext, MessageEvent) + Send,
+	{
+		self.worker_message_handler = Some(SendMessageHandler::classic(|context| {
+			move |event: web_sys::MessageEvent| {
+				message_handler(&context, MessageEvent::new(event));
+			}
+		}));
+		self
+	}
+
+	#[cfg(feature = "message")]
+	pub fn worker_message_handler_async<F1, F2>(mut self, mut message_handler: F1) -> Self
+	where
+		F1: 'static + FnMut(&WorkerContext, MessageEvent) -> F2 + Send,
+		F2: 'static + Future<Output = ()>,
+	{
+		self.worker_message_handler = Some(SendMessageHandler::future(|context| {
+			move |event: web_sys::MessageEvent| message_handler(&context, MessageEvent::new(event))
+		}));
+		self
+	}
+
 	pub fn spawn<F>(self, f: F) -> Worker
 	where
 		F: 'static + FnOnce(WorkerContext) + Send,
@@ -133,7 +162,12 @@ impl WorkerBuilder<'_> {
 		let id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
 		self.id.set(Ok(id));
 
-		let data = Box::into_raw(Box::new(Data { id, task }));
+		let data = Box::into_raw(Box::new(Data {
+			id,
+			task,
+			#[cfg(feature = "message")]
+			message_handler: self.worker_message_handler,
+		}));
 
 		let worker = if let Some(options) = self.options {
 			web_sys::Worker::new_with_options(&self.url.url, &options)
@@ -166,9 +200,14 @@ impl WorkerBuilder<'_> {
 
 #[doc(hidden)]
 #[allow(unreachable_pub)]
-pub struct Data {
+pub struct Data
+where
+	Self: Send,
+{
 	id: u64,
 	task: Task,
+	#[cfg(feature = "message")]
+	message_handler: Option<SendMessageHandler<WorkerContext>>,
 }
 
 #[allow(clippy::type_complexity)]
@@ -197,7 +236,12 @@ pub unsafe fn __wasm_worker_worker_entry(data: *mut Data) -> JsValue {
 	// only come from `WorkerBuilder::spawn_internal()`.
 	let data = *unsafe { Box::from_raw(data) };
 
-	let context = WorkerContext::init(global, data.id);
+	let context = WorkerContext::init(
+		global,
+		data.id,
+		#[cfg(feature = "message")]
+		data.message_handler,
+	);
 
 	match data.task {
 		Task::Classic(classic) => {

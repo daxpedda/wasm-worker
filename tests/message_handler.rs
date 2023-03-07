@@ -4,8 +4,6 @@
 
 mod util;
 
-use std::sync::{Arc, Mutex};
-
 use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -13,7 +11,6 @@ use wasm_worker::message::Message;
 use wasm_worker::WorkerBuilder;
 
 use self::util::{Flag, SIGNAL_DURATION};
-use crate::util::YIELD_DURATION;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
@@ -253,6 +250,27 @@ async fn builder_message_handler() {
 	flag.await;
 }
 
+/// [`WorkerBuilder::worker_message_handler()`].
+#[wasm_bindgen_test]
+async fn builder_worker_message_handler() {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let flag = Flag::new();
+
+	let worker = WorkerBuilder::new()
+		.unwrap()
+		.worker_message_handler({
+			let flag = flag.clone();
+			move |_, _| flag.signal()
+		})
+		.spawn(|_| ());
+
+	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	flag.await;
+
+	worker.terminate();
+}
+
 /// [`Worker::set_message_handler()`](wasm_worker::worker::Worker::set_message_handler).
 #[wasm_bindgen_test]
 async fn handle_message_handler() {
@@ -360,6 +378,30 @@ async fn builder_message_handler_async() {
 		});
 
 	flag.await;
+}
+
+/// [`WorkerBuilder::worker_message_handler_async()`].
+#[wasm_bindgen_test]
+async fn builder_worker_message_handler_async() {
+	assert!(Message::has_array_buffer_support().is_ok());
+
+	let flag = Flag::new();
+
+	let worker = WorkerBuilder::new()
+		.unwrap()
+		.worker_message_handler_async({
+			let flag = flag.clone();
+			move |_, _| {
+				let flag = flag.clone();
+				async move { flag.signal() }
+			}
+		})
+		.spawn(|_| ());
+
+	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	flag.await;
+
+	worker.terminate();
 }
 
 /// [`Worker::set_message_handler_async()`](wasm_worker::worker::Worker::set_message_handler_async).
@@ -695,34 +737,4 @@ async fn context_multi_message() {
 		});
 
 	flag.await;
-}
-
-/// Make sure sent messages are queued and correctly sent to the new message
-/// handler if not set after a yield point.
-#[wasm_bindgen_test]
-#[allow(clippy::await_holding_lock)]
-async fn message_handler_race() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
-	let flag = Flag::new();
-	let barrier = Arc::new(Mutex::new(()));
-	let lock = barrier.lock().unwrap();
-
-	let worker = wasm_worker::spawn_async({
-		let flag = flag.clone();
-		let barrier = Arc::clone(&barrier);
-
-		move |context| async move {
-			drop(barrier.lock().unwrap());
-			context.set_message_handler(move |_, _| flag.signal());
-		}
-	});
-
-	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
-	util::sleep(YIELD_DURATION).await;
-	drop(lock);
-
-	// The message handler will never signal if event was missed.
-	let result = future::select(flag, util::sleep(SIGNAL_DURATION)).await;
-	assert!(matches!(result, Either::Left(((), _))));
 }

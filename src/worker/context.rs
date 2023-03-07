@@ -2,7 +2,9 @@ use once_cell::unsync::OnceCell;
 use web_sys::DedicatedWorkerGlobalScope;
 #[cfg(feature = "message")]
 use {
-	crate::message::{Message, MessageEvent, MessageHandler, SendMessages, TransferError},
+	crate::message::{
+		Message, MessageEvent, MessageHandler, SendMessageHandler, SendMessages, TransferError,
+	},
 	std::cell::RefCell,
 	std::future::Future,
 };
@@ -23,10 +25,20 @@ impl WorkerContext {
 		static BACKUP: OnceCell<WorkerContext> = OnceCell::new();
 	}
 
-	pub(super) fn init(context: DedicatedWorkerGlobalScope, id: u64) -> Self {
+	pub(super) fn init(
+		context: DedicatedWorkerGlobalScope,
+		id: u64,
+		#[cfg(feature = "message")] message_handler: Option<SendMessageHandler<Self>>,
+	) -> Self {
 		let context = Self { context, id };
 
 		Self::BACKUP.with(|once| once.set(context.clone())).unwrap();
+
+		#[cfg(feature = "message")]
+		if let Some(message_handler) = message_handler {
+			let message_handler = message_handler.into_message_handler(context.clone());
+			context.set_message_handler_internal(message_handler);
+		}
 
 		context
 	}
@@ -71,35 +83,37 @@ impl WorkerContext {
 	}
 
 	#[cfg(feature = "message")]
-	pub fn set_message_handler<F>(&self, mut new_message_handler: F)
+	pub fn set_message_handler<F>(&self, mut message_handler: F)
 	where
 		F: 'static + FnMut(&Self, MessageEvent),
 	{
-		Self::MESSAGE_HANDLER.with(|message_handler| {
-			let mut message_handler = message_handler.borrow_mut();
-
-			let context = self.clone();
-			let message_handler = message_handler.insert(MessageHandler::classic(move |event| {
-				new_message_handler(&context, MessageEvent::new(event));
-			}));
-
-			self.context.set_onmessage(Some(message_handler));
+		let context = self.clone();
+		let message_handler = MessageHandler::classic(move |event| {
+			message_handler(&context, MessageEvent::new(event));
 		});
+
+		self.set_message_handler_internal(message_handler);
 	}
 
 	#[cfg(feature = "message")]
-	pub fn set_message_handler_async<F1, F2>(&self, mut new_message_handler: F1)
+	pub fn set_message_handler_async<F1, F2>(&self, mut message_handler: F1)
 	where
 		F1: 'static + FnMut(&Self, MessageEvent) -> F2,
 		F2: 'static + Future<Output = ()>,
 	{
+		let context = self.clone();
+		let message_handler = MessageHandler::future(move |event| {
+			message_handler(&context, MessageEvent::new(event))
+		});
+
+		self.set_message_handler_internal(message_handler);
+	}
+
+	#[cfg(feature = "message")]
+	fn set_message_handler_internal(&self, new_message_handler: MessageHandler) {
 		Self::MESSAGE_HANDLER.with(|message_handler| {
 			let mut message_handler = message_handler.borrow_mut();
-
-			let context = self.clone();
-			let message_handler = message_handler.insert(MessageHandler::future(move |event| {
-				new_message_handler(&context, MessageEvent::new(event))
-			}));
+			let message_handler = message_handler.insert(new_message_handler);
 
 			self.context.set_onmessage(Some(message_handler));
 		});

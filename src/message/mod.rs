@@ -19,7 +19,7 @@ use web_sys::{
 };
 
 pub use self::event::MessageEvent;
-pub(crate) use self::handler::MessageHandler;
+pub(crate) use self::handler::{MessageHandler, SendMessageHandler};
 pub use self::raw::{MessageError, RawMessage, RawMessages};
 pub(crate) use self::send::SendMessages;
 pub use self::send::TransferError;

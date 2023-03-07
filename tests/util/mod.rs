@@ -19,7 +19,6 @@ use web_sys::{DedicatedWorkerGlobalScope, Window};
 
 pub const SIGNAL_DURATION: Duration = Duration::from_millis(500);
 pub const CLOSE_DURATION: Duration = Duration::from_secs(2);
-pub const YIELD_DURATION: Duration = Duration::from_secs(5);
 
 pub struct Sleep(JsFuture);
 

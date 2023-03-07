@@ -1,3 +1,4 @@
+use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::ops::Deref;
 
@@ -42,5 +43,38 @@ impl MessageHandler {
 		});
 
 		Self::Future(closure)
+	}
+}
+
+pub(crate) struct SendMessageHandler<C>(Box<dyn FnOnce(C) -> MessageHandler + Send>);
+
+impl<C> SendMessageHandler<C> {
+	pub(crate) fn classic<F: 'static + FnMut(web_sys::MessageEvent)>(
+		closure: impl 'static + FnOnce(C) -> F + Send,
+	) -> Self {
+		Self(Box::new(|context| {
+			MessageHandler::classic(closure(context))
+		}))
+	}
+
+	pub(crate) fn future<
+		F1: 'static + FnMut(web_sys::MessageEvent) -> F2,
+		F2: 'static + Future<Output = ()>,
+	>(
+		closure: impl 'static + FnOnce(C) -> F1 + Send,
+	) -> Self {
+		Self(Box::new(|context| MessageHandler::future(closure(context))))
+	}
+
+	pub(crate) fn into_message_handler(self, context: C) -> MessageHandler {
+		self.0(context)
+	}
+}
+
+impl<C> Debug for SendMessageHandler<C> {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+		f.debug_tuple("SendMessageHandler")
+			.field(&"Box<FnOnce(C) -> MessageHandler>")
+			.finish()
 	}
 }
