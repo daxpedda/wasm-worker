@@ -71,7 +71,6 @@ rustflags = [
 	"-Wtrivial_numeric_casts",
 	"-Wunreachable_pub",
 	"-Wunsafe_op_in_unsafe_fn",
-	"-Wunstable_features",
 	"-Wunused_import_braces",
 	"-Wunused_lifetimes",
 	"-Wunused_qualifications",

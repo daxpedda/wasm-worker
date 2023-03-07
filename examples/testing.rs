@@ -1,9 +1,9 @@
+#![feature(stdsimd)]
 #![allow(clippy::missing_docs_in_private_items, missing_docs)]
 
-use std::ptr;
+use core::arch::wasm32;
 
-use js_sys::WebAssembly::Memory;
-use js_sys::{ArrayBuffer, Atomics, Int32Array, JsString};
+use js_sys::{ArrayBuffer, JsString};
 use utf16_lit::utf16;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
@@ -50,11 +50,9 @@ async fn main() {
 		context.close();
 		console::log_1(&"closed".into());
 
-		let mem = wasm_bindgen::memory().unchecked_into::<Memory>();
-		let array = Int32Array::new(&mem.buffer());
-		let value = 0_i32;
-		#[allow(clippy::as_conversions)]
-		let _: Result<_, _> = Atomics::wait(&array, ptr::addr_of!(value) as u32 / 4, value);
+		let mut value = 0_i32;
+		// SAFETY: This shouldn't be unsafe.
+		unsafe { wasm32::memory_atomic_wait32(&mut value, value, -1) };
 		unreachable!()
 	});
 }
