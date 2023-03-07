@@ -7,7 +7,6 @@
 )]
 
 //! Notes:
-//! - Note Chrome nested worker issue: <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
 //! - Note Firefox nested worker issue: <https://bugzilla.mozilla.org/show_bug.cgi?id=1817152>.
 //! - Document that getting the default worker url will fail if using no-modules
 //!   and not starting in a document.

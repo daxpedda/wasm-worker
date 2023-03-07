@@ -62,10 +62,6 @@ async fn nested() {
 
 			inner.await;
 
-			// Wait for nested worker to close.
-			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-			util::sleep(SIGNAL_DURATION).await;
-
 			outer.signal();
 
 			context.close();
@@ -100,10 +96,6 @@ async fn nested_nested() {
 
 					inner.await;
 
-					// Wait for nested worker to close.
-					// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-					util::sleep(SIGNAL_DURATION).await;
-
 					outer.signal();
 
 					context.close();
@@ -111,10 +103,6 @@ async fn nested_nested() {
 			});
 
 			inner.await;
-
-			// Wait for nested worker to close.
-			// See <https://bugs.chromium.org/p/chromium/issues/detail?id=1408115>.
-			util::sleep(SIGNAL_DURATION).await;
 
 			outer.signal();
 
