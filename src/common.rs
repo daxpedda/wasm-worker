@@ -11,6 +11,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 
 use crate::worker::WorkerContext;
+#[cfg(feature = "worklet")]
 use crate::worklet::WorkletContext;
 
 const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
@@ -41,20 +42,24 @@ impl ShimFormat<'_> {
 #[derive(Debug)]
 pub enum Context {
 	Worker(WorkerContext),
+	#[cfg(feature = "worklet")]
 	Worklet(WorkletContext),
 }
 
 impl Context {
 	pub fn new() -> Option<Self> {
-		WorkerContext::new()
-			.map(Self::Worker)
-			.or_else(|| WorkletContext::new().map(Self::Worklet))
+		let result = WorkerContext::new().map(Self::Worker);
+		#[cfg(feature = "worklet")]
+		let result = result.or_else(|| WorkletContext::new().map(Self::Worklet));
+
+		result
 	}
 
 	#[must_use]
 	pub fn tls(&self) -> Tls {
 		match self {
 			Self::Worker(worker) => worker.tls(),
+			#[cfg(feature = "worklet")]
 			Self::Worklet(worklet) => worklet.tls(),
 		}
 	}
@@ -63,6 +68,7 @@ impl Context {
 	pub const fn id(&self) -> u64 {
 		match self {
 			Self::Worker(worker) => worker.id(),
+			#[cfg(feature = "worklet")]
 			Self::Worklet(worklet) => worklet.id(),
 		}
 	}
