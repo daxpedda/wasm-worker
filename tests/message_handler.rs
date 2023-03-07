@@ -1,6 +1,6 @@
 //! Tests functionality around setting and clearing message handlers in
 //! [`WorkerBuilder`], [`Worker`](wasm_worker::worker::Worker) and
-//! [`WorkerContext`].
+//! [`WorkerContext`](wasm_worker::worker::WorkerContext).
 
 mod util;
 
@@ -118,8 +118,8 @@ async fn handle_ref_clear_message_handler() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// [`WorkerContext::set_message_handler()`] with
-/// [`WorkerContext::clear_message_handler()`].
+/// [`WorkerContext::set_message_handler()`](wasm_worker::worker::WorkerContext::set_message_handler) with
+/// [`WorkerContext::clear_message_handler()`](wasm_worker::worker::WorkerContext::clear_message_handler).
 #[wasm_bindgen_test]
 async fn context_clear_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -230,7 +230,7 @@ async fn handle_ref_has_message_handler() {
 	flag.await;
 }
 
-/// [`WorkerContext::has_message_handler()`].
+/// [`WorkerContext::has_message_handler()`](wasm_worker::worker::WorkerContext::has_message_handler).
 #[wasm_bindgen_test]
 async fn context_has_message_handler() {
 	let flag = Flag::new();
@@ -356,7 +356,7 @@ async fn handle_ref_message_handler() {
 	flag.await;
 }
 
-/// [`WorkerContext::set_message_handler()`].
+/// [`WorkerContext::set_message_handler()`](wasm_worker::worker::WorkerContext::set_message_handler).
 #[wasm_bindgen_test]
 async fn context_message_handler() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -495,7 +495,7 @@ async fn handle_ref_message_handler_async() {
 	flag.await;
 }
 
-/// [`WorkerContext::set_message_handler_async()`].
+/// [`WorkerContext::set_message_handler_async()`](wasm_worker::worker::WorkerContext::set_message_handler_async).
 #[wasm_bindgen_test]
 async fn context_message_handler_async() {
 	assert!(Message::has_array_buffer_support().is_ok());
@@ -715,7 +715,8 @@ async fn handle_ref_multi_message() {
 	worker.terminate();
 }
 
-/// Multiple messages in [`WorkerContext::transfer_messages()`].
+/// Multiple messages in
+/// [`WorkerContext::transfer_messages()`](wasm_worker::worker::WorkerContext::transfer_messages).
 #[wasm_bindgen_test]
 async fn context_multi_message() {
 	assert!(Message::has_array_buffer_support().is_ok());
