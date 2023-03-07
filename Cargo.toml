@@ -33,6 +33,7 @@ worklet = [
 	"web-sys/AudioWorkletGlobalScope",
 	"web-sys/AudioWorkletNode",
 	"web-sys/AudioWorkletNodeOptions",
+	"web-sys/AudioWorkletProcessor",
 	"web-sys/BaseAudioContext",
 	"web-sys/OfflineAudioContext",
 	"web-sys/RequestCache",
@@ -65,7 +66,6 @@ futures-util = { version = "0.3", default-features = false, features = ["alloc"]
 utf16_lit = "2"
 wasm-bindgen-test = "0.3"
 web-sys = { version = "0.3", features = [
-	"AudioContext",
 	"AudioDataCopyToOptions",
 	"console",
 	"RtcDataChannelState",

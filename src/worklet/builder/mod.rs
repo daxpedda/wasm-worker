@@ -9,14 +9,15 @@ use std::rc::Rc;
 use js_sys::Reflect;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
-use web_sys::{AudioWorkletGlobalScope, BaseAudioContext};
+use web_sys::{AudioWorkletProcessor, BaseAudioContext};
 #[cfg(feature = "message")]
 use {
 	super::WorkletRef,
-	crate::message::{MessageEvent, MessageHandler},
+	crate::message::{MessageEvent, MessageHandler, SendMessageHandler},
 	std::cell::RefCell,
 	std::future::Future,
 	std::rc::Weak,
+	web_sys::AudioWorkletNode,
 };
 
 pub use self::future::WorkletFuture;
@@ -26,10 +27,11 @@ use super::{WorkletContext, WorkletUrl, WorkletUrlFuture};
 #[derive(Debug)]
 pub struct WorkletBuilder<'url> {
 	url: DefaultOrUrl<'url>,
-	#[cfg(feature = "message")]
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
+	#[cfg(feature = "message")]
+	worker_message_handler: Option<SendMessageHandler<WorkletContext>>,
 }
 
 #[derive(Debug)]
@@ -42,10 +44,11 @@ impl WorkletBuilder<'_> {
 	pub fn new() -> WorkletBuilder<'static> {
 		WorkletBuilder {
 			url: DefaultOrUrl::Default(WorkletUrl::default()),
-			#[cfg(feature = "message")]
 			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
+			#[cfg(feature = "message")]
+			worker_message_handler: None,
 		}
 	}
 
@@ -53,10 +56,11 @@ impl WorkletBuilder<'_> {
 	pub fn new_with_url(url: &WorkletUrl) -> WorkletBuilder<'_> {
 		WorkletBuilder {
 			url: DefaultOrUrl::Url(url),
-			#[cfg(feature = "message")]
 			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
+			#[cfg(feature = "message")]
+			worker_message_handler: None,
 		}
 	}
 
@@ -71,9 +75,12 @@ impl WorkletBuilder<'_> {
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
+					let worklet: AudioWorkletNode = event.target().unwrap().unchecked_into();
+					let port = worklet.port().unwrap();
 					WorkletRef::new(
-						event.target().unwrap().unchecked_into(),
+						worklet,
 						Rc::clone(&id_handle),
+						port,
 						Weak::clone(&message_handler_handle),
 					)
 				});
@@ -95,14 +102,42 @@ impl WorkletBuilder<'_> {
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
+					let worklet: AudioWorkletNode = event.target().unwrap().unchecked_into();
+					let port = worklet.port().unwrap();
 					WorkletRef::new(
-						event.target().unwrap().unchecked_into(),
+						worklet,
 						Rc::clone(&id_handle),
+						port,
 						Weak::clone(&message_handler_handle),
 					)
 				});
 				message_handler(handle, MessageEvent::new(event))
 			}
+		}));
+		self
+	}
+
+	#[cfg(feature = "message")]
+	pub fn worker_message_handler<F>(mut self, mut message_handler: F) -> Self
+	where
+		F: 'static + FnMut(&WorkletContext, MessageEvent) + Send,
+	{
+		self.worker_message_handler = Some(SendMessageHandler::classic(|context| {
+			move |event: web_sys::MessageEvent| {
+				message_handler(&context, MessageEvent::new(event));
+			}
+		}));
+		self
+	}
+
+	#[cfg(feature = "message")]
+	pub fn worker_message_handler_async<F1, F2>(mut self, mut message_handler: F1) -> Self
+	where
+		F1: 'static + FnMut(&WorkletContext, MessageEvent) -> F2 + Send,
+		F2: 'static + Future<Output = ()>,
+	{
+		self.worker_message_handler = Some(SendMessageHandler::future(|context| {
+			move |event: web_sys::MessageEvent| message_handler(&context, MessageEvent::new(event))
 		}));
 		self
 	}
@@ -128,29 +163,33 @@ impl WorkletBuilder<'_> {
 
 		Ok(WorkletFuture::new(
 			Cow::Borrowed(context),
-			Box::new(|global, id| {
-				let context = WorkletContext::init(global, id);
-				f(context);
-			}),
+			self.url,
+			Box::new(f),
 			self.id,
 			#[cfg(feature = "message")]
 			self.message_handler,
-			self.url,
+			#[cfg(feature = "message")]
+			self.worker_message_handler,
 		))
 	}
 }
 
 #[doc(hidden)]
 #[allow(unreachable_pub)]
-pub struct Data {
+pub struct Data
+where
+	Self: Send,
+{
 	id: u64,
-	task: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
+	task: Box<dyn 'static + FnOnce(WorkletContext) + Send>,
+	#[cfg(feature = "message")]
+	message_handler: Option<SendMessageHandler<WorkletContext>>,
 }
 
 #[doc(hidden)]
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
-pub unsafe fn __wasm_worker_worklet_entry(data: *mut Data) {
+pub unsafe fn __wasm_worker_worklet_entry(this: AudioWorkletProcessor, data: *mut Data) {
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
 	// `__wasm_worker_worklet_entry` from `worklet.js`. The data sent to it should
 	// only come from `WorkletFuture::poll()`.
@@ -158,7 +197,15 @@ pub unsafe fn __wasm_worker_worklet_entry(data: *mut Data) {
 
 	let global = js_sys::global().unchecked_into();
 
-	(data.task)(global, data.id);
+	let context = WorkletContext::init(
+		global,
+		this,
+		data.id,
+		#[cfg(feature = "message")]
+		data.message_handler,
+	);
+
+	(data.task)(context);
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

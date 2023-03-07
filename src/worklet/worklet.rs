@@ -10,6 +10,7 @@ use {
 	std::cell::RefCell,
 	std::future::Future,
 	std::rc::Weak,
+	web_sys::MessagePort,
 };
 
 use crate::common::{DestroyError, Exports, Tls};
@@ -19,6 +20,8 @@ pub struct Worklet {
 	worklet: AudioWorkletNode,
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
+	port: MessagePort,
+	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 }
 
@@ -26,7 +29,7 @@ impl Drop for Worklet {
 	fn drop(&mut self) {
 		#[cfg(feature = "message")]
 		if Rc::strong_count(&self.message_handler) == 1 {
-			self.worklet.port().unwrap().set_onmessage(None);
+			self.port.set_onmessage(None);
 		}
 	}
 }
@@ -45,7 +48,7 @@ impl WorkletOrRef for Worklet {
 		WorkletRef {
 			worklet: self.worklet.clone(),
 			id: Rc::clone(&self.id),
-			#[cfg(feature = "message")]
+			port: self.port.clone(),
 			message_handler: Rc::downgrade(&self.message_handler),
 		}
 	}
@@ -59,6 +62,11 @@ impl WorkletOrRef for Worklet {
 	}
 
 	#[cfg(feature = "message")]
+	fn port(&self) -> &MessagePort {
+		&self.port
+	}
+
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Some(Cow::Borrowed(&self.message_handler))
 	}
@@ -68,11 +76,14 @@ impl Worklet {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
 		id: Rc<Cell<Result<u64, u64>>>,
+		#[cfg(feature = "message")] port: MessagePort,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
 			worklet,
 			id,
+			#[cfg(feature = "message")]
+			port,
 			#[cfg(feature = "message")]
 			message_handler,
 		}
@@ -152,7 +163,7 @@ impl Worklet {
 pub struct WorkletRef {
 	worklet: AudioWorkletNode,
 	id: Rc<Cell<Result<u64, u64>>>,
-	#[cfg(feature = "message")]
+	port: MessagePort,
 	message_handler: Weak<RefCell<Option<MessageHandler>>>,
 }
 
@@ -170,7 +181,10 @@ impl WorkletOrRef for WorkletRef {
 		&self.id
 	}
 
-	#[cfg(feature = "message")]
+	fn port(&self) -> &MessagePort {
+		&self.port
+	}
+
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>> {
 		Weak::upgrade(&self.message_handler).map(Cow::Owned)
 	}
@@ -181,11 +195,13 @@ impl WorkletRef {
 	pub(super) fn new(
 		worklet: AudioWorkletNode,
 		id: Rc<Cell<Result<u64, u64>>>,
+		port: MessagePort,
 		message_handler: Weak<RefCell<Option<MessageHandler>>>,
 	) -> Self {
 		Self {
 			worklet,
 			id,
+			port,
 			message_handler,
 		}
 	}
@@ -263,6 +279,9 @@ trait WorkletOrRef: Debug + Sized {
 	fn id(&self) -> &Rc<Cell<Result<u64, u64>>>;
 
 	#[cfg(feature = "message")]
+	fn port(&self) -> &MessagePort;
+
+	#[cfg(feature = "message")]
 	fn message_handler(&self) -> Option<Cow<'_, Rc<RefCell<Option<MessageHandler>>>>>;
 
 	#[cfg(feature = "message")]
@@ -276,7 +295,7 @@ trait WorkletOrRef: Debug + Sized {
 	fn clear_message_handler(&self) {
 		if let Some(message_handler) = self.message_handler() {
 			message_handler.take();
-			self.worklet().port().unwrap().set_onmessage(None);
+			self.port().set_onmessage(None);
 		}
 	}
 
@@ -293,10 +312,7 @@ trait WorkletOrRef: Debug + Sized {
 				new_message_handler(&handle, MessageEvent::new(event));
 			}));
 
-			self.worklet()
-				.port()
-				.unwrap()
-				.set_onmessage(Some(message_handler));
+			self.port().set_onmessage(Some(message_handler));
 		}
 	}
 
@@ -316,10 +332,7 @@ trait WorkletOrRef: Debug + Sized {
 				new_message_handler(&handle, MessageEvent::new(event))
 			}));
 
-			self.worklet()
-				.port()
-				.unwrap()
-				.set_onmessage(Some(message_handler));
+			self.port().set_onmessage(Some(message_handler));
 		}
 	}
 
@@ -328,7 +341,7 @@ trait WorkletOrRef: Debug + Sized {
 		&self,
 		messages: M,
 	) -> Result<(), TransferError> {
-		self.worklet().port().unwrap().transfer_messages(messages)
+		self.port().transfer_messages(messages)
 	}
 
 	unsafe fn destroy(self, tls: Tls) -> Result<(), DestroyError<Self>> {

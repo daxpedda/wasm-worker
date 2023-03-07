@@ -11,14 +11,16 @@ use std::task::{ready, Context, Poll};
 use futures_core::FusedFuture;
 use js_sys::Array;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{
-	AudioWorkletGlobalScope, AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext,
-};
+use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 #[cfg(feature = "message")]
-use {crate::message::MessageHandler, std::cell::RefCell, std::ops::Deref};
+use {
+	crate::message::{MessageHandler, SendMessageHandler},
+	std::cell::RefCell,
+	std::ops::Deref,
+};
 
 use super::super::url::{WorkletUrl, WorkletUrlError, WorkletUrlFuture};
-use super::super::Worklet;
+use super::super::{Worklet, WorkletContext};
 use super::{Data, DefaultOrUrl};
 use crate::common::ID_COUNTER;
 
@@ -28,10 +30,12 @@ pub struct WorkletFuture<'context>(Option<Inner<'context>>);
 
 struct Inner<'context> {
 	context: Cow<'context, BaseAudioContext>,
-	f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
+	f: Box<dyn 'static + FnOnce(WorkletContext) + Send>,
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
+	#[cfg(feature = "message")]
+	worker_message_handler: Option<SendMessageHandler<WorkletContext>>,
 	state: State,
 }
 
@@ -44,10 +48,13 @@ enum State {
 impl<'context> WorkletFuture<'context> {
 	pub(super) fn new(
 		context: Cow<'context, BaseAudioContext>,
-		f: Box<dyn 'static + FnOnce(AudioWorkletGlobalScope, u64) + Send>,
+		url: DefaultOrUrl<'_>,
+		f: Box<dyn 'static + FnOnce(WorkletContext) + Send>,
 		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
-		url: DefaultOrUrl<'_>,
+		#[cfg(feature = "message")] worker_message_handler: Option<
+			SendMessageHandler<WorkletContext>,
+		>,
 	) -> Self {
 		let state = match url {
 			DefaultOrUrl::Default(future) => State::Url(future),
@@ -60,6 +67,8 @@ impl<'context> WorkletFuture<'context> {
 			id,
 			#[cfg(feature = "message")]
 			message_handler,
+			#[cfg(feature = "message")]
+			worker_message_handler,
 			state,
 		}))
 	}
@@ -72,6 +81,8 @@ impl<'context> WorkletFuture<'context> {
 			     id,
 			     #[cfg(feature = "message")]
 			     message_handler,
+			     #[cfg(feature = "message")]
+			     worker_message_handler,
 			     state,
 			 }| Inner {
 				context: Cow::Owned(context.into_owned()),
@@ -79,6 +90,8 @@ impl<'context> WorkletFuture<'context> {
 				id,
 				#[cfg(feature = "message")]
 				message_handler,
+				#[cfg(feature = "message")]
+				worker_message_handler,
 				state,
 			},
 		))
@@ -119,6 +132,8 @@ impl Future for WorkletFuture<'_> {
 						id,
 						#[cfg(feature = "message")]
 						message_handler,
+						#[cfg(feature = "message")]
+						worker_message_handler,
 						..
 					} = self.0.take().unwrap();
 
@@ -130,6 +145,8 @@ impl Future for WorkletFuture<'_> {
 					let data = Box::into_raw(Box::new(Data {
 						id: new_id,
 						task: f,
+						#[cfg(feature = "message")]
+						message_handler: worker_message_handler,
 					}));
 
 					let mut options = AudioWorkletNodeOptions::new();
@@ -147,13 +164,18 @@ impl Future for WorkletFuture<'_> {
 					.unwrap();
 
 					#[cfg(feature = "message")]
+					let port = node.port().unwrap();
+
+					#[cfg(feature = "message")]
 					if let Some(message_handler) = RefCell::borrow(&message_handler).deref() {
-						node.port().unwrap().set_onmessage(Some(message_handler));
+						port.set_onmessage(Some(message_handler));
 					}
 
 					return Poll::Ready(Ok(Worklet::new(
 						node,
 						id,
+						#[cfg(feature = "message")]
+						port,
 						#[cfg(feature = "message")]
 						message_handler,
 					)));
