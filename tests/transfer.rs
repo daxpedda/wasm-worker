@@ -105,18 +105,17 @@ async fn test_transfer<T, F1, F2, F3>(
 		}
 	}
 
-	let request = Flag::new();
-	let response = Flag::new();
+	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
 		.unwrap()
 		.message_handler_async({
 			let assert_received = assert_received.clone();
-			let response = response.clone();
+			let flag = flag.clone();
 
 			move |_, event| {
 				let assert_received = assert_received.clone();
-				let response = response.clone();
+				let flag = flag.clone();
 
 				async move {
 					let mut messages = event.messages().unwrap().into_iter();
@@ -129,39 +128,31 @@ async fn test_transfer<T, F1, F2, F3>(
 					let value: T = value.try_into().unwrap();
 					assert_received(&value).await;
 
-					response.signal();
+					flag.signal();
 				}
 			}
 		})
-		.spawn({
-			let request = request.clone();
-			move |context| {
-				context.set_message_handler_async(move |context, event| {
-					let assert_received = assert_received.clone();
-					let context = context.clone();
+		.worker_message_handler_async(move |context, event| {
+			let assert_received = assert_received.clone();
+			let context = context.clone();
 
-					async move {
-						let mut messages = event.messages().unwrap().into_iter();
-						assert_eq!(messages.len(), 2);
+			async move {
+				let mut messages = event.messages().unwrap().into_iter();
+				assert_eq!(messages.len(), 2);
 
-						let value_1: T = messages.next().unwrap().serialize_as().unwrap();
-						assert_received(&value_1).await;
+				let value_1: T = messages.next().unwrap().serialize_as().unwrap();
+				assert_received(&value_1).await;
 
-						let value_2 = messages.next().unwrap().serialize().unwrap();
-						let value_2: T = value_2.try_into().unwrap();
-						assert_received(&value_2).await;
+				let value_2 = messages.next().unwrap().serialize().unwrap();
+				let value_2: T = value_2.try_into().unwrap();
+				assert_received(&value_2).await;
 
-						let old_value = value_1.clone();
-						context.transfer_messages([value_1, value_2]).unwrap();
-						assert_sent(&old_value);
-					}
-				});
-
-				request.signal();
+				let old_value = value_1.clone();
+				context.transfer_messages([value_1, value_2]).unwrap();
+				assert_sent(&old_value);
 			}
-		});
-
-	request.await;
+		})
+		.spawn(|_| ());
 
 	let value_1 = init().await;
 	let value_2 = init().await;
@@ -170,7 +161,7 @@ async fn test_transfer<T, F1, F2, F3>(
 	worker.transfer_messages([value_1, value_2]).unwrap();
 	assert_sent(&old_value);
 
-	response.await;
+	flag.await;
 
 	worker.terminate();
 
