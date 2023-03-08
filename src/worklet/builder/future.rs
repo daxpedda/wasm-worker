@@ -35,7 +35,7 @@ struct Inner<'context> {
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	#[cfg(feature = "message")]
-	worker_message_handler: Option<SendMessageHandler<WorkletContext>>,
+	worklet_message_handler: Option<SendMessageHandler<WorkletContext>>,
 	state: State,
 }
 
@@ -52,7 +52,7 @@ impl<'context> WorkletFuture<'context> {
 		f: Box<dyn 'static + FnOnce(WorkletContext) + Send>,
 		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
-		#[cfg(feature = "message")] worker_message_handler: Option<
+		#[cfg(feature = "message")] worklet_message_handler: Option<
 			SendMessageHandler<WorkletContext>,
 		>,
 	) -> Self {
@@ -68,7 +68,7 @@ impl<'context> WorkletFuture<'context> {
 			#[cfg(feature = "message")]
 			message_handler,
 			#[cfg(feature = "message")]
-			worker_message_handler,
+			worklet_message_handler,
 			state,
 		}))
 	}
@@ -82,7 +82,7 @@ impl<'context> WorkletFuture<'context> {
 			     #[cfg(feature = "message")]
 			     message_handler,
 			     #[cfg(feature = "message")]
-			     worker_message_handler,
+			     worklet_message_handler,
 			     state,
 			 }| Inner {
 				context: Cow::Owned(context.into_owned()),
@@ -91,7 +91,7 @@ impl<'context> WorkletFuture<'context> {
 				#[cfg(feature = "message")]
 				message_handler,
 				#[cfg(feature = "message")]
-				worker_message_handler,
+				worklet_message_handler,
 				state,
 			},
 		))
@@ -133,7 +133,7 @@ impl Future for WorkletFuture<'_> {
 						#[cfg(feature = "message")]
 						message_handler,
 						#[cfg(feature = "message")]
-						worker_message_handler,
+						worklet_message_handler,
 						..
 					} = self.0.take().unwrap();
 
@@ -146,7 +146,7 @@ impl Future for WorkletFuture<'_> {
 						id: new_id,
 						task: f,
 						#[cfg(feature = "message")]
-						message_handler: worker_message_handler,
+						message_handler: worklet_message_handler,
 					}));
 
 					let mut options = AudioWorkletNodeOptions::new();

@@ -350,9 +350,9 @@ trait WorkletOrRef: Debug + Sized {
 				self.id().set(Err(id));
 
 				Exports::with(|exports| {
-					// SAFETY: The id is uniquely created in `WorkerBuilder::spawn_internal()`
+					// SAFETY: The id is uniquely created in `WorkletBuilder::spawn_internal()`
 					// through an `AtomicUsize` counter. It then is saved here and sent to the
-					// worker and used in generating `Tls`. The ids are then compared above and if
+					// worklet and used in generating `Tls`. The ids are then compared above and if
 					// they match, the state is change to `None` preventing any subsequent calls.
 					unsafe { exports.thread_destroy(&tls.tls_base(), &tls.stack_alloc()) };
 				});

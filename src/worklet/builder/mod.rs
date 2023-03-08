@@ -31,7 +31,7 @@ pub struct WorkletBuilder<'url> {
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	#[cfg(feature = "message")]
-	worker_message_handler: Option<SendMessageHandler<WorkletContext>>,
+	worklet_message_handler: Option<SendMessageHandler<WorkletContext>>,
 }
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ impl WorkletBuilder<'_> {
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 			#[cfg(feature = "message")]
-			worker_message_handler: None,
+			worklet_message_handler: None,
 		}
 	}
 
@@ -60,7 +60,7 @@ impl WorkletBuilder<'_> {
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
 			#[cfg(feature = "message")]
-			worker_message_handler: None,
+			worklet_message_handler: None,
 		}
 	}
 
@@ -118,11 +118,11 @@ impl WorkletBuilder<'_> {
 	}
 
 	#[cfg(feature = "message")]
-	pub fn worker_message_handler<F>(mut self, mut message_handler: F) -> Self
+	pub fn worklet_message_handler<F>(mut self, mut message_handler: F) -> Self
 	where
 		F: 'static + FnMut(&WorkletContext, MessageEvent) + Send,
 	{
-		self.worker_message_handler = Some(SendMessageHandler::function(|context| {
+		self.worklet_message_handler = Some(SendMessageHandler::function(|context| {
 			move |event: web_sys::MessageEvent| {
 				message_handler(&context, MessageEvent::new(event));
 			}
@@ -131,12 +131,12 @@ impl WorkletBuilder<'_> {
 	}
 
 	#[cfg(feature = "message")]
-	pub fn worker_message_handler_async<F1, F2>(mut self, mut message_handler: F1) -> Self
+	pub fn worklet_message_handler_async<F1, F2>(mut self, mut message_handler: F1) -> Self
 	where
 		F1: 'static + FnMut(&WorkletContext, MessageEvent) -> F2 + Send,
 		F2: 'static + Future<Output = ()>,
 	{
-		self.worker_message_handler = Some(SendMessageHandler::future(|context| {
+		self.worklet_message_handler = Some(SendMessageHandler::future(|context| {
 			move |event: web_sys::MessageEvent| message_handler(&context, MessageEvent::new(event))
 		}));
 		self
@@ -169,7 +169,7 @@ impl WorkletBuilder<'_> {
 			#[cfg(feature = "message")]
 			self.message_handler,
 			#[cfg(feature = "message")]
-			self.worker_message_handler,
+			self.worklet_message_handler,
 		))
 	}
 }

@@ -69,7 +69,7 @@ async fn main() {
 				&format!("received audio message: {:?}", message.as_raw().data()).into(),
 			);
 		})
-		.worker_message_handler(|_, message| {
+		.worklet_message_handler(|_, message| {
 			console::log_1(&format_js!(
 				"received window message: {:?}",
 				message.as_raw().data()
