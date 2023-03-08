@@ -11,7 +11,6 @@
 //! - Document that getting the default worker url will fail if using no-modules
 //!   and not starting in a document.
 //! - Note Chrome not cleaning up worklets: <https://bugs.chromium.org/p/chromium/issues/detail?id=1298955>.
-//! - Note `TextDe/Encoder` polyfill required: <https://github.com/rustwasm/wasm-bindgen/issues/2367>.
 //! - Note workaround for missing ports on worklet creation: <https://github.com/WebAudio/web-audio-api/issues/2456>.
 //! - Note Chrome silently failing on unsupported messages: <https://bugs.chromium.org/p/chromium/issues/detail?id=1341844>.
 //!
