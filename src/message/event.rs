@@ -26,6 +26,8 @@ impl MessageEvent {
 
 		if data.is_array() {
 			Some(Messages(RawMessages::Array(data.unchecked_into())))
+		} else if data.is_undefined() {
+			Some(Messages(RawMessages::None))
 		} else {
 			Some(Messages(RawMessages::Single(data)))
 		}

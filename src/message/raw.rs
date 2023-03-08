@@ -53,6 +53,7 @@ impl RawMessage {
 
 #[derive(Debug)]
 pub enum RawMessages {
+	None,
 	Single(JsValue),
 	Array(Array),
 }

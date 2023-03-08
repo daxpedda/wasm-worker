@@ -4,6 +4,8 @@
 
 mod util;
 
+use std::iter;
+
 use futures_util::future::{self, Either};
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -584,6 +586,88 @@ async fn handle_drop_message_handler() {
 	// The message handler will never respond if dropped.
 	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
 	assert!(matches!(result, Either::Right(((), _))));
+}
+
+/// No messages in
+/// [`Worker::transfer_messages()`](wasm_worker::worker::Worker::transfer_messages).
+#[wasm_bindgen_test]
+async fn handle_no_message() {
+	let flag = Flag::new();
+
+	let worker = WorkerBuilder::new()
+		.unwrap()
+		.worker_message_handler({
+			let flag = flag.clone();
+			move |_, event| {
+				let mut messages = event.messages().unwrap().into_iter();
+				assert_eq!(messages.len(), 0);
+				assert!(matches!(messages.next(), None));
+
+				flag.signal();
+			}
+		})
+		.spawn(|_| ());
+
+	worker.transfer_messages(iter::empty::<Message>()).unwrap();
+
+	flag.await;
+
+	worker.terminate();
+}
+
+/// No messages in
+/// [`WorkerRef::transfer_messages()`](wasm_worker::worker::WorkerRef::transfer_messages).
+#[wasm_bindgen_test]
+async fn handle_ref_no_message() {
+	let flag = Flag::new();
+
+	let worker = WorkerBuilder::new()
+		.unwrap()
+		.message_handler(move |worker, _| {
+			worker.transfer_messages(iter::empty::<Message>()).unwrap();
+		})
+		.worker_message_handler({
+			let flag = flag.clone();
+			move |_, event| {
+				let mut messages = event.messages().unwrap().into_iter();
+				assert_eq!(messages.len(), 0);
+				assert!(matches!(messages.next(), None));
+
+				flag.signal();
+			}
+		})
+		.spawn(|context| context.transfer_messages(iter::empty::<Message>()).unwrap());
+
+	flag.await;
+
+	worker.terminate();
+}
+
+/// No messages in
+/// [`WorkerContext::transfer_messages()`](wasm_worker::worker::WorkerContext::transfer_messages).
+#[wasm_bindgen_test]
+async fn context_no_message() {
+	let flag = Flag::new();
+
+	let _worker = WorkerBuilder::new()
+		.unwrap()
+		.message_handler({
+			let flag = flag.clone();
+			move |_, event| {
+				let mut messages = event.messages().unwrap().into_iter();
+				assert_eq!(messages.len(), 0);
+				assert!(matches!(messages.next(), None));
+
+				flag.signal();
+			}
+		})
+		.spawn(|context| {
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
+
+			context.close();
+		});
+
+	flag.await;
 }
 
 /// Multiple messages in

@@ -79,6 +79,7 @@ impl IntoIterator for Messages {
 
 	fn into_iter(self) -> Self::IntoIter {
 		match self.0 {
+			RawMessages::None => MessageIter(Inner::Single(None)),
 			RawMessages::Single(value) => MessageIter(Inner::Single(Some(value))),
 			RawMessages::Array(array) => MessageIter(Inner::Array {
 				range: 0..array.length(),
@@ -99,18 +100,19 @@ enum Inner {
 
 impl MessageIter {
 	#[must_use]
-	pub fn into_raw(self) -> Option<RawMessages> {
+	pub fn into_raw(self) -> RawMessages {
 		match self.0 {
-			Inner::Single(value) => Some(RawMessages::Single(value?)),
+			Inner::Single(None) => RawMessages::None,
+			Inner::Single(Some(value)) => RawMessages::Single(value),
 			Inner::Array { array, range } => {
 				let real_range = 0..array.length();
 
 				if range.is_empty() {
-					None
+					RawMessages::None
 				} else if real_range == range {
-					Some(RawMessages::Array(array))
+					RawMessages::Array(array)
 				} else {
-					Some(RawMessages::Array(array.slice(range.start, range.end)))
+					RawMessages::Array(array.slice(range.start, range.end))
 				}
 			}
 		}

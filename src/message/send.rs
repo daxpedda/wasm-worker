@@ -9,21 +9,28 @@ use web_sys::{DedicatedWorkerGlobalScope, DomException, MessagePort, Worker};
 use super::{Message, Messages, RawMessages};
 
 pub(crate) trait SendMessages {
+	fn post_message(&self, message: &JsValue) -> Result<(), JsValue>;
+
 	fn post_message_with_transfer(
 		&self,
 		message: &JsValue,
 		transfer: &JsValue,
 	) -> Result<(), JsValue>;
 
-	fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
+	fn transfer_messages<I: IntoIterator<Item = M>, M: Into<Message>>(
 		&self,
-		messages: M,
+		messages: I,
 	) -> Result<(), TransferError> {
 		let mut messages = messages.into_iter().map(Into::into).map(Message::into_raw);
 
 		let array = 'array: {
 			let Some(message_1) = messages.next() else {
-				return Ok(())
+				return self
+					.post_message(&JsValue::UNDEFINED)
+					.map_err(|error| TransferError {
+						error: error.into(),
+						messages: Messages(RawMessages::None),
+					});
 			};
 
 			let Some(message_2) = messages.next() else {
@@ -66,6 +73,10 @@ pub(crate) trait SendMessages {
 }
 
 impl SendMessages for Worker {
+	fn post_message(&self, message: &JsValue) -> Result<(), JsValue> {
+		self.post_message(message)
+	}
+
 	fn post_message_with_transfer(
 		&self,
 		message: &JsValue,
@@ -76,6 +87,10 @@ impl SendMessages for Worker {
 }
 
 impl SendMessages for DedicatedWorkerGlobalScope {
+	fn post_message(&self, message: &JsValue) -> Result<(), JsValue> {
+		self.post_message(message)
+	}
+
 	fn post_message_with_transfer(
 		&self,
 		message: &JsValue,
@@ -86,6 +101,10 @@ impl SendMessages for DedicatedWorkerGlobalScope {
 }
 
 impl SendMessages for MessagePort {
+	fn post_message(&self, message: &JsValue) -> Result<(), JsValue> {
+		self.post_message(message)
+	}
+
 	fn post_message_with_transfer(
 		&self,
 		message: &JsValue,
