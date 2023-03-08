@@ -48,6 +48,7 @@ pub enum Context {
 
 impl Context {
 	pub fn new() -> Option<Self> {
+		#[cfg_attr(not(feature = "message"), allow(clippy::let_and_return))]
 		let result = WorkerContext::new().map(Self::Worker);
 		#[cfg(feature = "worklet")]
 		let result = result.or_else(|| WorkletContext::new().map(Self::Worklet));

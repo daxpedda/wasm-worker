@@ -183,6 +183,7 @@ impl WorkerBuilder<'_> {
 		.unwrap()
 	}
 
+	#[cfg(feature = "message")]
 	pub fn spawn_async_with_message<F1, F2, I, M>(
 		self,
 		f: F1,
@@ -206,6 +207,7 @@ impl WorkerBuilder<'_> {
 			})
 	}
 
+	#[cfg_attr(not(feature = "message"), allow(clippy::unnecessary_wraps))]
 	fn spawn_internal(
 		self,
 		task: Task,
@@ -336,9 +338,10 @@ enum Task {
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 #[wasm_bindgen]
+#[cfg_attr(not(feature = "message"), allow(clippy::needless_pass_by_value))]
 pub unsafe fn __wasm_worker_worker_entry(
 	data: *mut Data,
-	#[cfg(feature = "message")] messages: JsValue,
+	#[cfg_attr(not(feature = "message"), allow(unused_variables))] messages: JsValue,
 ) {
 	let global = js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>();
 	#[cfg(not(feature = "message"))]
