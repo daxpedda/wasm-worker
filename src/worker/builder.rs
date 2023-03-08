@@ -172,10 +172,7 @@ impl WorkerBuilder<'_> {
 		F2: 'static + Future<Output = ()>,
 	{
 		let task = Task::Future(Box::new(move |context| {
-			Box::pin(async move {
-				f(context).await;
-				Ok(JsValue::UNDEFINED)
-			})
+			Box::pin(async move { f(context).await })
 		}));
 
 		self.spawn_internal(
@@ -199,10 +196,7 @@ impl WorkerBuilder<'_> {
 	{
 		let messages = RawMessages::from_messages(messages);
 		let task = Task::FutureWithMessage(Box::new(move |context, messages| {
-			Box::pin(async move {
-				f(context, messages).await;
-				Ok(JsValue::UNDEFINED)
-			})
+			Box::pin(async move { f(context, messages).await })
 		}));
 
 		self.spawn_internal(task, Some(&messages))
@@ -325,9 +319,7 @@ enum Task {
 	Future(
 		Box<
 			dyn 'static
-				+ FnOnce(
-					WorkerContext,
-				) -> Pin<Box<dyn 'static + Future<Output = Result<JsValue, JsValue>>>>
+				+ FnOnce(WorkerContext) -> Pin<Box<dyn 'static + Future<Output = ()>>>
 				+ Send,
 		>,
 	),
@@ -335,10 +327,7 @@ enum Task {
 	FutureWithMessage(
 		Box<
 			dyn 'static
-				+ FnOnce(
-					WorkerContext,
-					Messages,
-				) -> Pin<Box<dyn 'static + Future<Output = Result<JsValue, JsValue>>>>
+				+ FnOnce(WorkerContext, Messages) -> Pin<Box<dyn 'static + Future<Output = ()>>>
 				+ Send,
 		>,
 	),
@@ -350,8 +339,9 @@ enum Task {
 pub unsafe fn __wasm_worker_worker_entry(
 	data: *mut Data,
 	#[cfg(feature = "message")] messages: JsValue,
-) -> JsValue {
+) {
 	let global = js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>();
+	#[cfg(not(feature = "message"))]
 	global.set_onmessage(None);
 
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
@@ -369,21 +359,19 @@ pub unsafe fn __wasm_worker_worker_entry(
 	match data.task {
 		Task::Function(f) => {
 			f(context);
-			JsValue::UNDEFINED
 		}
 		#[cfg(feature = "message")]
 		Task::FunctionWithMessage(f) => {
 			let messages = Messages(RawMessages::from_js(messages));
 
 			f(context, messages);
-			JsValue::UNDEFINED
 		}
-		Task::Future(future) => wasm_bindgen_futures::future_to_promise(future(context)).into(),
+		Task::Future(future) => wasm_bindgen_futures::spawn_local(future(context)),
 		#[cfg(feature = "message")]
 		Task::FutureWithMessage(future) => {
 			let messages = Messages(RawMessages::from_js(messages));
 
-			wasm_bindgen_futures::future_to_promise(future(context, messages)).into()
+			wasm_bindgen_futures::spawn_local(future(context, messages));
 		}
 	}
 }

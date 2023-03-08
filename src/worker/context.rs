@@ -38,6 +38,8 @@ impl WorkerContext {
 		if let Some(message_handler) = message_handler {
 			let message_handler = message_handler.into_message_handler(context.clone());
 			context.set_message_handler_internal(message_handler);
+		} else {
+			context.clear_message_handler();
 		}
 
 		context
