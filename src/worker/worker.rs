@@ -116,10 +116,10 @@ impl Worker {
 
 	#[allow(clippy::same_name_method)]
 	#[cfg(feature = "message")]
-	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
+	pub fn transfer_messages<I, M>(&self, messages: I) -> Result<(), TransferError>
 	where
-		M: IntoIterator<Item = I>,
-		I: Into<Message>,
+		I: IntoIterator<Item = M>,
+		M: Into<Message>,
 	{
 		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
@@ -230,10 +230,10 @@ impl WorkerRef {
 
 	#[allow(clippy::same_name_method)]
 	#[cfg(feature = "message")]
-	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
+	pub fn transfer_messages<I, M>(&self, messages: I) -> Result<(), TransferError>
 	where
-		M: IntoIterator<Item = I>,
-		I: Into<Message>,
+		I: IntoIterator<Item = M>,
+		M: Into<Message>,
 	{
 		<Self as WorkerOrRef>::transfer_messages(self, messages)
 	}
@@ -325,9 +325,9 @@ trait WorkerOrRef: Debug + Sized {
 	}
 
 	#[cfg(feature = "message")]
-	fn transfer_messages<M: IntoIterator<Item = I>, I: Into<Message>>(
+	fn transfer_messages<I: IntoIterator<Item = M>, M: Into<Message>>(
 		&self,
-		messages: M,
+		messages: I,
 	) -> Result<(), TransferError> {
 		self.worker().transfer_messages(messages)
 	}

@@ -120,10 +120,10 @@ impl WorkletContext {
 	}
 
 	#[cfg(feature = "message")]
-	pub fn transfer_messages<M, I>(&self, messages: M) -> Result<(), TransferError>
+	pub fn transfer_messages<I, M>(&self, messages: I) -> Result<(), TransferError>
 	where
-		M: IntoIterator<Item = I>,
-		I: Into<Message>,
+		I: IntoIterator<Item = M>,
+		M: Into<Message>,
 	{
 		self.port.transfer_messages(messages)
 	}
