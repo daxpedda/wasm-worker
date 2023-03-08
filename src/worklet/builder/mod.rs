@@ -3,7 +3,9 @@ mod future;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::error::Error;
-use std::fmt::{Display, Formatter};
+use std::fmt::{self, Display, Formatter};
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 
 use js_sys::Reflect;
@@ -15,7 +17,6 @@ use {
 	super::WorkletRef,
 	crate::message::{MessageEvent, MessageHandler, SendMessageHandler},
 	std::cell::RefCell,
-	std::future::Future,
 	std::rc::Weak,
 	web_sys::AudioWorkletNode,
 };
@@ -150,6 +151,30 @@ impl WorkletBuilder<'_> {
 	where
 		F: 'static + FnOnce(WorkletContext) + Send,
 	{
+		self.add_internal(context, Task::Function(Box::new(f)))
+	}
+
+	pub fn add_async<F1, F2>(
+		self,
+		context: &BaseAudioContext,
+		f: F1,
+	) -> Result<WorkletFuture<'_>, WorkletInitError>
+	where
+		F1: 'static + FnOnce(WorkletContext) -> F2 + Send,
+		F2: 'static + Future<Output = ()>,
+	{
+		let task = Task::Future(Box::new(move |context| {
+			Box::pin(async move { f(context).await })
+		}));
+
+		self.add_internal(context, task)
+	}
+
+	fn add_internal(
+		self,
+		context: &BaseAudioContext,
+		task: Task,
+	) -> Result<WorkletFuture<'_>, WorkletInitError> {
 		let init = Reflect::get(context, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
@@ -164,7 +189,7 @@ impl WorkletBuilder<'_> {
 		Ok(WorkletFuture::new(
 			Cow::Borrowed(context),
 			self.url,
-			Box::new(f),
+			task,
 			self.id,
 			#[cfg(feature = "message")]
 			self.message_handler,
@@ -181,21 +206,33 @@ where
 	Self: Send,
 {
 	id: u64,
-	task: Box<dyn 'static + FnOnce(WorkletContext) + Send>,
+	task: Task,
 	#[cfg(feature = "message")]
 	message_handler: Option<SendMessageHandler<WorkletContext>>,
+}
+
+#[allow(clippy::type_complexity)]
+enum Task {
+	Function(Box<dyn 'static + FnOnce(WorkletContext) + Send>),
+	Future(
+		Box<
+			dyn 'static
+				+ FnOnce(WorkletContext) -> Pin<Box<dyn 'static + Future<Output = ()>>>
+				+ Send,
+		>,
+	),
 }
 
 #[doc(hidden)]
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
 pub unsafe fn __wasm_worker_worklet_entry(this: AudioWorkletProcessor, data: *mut Data) {
+	let global = js_sys::global().unchecked_into();
+
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
 	// `__wasm_worker_worklet_entry` from `worklet.js`. The data sent to it should
 	// only come from `WorkletFuture::poll()`.
 	let data = *unsafe { Box::from_raw(data) };
-
-	let global = js_sys::global().unchecked_into();
 
 	let context = WorkletContext::init(
 		global,
@@ -205,14 +242,19 @@ pub unsafe fn __wasm_worker_worklet_entry(this: AudioWorkletProcessor, data: *mu
 		data.message_handler,
 	);
 
-	(data.task)(context);
+	match data.task {
+		Task::Function(f) => {
+			f(context);
+		}
+		Task::Future(future) => wasm_bindgen_futures::spawn_local(future(context)),
+	}
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct WorkletInitError;
 
 impl Display for WorkletInitError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
 		write!(f, "already added a Wasm module to this worklet")
 	}
 }

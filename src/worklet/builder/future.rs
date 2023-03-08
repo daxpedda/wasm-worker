@@ -14,14 +14,15 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 #[cfg(feature = "message")]
 use {
+	super::super::WorkletContext,
 	crate::message::{MessageHandler, SendMessageHandler},
 	std::cell::RefCell,
 	std::ops::Deref,
 };
 
 use super::super::url::{WorkletUrl, WorkletUrlError, WorkletUrlFuture};
-use super::super::{Worklet, WorkletContext};
-use super::{Data, DefaultOrUrl};
+use super::super::Worklet;
+use super::{Data, DefaultOrUrl, Task};
 use crate::common::ID_COUNTER;
 
 #[derive(Debug)]
@@ -30,7 +31,7 @@ pub struct WorkletFuture<'context>(Option<Inner<'context>>);
 
 struct Inner<'context> {
 	context: Cow<'context, BaseAudioContext>,
-	f: Box<dyn 'static + FnOnce(WorkletContext) + Send>,
+	task: Task,
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
@@ -49,7 +50,7 @@ impl<'context> WorkletFuture<'context> {
 	pub(super) fn new(
 		context: Cow<'context, BaseAudioContext>,
 		url: DefaultOrUrl<'_>,
-		f: Box<dyn 'static + FnOnce(WorkletContext) + Send>,
+		task: Task,
 		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
 		#[cfg(feature = "message")] worklet_message_handler: Option<
@@ -63,7 +64,7 @@ impl<'context> WorkletFuture<'context> {
 
 		Self(Some(Inner {
 			context,
-			f,
+			task,
 			id,
 			#[cfg(feature = "message")]
 			message_handler,
@@ -77,7 +78,7 @@ impl<'context> WorkletFuture<'context> {
 		WorkletFuture(self.0.map(
 			|Inner {
 			     context,
-			     f,
+			     task,
 			     id,
 			     #[cfg(feature = "message")]
 			     message_handler,
@@ -86,7 +87,7 @@ impl<'context> WorkletFuture<'context> {
 			     state,
 			 }| Inner {
 				context: Cow::Owned(context.into_owned()),
-				f,
+				task,
 				id,
 				#[cfg(feature = "message")]
 				message_handler,
@@ -128,7 +129,7 @@ impl Future for WorkletFuture<'_> {
 					let result = ready!(Pin::new(future).poll(cx));
 					let Inner {
 						context,
-						f,
+						task,
 						id,
 						#[cfg(feature = "message")]
 						message_handler,
@@ -144,7 +145,7 @@ impl Future for WorkletFuture<'_> {
 					id.set(Ok(new_id));
 					let data = Box::into_raw(Box::new(Data {
 						id: new_id,
-						task: f,
+						task,
 						#[cfg(feature = "message")]
 						message_handler: worklet_message_handler,
 					}));

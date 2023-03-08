@@ -36,7 +36,6 @@ async fn main() {
 			.unwrap();
 	audio
 		.add_wasm(|_| console::log_1(&lit_js!("audio")))
-		.unwrap()
 		.await
 		.unwrap();
 

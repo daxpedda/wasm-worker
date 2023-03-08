@@ -336,8 +336,8 @@ enum Task {
 }
 
 #[doc(hidden)]
-#[allow(unreachable_pub)]
 #[wasm_bindgen]
+#[allow(unreachable_pub)]
 #[cfg_attr(not(feature = "message"), allow(clippy::needless_pass_by_value))]
 pub unsafe fn __wasm_worker_worker_entry(
 	data: *mut Data,
