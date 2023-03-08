@@ -20,8 +20,6 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// [`Worker::clear_message_handler()`](wasm_worker::worker::Worker::clear_message_handler).
 #[wasm_bindgen_test]
 async fn builder_clear_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -35,7 +33,7 @@ async fn builder_clear_message_handler() {
 			let request = request.clone();
 			|context| async move {
 				request.await;
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 				context.close();
 			}
@@ -53,8 +51,6 @@ async fn builder_clear_message_handler() {
 /// with [`Worker::clear_message_handler()`](wasm_worker::worker::Worker::clear_message_handler).
 #[wasm_bindgen_test]
 async fn handle_clear_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -62,7 +58,7 @@ async fn handle_clear_message_handler() {
 		let request = request.clone();
 		|context| async move {
 			request.await;
-			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 			context.close();
 		}
@@ -84,8 +80,6 @@ async fn handle_clear_message_handler() {
 /// [`WorkerRef::clear_message_handler()`](wasm_worker::worker::WorkerRef::clear_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_clear_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -93,8 +87,8 @@ async fn handle_ref_clear_message_handler() {
 		let request = request.clone();
 		|context| async move {
 			request.await;
-			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
-			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 			context.close();
 		}
@@ -124,8 +118,6 @@ async fn handle_ref_clear_message_handler() {
 /// [`WorkerContext::clear_message_handler()`](wasm_worker::worker::WorkerContext::clear_message_handler).
 #[wasm_bindgen_test]
 async fn context_clear_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -140,7 +132,7 @@ async fn context_clear_message_handler() {
 	});
 
 	request.await;
-	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	worker.transfer_messages(iter::empty::<Message>()).unwrap();
 
 	// The message handler will never respond if cleared.
 	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
@@ -207,8 +199,6 @@ fn handle_has_message_handler() {
 /// [`WorkerRef::has_message_handler()`](wasm_worker::worker::WorkerRef::has_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_has_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
@@ -225,7 +215,7 @@ async fn handle_ref_has_message_handler() {
 			}
 		})
 		.spawn(|context| {
-			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 			context.close();
 		});
 
@@ -259,8 +249,6 @@ async fn context_has_message_handler() {
 /// [`WorkerBuilder::message_handler()`].
 #[wasm_bindgen_test]
 async fn builder_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
@@ -271,7 +259,7 @@ async fn builder_message_handler() {
 		})
 		.spawn({
 			|context| {
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 				context.close();
 			}
@@ -283,8 +271,6 @@ async fn builder_message_handler() {
 /// [`WorkerBuilder::worker_message_handler()`].
 #[wasm_bindgen_test]
 async fn builder_worker_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
@@ -295,7 +281,7 @@ async fn builder_worker_message_handler() {
 		})
 		.spawn(|_| ());
 
-	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	worker.transfer_messages(iter::empty::<Message>()).unwrap();
 	flag.await;
 
 	worker.terminate();
@@ -304,8 +290,6 @@ async fn builder_worker_message_handler() {
 /// [`Worker::set_message_handler()`](wasm_worker::worker::Worker::set_message_handler).
 #[wasm_bindgen_test]
 async fn handle_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -313,7 +297,7 @@ async fn handle_message_handler() {
 		let request = request.clone();
 		|context| async move {
 			request.await;
-			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 			context.close();
 		}
@@ -331,8 +315,6 @@ async fn handle_message_handler() {
 /// [`WorkerRef::set_message_handler()`](wasm_worker::worker::WorkerRef::set_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
@@ -348,8 +330,8 @@ async fn handle_ref_message_handler() {
 		})
 		.spawn({
 			|context| {
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 				context.close();
 			}
@@ -361,8 +343,6 @@ async fn handle_ref_message_handler() {
 /// [`WorkerContext::set_message_handler()`](wasm_worker::worker::WorkerContext::set_message_handler).
 #[wasm_bindgen_test]
 async fn context_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -376,7 +356,7 @@ async fn context_message_handler() {
 	});
 
 	request.await;
-	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	worker.transfer_messages(iter::empty::<Message>()).unwrap();
 
 	response.await;
 
@@ -386,8 +366,6 @@ async fn context_message_handler() {
 /// [`WorkerBuilder::message_handler_async()`].
 #[wasm_bindgen_test]
 async fn builder_message_handler_async() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
@@ -401,7 +379,7 @@ async fn builder_message_handler_async() {
 		})
 		.spawn({
 			|context| {
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 				context.close();
 			}
@@ -413,8 +391,6 @@ async fn builder_message_handler_async() {
 /// [`WorkerBuilder::worker_message_handler_async()`].
 #[wasm_bindgen_test]
 async fn builder_worker_message_handler_async() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
@@ -428,7 +404,7 @@ async fn builder_worker_message_handler_async() {
 		})
 		.spawn(|_| ());
 
-	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	worker.transfer_messages(iter::empty::<Message>()).unwrap();
 	flag.await;
 
 	worker.terminate();
@@ -437,8 +413,6 @@ async fn builder_worker_message_handler_async() {
 /// [`Worker::set_message_handler_async()`](wasm_worker::worker::Worker::set_message_handler_async).
 #[wasm_bindgen_test]
 async fn handle_message_handler_async() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -446,7 +420,7 @@ async fn handle_message_handler_async() {
 		let request = request.clone();
 		|context| async move {
 			request.await;
-			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 			context.close();
 		}
@@ -467,8 +441,6 @@ async fn handle_message_handler_async() {
 /// [`WorkerRef::set_message_handler()`](wasm_worker::worker::WorkerRef::set_message_handler).
 #[wasm_bindgen_test]
 async fn handle_ref_message_handler_async() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
@@ -487,8 +459,8 @@ async fn handle_ref_message_handler_async() {
 		})
 		.spawn({
 			|context| {
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 				context.close();
 			}
@@ -500,8 +472,6 @@ async fn handle_ref_message_handler_async() {
 /// [`WorkerContext::set_message_handler_async()`](wasm_worker::worker::WorkerContext::set_message_handler_async).
 #[wasm_bindgen_test]
 async fn context_message_handler_async() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -518,7 +488,7 @@ async fn context_message_handler_async() {
 	});
 
 	request.await;
-	worker.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+	worker.transfer_messages(iter::empty::<Message>()).unwrap();
 
 	response.await;
 
@@ -529,8 +499,6 @@ async fn context_message_handler_async() {
 /// [`Worker`](wasm_worker::worker::Worker) is dropped.
 #[wasm_bindgen_test]
 async fn builder_drop_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -544,7 +512,7 @@ async fn builder_drop_message_handler() {
 			let request = request.clone();
 			|context| async move {
 				request.await;
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 				context.close();
 			}
@@ -561,8 +529,6 @@ async fn builder_drop_message_handler() {
 /// when [`Worker`](wasm_worker::worker::Worker) is dropped.
 #[wasm_bindgen_test]
 async fn handle_drop_message_handler() {
-	assert!(Message::has_array_buffer_support().is_ok());
-
 	let request = Flag::new();
 	let response = Flag::new();
 
@@ -570,7 +536,7 @@ async fn handle_drop_message_handler() {
 		let request = request.clone();
 		|context| async move {
 			request.await;
-			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 			context.close();
 		}

@@ -8,8 +8,8 @@ use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::common::DestroyError;
 #[cfg(feature = "message")]
 use {
-	js_sys::ArrayBuffer, std::cell::RefCell, std::ops::DerefMut, std::rc::Rc,
-	wasm_worker::message::Message, wasm_worker::WorkerBuilder,
+	std::cell::RefCell, std::iter, std::ops::DerefMut, std::rc::Rc, wasm_worker::message::Message,
+	wasm_worker::WorkerBuilder,
 };
 
 use self::util::{Flag, SIGNAL_DURATION};
@@ -130,9 +130,7 @@ async fn handle_ref() {
 
 			|context| async move {
 				sender.send(context.tls()).unwrap();
-				context
-					.transfer_messages([Message::ArrayBuffer(ArrayBuffer::new(1))])
-					.unwrap();
+				context.transfer_messages(iter::empty::<Message>()).unwrap();
 
 				// Worker will be terminated before the request signal is sent.
 				request.await;
@@ -181,9 +179,7 @@ async fn handle_ref_twice() {
 		})
 		.spawn(|context| {
 			sender.send((context.tls(), context.tls())).unwrap();
-			context
-				.transfer_messages([Message::ArrayBuffer(ArrayBuffer::new(1))])
-				.unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 		});
 
 	flag.await;
@@ -194,6 +190,8 @@ async fn handle_ref_twice() {
 #[wasm_bindgen_test]
 #[cfg(feature = "message")]
 async fn handle_ref_wrong() {
+	use std::iter;
+
 	let flag = Flag::new();
 	let (sender_wrong, receiver_wrong) = oneshot::channel();
 	let (sender_right, receiver_right) = oneshot::channel();
@@ -248,9 +246,7 @@ async fn handle_ref_wrong() {
 		})
 		.spawn(|context| {
 			sender_right.send((context.tls(), context.tls())).unwrap();
-			context
-				.transfer_messages([Message::ArrayBuffer(ArrayBuffer::new(1))])
-				.unwrap();
+			context.transfer_messages(iter::empty::<Message>()).unwrap();
 		});
 
 	flag.await;
