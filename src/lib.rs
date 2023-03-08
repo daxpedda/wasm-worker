@@ -19,7 +19,6 @@
 //!   worklets and adjust appropriately.
 //! - Implement support for `MessagePort`.
 //! - Support sending additional messages that are not transfered.
-//! - Support sending initial messages in Worker and Worklet.
 //! - Implement a higher level implementation of this library.
 
 pub mod common;

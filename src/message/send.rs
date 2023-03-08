@@ -21,54 +21,63 @@ pub(crate) trait SendMessages {
 		&self,
 		messages: I,
 	) -> Result<(), TransferError> {
-		let mut messages = messages.into_iter().map(Into::into).map(Message::into_raw);
-
-		let array = 'array: {
-			let Some(message_1) = messages.next() else {
-				return self
-					.post_message(&JsValue::UNDEFINED)
+		match RawMessages::from_messages(messages) {
+			RawMessages::None => {
+				self.post_message(&JsValue::UNDEFINED)
 					.map_err(|error| TransferError {
 						error: error.into(),
 						messages: Messages(RawMessages::None),
-					});
-			};
-
-			let Some(message_2) = messages.next() else {
-				let array = Array::of1(&message_1);
-				return self
-					.post_message_with_transfer(&message_1, &array)
+					})
+			}
+			RawMessages::Single(message) => {
+				let transfer = Array::of1(&message);
+				self.post_message_with_transfer(&message, &transfer)
 					.map_err(|error| TransferError {
 						error: error.into(),
-						messages: Messages(RawMessages::Single(message_1)),
-					});
-			};
-
-			let Some(message_3) = messages.next() else {
-				break 'array Array::of2(&message_1, &message_2);
-			};
-
-			let Some(message_4) = messages.next() else {
-				break 'array Array::of3(&message_1, &message_2, &message_3);
-			};
-
-			if let Some(message_5) = messages.next() {
-				let array = Array::of5(&message_1, &message_2, &message_3, &message_4, &message_5);
-
-				for message in messages {
-					array.push(&message);
-				}
-
-				array
-			} else {
-				Array::of4(&message_1, &message_2, &message_3, &message_4)
+						messages: Messages(RawMessages::Single(message)),
+					})
 			}
+			RawMessages::Array(messages) => self
+				.post_message_with_transfer(&messages, &messages)
+				.map_err(|error| TransferError {
+					error: error.into(),
+					messages: Messages(RawMessages::Array(messages)),
+				}),
+		}
+	}
+}
+
+impl RawMessages {
+	pub(crate) fn from_messages<I: IntoIterator<Item = M>, M: Into<Message>>(messages: I) -> Self {
+		let mut messages = messages.into_iter().map(Into::into).map(Message::into_raw);
+
+		let Some(message_1) = messages.next() else {
+			return Self::None;
 		};
 
-		self.post_message_with_transfer(&array, &array)
-			.map_err(|error| TransferError {
-				error: error.into(),
-				messages: Messages(RawMessages::Array(array)),
-			})
+		let Some(message_2) = messages.next() else {
+			return Self::Single(message_1);
+		};
+
+		let Some(message_3) = messages.next() else {
+			return Self::Array(Array::of2(&message_1, &message_2));
+		};
+
+		let Some(message_4) = messages.next() else {
+			return Self::Array(Array::of3(&message_1, &message_2, &message_3));
+		};
+
+		if let Some(message_5) = messages.next() {
+			let array = Array::of5(&message_1, &message_2, &message_3, &message_4, &message_5);
+
+			for message in messages {
+				array.push(&message);
+			}
+
+			Self::Array(array)
+		} else {
+			Self::Array(Array::of4(&message_1, &message_2, &message_3, &message_4))
+		}
 	}
 }
 

@@ -58,6 +58,18 @@ pub enum RawMessages {
 	Array(Array),
 }
 
+impl RawMessages {
+	pub(crate) fn from_js(value: JsValue) -> Self {
+		if value.is_array() {
+			Self::Array(value.unchecked_into())
+		} else if value.is_undefined() {
+			Self::None
+		} else {
+			Self::Single(value)
+		}
+	}
+}
+
 #[derive(Debug)]
 pub struct MessageError<T>(pub T)
 where

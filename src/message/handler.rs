@@ -8,7 +8,7 @@ use wasm_bindgen::{JsCast, JsValue};
 
 #[derive(Debug)]
 pub(crate) enum MessageHandler {
-	Classic(Closure<dyn FnMut(web_sys::MessageEvent)>),
+	Function(Closure<dyn FnMut(web_sys::MessageEvent)>),
 	Future(Closure<dyn FnMut(web_sys::MessageEvent) -> Promise>),
 }
 
@@ -17,7 +17,7 @@ impl Deref for MessageHandler {
 
 	fn deref(&self) -> &Self::Target {
 		match self {
-			Self::Classic(closure) => closure.as_ref(),
+			Self::Function(closure) => closure.as_ref(),
 			Self::Future(closure) => closure.as_ref(),
 		}
 		.unchecked_ref()
@@ -25,8 +25,8 @@ impl Deref for MessageHandler {
 }
 
 impl MessageHandler {
-	pub(crate) fn classic(closure: impl 'static + FnMut(web_sys::MessageEvent)) -> Self {
-		Self::Classic(Closure::new(closure))
+	pub(crate) fn function(closure: impl 'static + FnMut(web_sys::MessageEvent)) -> Self {
+		Self::Function(Closure::new(closure))
 	}
 
 	pub(crate) fn future<F: 'static + Future<Output = ()>>(
@@ -49,11 +49,11 @@ impl MessageHandler {
 pub(crate) struct SendMessageHandler<C>(Box<dyn FnOnce(C) -> MessageHandler + Send>);
 
 impl<C> SendMessageHandler<C> {
-	pub(crate) fn classic<F: 'static + FnMut(web_sys::MessageEvent)>(
+	pub(crate) fn function<F: 'static + FnMut(web_sys::MessageEvent)>(
 		closure: impl 'static + FnOnce(C) -> F + Send,
 	) -> Self {
 		Self(Box::new(|context| {
-			MessageHandler::classic(closure(context))
+			MessageHandler::function(closure(context))
 		}))
 	}
 

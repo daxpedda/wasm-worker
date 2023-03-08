@@ -11,7 +11,10 @@ use web_sys::{DedicatedWorkerGlobalScope, WorkerOptions, WorkerType};
 #[cfg(feature = "message")]
 use {
 	super::WorkerRef,
-	crate::message::{MessageEvent, MessageHandler, SendMessageHandler},
+	crate::message::{
+		Message, MessageEvent, MessageHandler, Messages, RawMessages, SendMessageHandler,
+		TransferError,
+	},
 	std::cell::RefCell,
 	std::ops::Deref,
 	std::rc::Weak,
@@ -71,7 +74,7 @@ impl WorkerBuilder<'_> {
 	{
 		let id_handle = Rc::clone(&self.id);
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
-		RefCell::borrow_mut(&self.message_handler).replace(MessageHandler::classic({
+		RefCell::borrow_mut(&self.message_handler).replace(MessageHandler::function({
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
@@ -116,7 +119,7 @@ impl WorkerBuilder<'_> {
 	where
 		F: 'static + FnMut(&WorkerContext, MessageEvent) + Send,
 	{
-		self.worker_message_handler = Some(SendMessageHandler::classic(|context| {
+		self.worker_message_handler = Some(SendMessageHandler::function(|context| {
 			move |event: web_sys::MessageEvent| {
 				message_handler(&context, MessageEvent::new(event));
 			}
@@ -140,7 +143,27 @@ impl WorkerBuilder<'_> {
 	where
 		F: 'static + FnOnce(WorkerContext) + Send,
 	{
-		self.spawn_internal(Task::Classic(Box::new(f)))
+		self.spawn_internal(
+			Task::Function(Box::new(f)),
+			#[cfg(feature = "message")]
+			None,
+		)
+		.unwrap()
+	}
+
+	#[cfg(feature = "message")]
+	pub fn spawn_with_message<F, I, M>(self, f: F, messages: I) -> Result<Worker, TransferError>
+	where
+		F: 'static + FnOnce(WorkerContext, Messages) + Send,
+		I: IntoIterator<Item = M>,
+		M: Into<Message>,
+	{
+		let messages = RawMessages::from_messages(messages);
+		self.spawn_internal(Task::FunctionWithMessage(Box::new(f)), Some(&messages))
+			.map_err(|error| TransferError {
+				error: error.into(),
+				messages: Messages(messages),
+			})
 	}
 
 	pub fn spawn_async<F1, F2>(self, f: F1) -> Worker
@@ -155,10 +178,45 @@ impl WorkerBuilder<'_> {
 			})
 		}));
 
-		self.spawn_internal(task)
+		self.spawn_internal(
+			task,
+			#[cfg(feature = "message")]
+			None,
+		)
+		.unwrap()
 	}
 
-	fn spawn_internal(self, task: Task) -> Worker {
+	pub fn spawn_async_with_message<F1, F2, I, M>(
+		self,
+		f: F1,
+		messages: I,
+	) -> Result<Worker, TransferError>
+	where
+		F1: 'static + FnOnce(WorkerContext, Messages) -> F2 + Send,
+		F2: 'static + Future<Output = ()>,
+		I: IntoIterator<Item = M>,
+		M: Into<Message>,
+	{
+		let messages = RawMessages::from_messages(messages);
+		let task = Task::FutureWithMessage(Box::new(move |context, messages| {
+			Box::pin(async move {
+				f(context, messages).await;
+				Ok(JsValue::UNDEFINED)
+			})
+		}));
+
+		self.spawn_internal(task, Some(&messages))
+			.map_err(|error| TransferError {
+				error: error.into(),
+				messages: Messages(messages),
+			})
+	}
+
+	fn spawn_internal(
+		self,
+		task: Task,
+		#[cfg(feature = "message")] messages: Option<&RawMessages>,
+	) -> Result<Worker, JsValue> {
 		let id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
 		self.id.set(Ok(id));
 
@@ -181,20 +239,69 @@ impl WorkerBuilder<'_> {
 			worker.set_onmessage(Some(message_handler));
 		}
 
-		let init = Array::of3(
-			&wasm_bindgen::module(),
-			&wasm_bindgen::memory(),
-			&data.into(),
-		);
+		#[cfg(feature = "message")]
+		{
+			let result = match messages {
+				None | Some(RawMessages::None) => {
+					let init = Array::of4(
+						&wasm_bindgen::module(),
+						&wasm_bindgen::memory(),
+						&data.into(),
+						&JsValue::UNDEFINED,
+					);
 
-		worker.post_message(&init).unwrap();
+					worker.post_message(&init).unwrap();
+					Ok(())
+				}
+				Some(RawMessages::Single(message)) => {
+					let init = Array::of4(
+						&wasm_bindgen::module(),
+						&wasm_bindgen::memory(),
+						&data.into(),
+						message,
+					);
+					let transfer = Array::of1(message);
 
-		Worker::new(
+					worker.post_message_with_transfer(&init, &transfer)
+				}
+				Some(RawMessages::Array(messages)) => {
+					let init = Array::of4(
+						&wasm_bindgen::module(),
+						&wasm_bindgen::memory(),
+						&data.into(),
+						messages,
+					);
+
+					worker.post_message_with_transfer(&init, messages)
+				}
+			};
+
+			if let Err(error) = result {
+				// SAFETY: We just wraped this above.
+				drop(unsafe { Box::from_raw(data) });
+
+				return Err(error);
+			}
+		}
+
+		#[cfg(not(feature = "message"))]
+		{
+			let init = Array::of4(
+				&wasm_bindgen::module(),
+				&wasm_bindgen::memory(),
+				&data.into(),
+				&JsValue::UNDEFINED,
+			);
+
+			worker.post_message(&init).unwrap();
+		}
+
+		Ok(Worker::new(
 			worker,
 			self.id,
 			#[cfg(feature = "message")]
 			self.message_handler,
-		)
+		))
 	}
 }
 
@@ -212,7 +319,9 @@ where
 
 #[allow(clippy::type_complexity)]
 enum Task {
-	Classic(Box<dyn 'static + FnOnce(WorkerContext) + Send>),
+	Function(Box<dyn 'static + FnOnce(WorkerContext) + Send>),
+	#[cfg(feature = "message")]
+	FunctionWithMessage(Box<dyn 'static + FnOnce(WorkerContext, Messages) + Send>),
 	Future(
 		Box<
 			dyn 'static
@@ -222,12 +331,26 @@ enum Task {
 				+ Send,
 		>,
 	),
+	#[cfg(feature = "message")]
+	FutureWithMessage(
+		Box<
+			dyn 'static
+				+ FnOnce(
+					WorkerContext,
+					Messages,
+				) -> Pin<Box<dyn 'static + Future<Output = Result<JsValue, JsValue>>>>
+				+ Send,
+		>,
+	),
 }
 
 #[doc(hidden)]
 #[allow(unreachable_pub)]
 #[wasm_bindgen]
-pub unsafe fn __wasm_worker_worker_entry(data: *mut Data) -> JsValue {
+pub unsafe fn __wasm_worker_worker_entry(
+	data: *mut Data,
+	#[cfg(feature = "message")] messages: JsValue,
+) -> JsValue {
 	let global = js_sys::global().unchecked_into::<DedicatedWorkerGlobalScope>();
 	global.set_onmessage(None);
 
@@ -244,10 +367,23 @@ pub unsafe fn __wasm_worker_worker_entry(data: *mut Data) -> JsValue {
 	);
 
 	match data.task {
-		Task::Classic(classic) => {
-			classic(context);
+		Task::Function(f) => {
+			f(context);
+			JsValue::UNDEFINED
+		}
+		#[cfg(feature = "message")]
+		Task::FunctionWithMessage(f) => {
+			let messages = Messages(RawMessages::from_js(messages));
+
+			f(context, messages);
 			JsValue::UNDEFINED
 		}
 		Task::Future(future) => wasm_bindgen_futures::future_to_promise(future(context)).into(),
+		#[cfg(feature = "message")]
+		Task::FutureWithMessage(future) => {
+			let messages = Messages(RawMessages::from_js(messages));
+
+			wasm_bindgen_futures::future_to_promise(future(context, messages)).into()
+		}
 	}
 }

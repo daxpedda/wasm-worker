@@ -40,37 +40,35 @@ async fn serialize() {
 
 	let _worker = WorkerBuilder::new()
 		.unwrap()
-		.message_handler({
-			let flag = flag.clone();
-			move |_, event| {
-				let mut message = event.messages().unwrap().into_iter().next().unwrap();
+		.spawn_with_message(
+			{
+				let flag = flag.clone();
+				move |context, messages| {
+					let mut message = messages.into_iter().next().unwrap();
 
-				#[cfg(web_sys_unstable_apis)]
-				{
-					message = message.serialize_as::<AudioData>().unwrap_err().0;
+					#[cfg(web_sys_unstable_apis)]
+					{
+						message = message.serialize_as::<AudioData>().unwrap_err().0;
+					}
+					message = message.serialize_as::<ImageBitmap>().unwrap_err().0;
+					message = message.serialize_as::<MessagePort>().unwrap_err().0;
+					message = message.serialize_as::<OffscreenCanvas>().unwrap_err().0;
+					message = message.serialize_as::<ReadableStream>().unwrap_err().0;
+					message = message.serialize_as::<RtcDataChannel>().unwrap_err().0;
+					message = message.serialize_as::<TransformStream>().unwrap_err().0;
+					#[cfg(web_sys_unstable_apis)]
+					{
+						message = message.serialize_as::<VideoFrame>().unwrap_err().0;
+					}
+					message.serialize_as::<WritableStream>().unwrap_err();
+
+					flag.signal();
+					context.close();
 				}
-				message = message.serialize_as::<ImageBitmap>().unwrap_err().0;
-				message = message.serialize_as::<MessagePort>().unwrap_err().0;
-				message = message.serialize_as::<OffscreenCanvas>().unwrap_err().0;
-				message = message.serialize_as::<ReadableStream>().unwrap_err().0;
-				message = message.serialize_as::<RtcDataChannel>().unwrap_err().0;
-				message = message.serialize_as::<TransformStream>().unwrap_err().0;
-				#[cfg(web_sys_unstable_apis)]
-				{
-					message = message.serialize_as::<VideoFrame>().unwrap_err().0;
-				}
-				message.serialize_as::<WritableStream>().unwrap_err();
-
-				flag.signal();
-			}
-		})
-		.spawn({
-			|context| {
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
-
-				context.close();
-			}
-		});
+			},
+			[ArrayBuffer::new(1)],
+		)
+		.unwrap();
 
 	flag.await;
 }
@@ -105,6 +103,10 @@ async fn test_transfer<T, F1, F2, F3>(
 		}
 	}
 
+	let value_1 = init().await;
+	let value_2 = init().await;
+	let old_value = value_1.clone();
+
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
@@ -132,12 +134,9 @@ async fn test_transfer<T, F1, F2, F3>(
 				}
 			}
 		})
-		.worker_message_handler_async(move |context, event| {
-			let assert_received = assert_received.clone();
-			let context = context.clone();
-
-			async move {
-				let mut messages = event.messages().unwrap().into_iter();
+		.spawn_async_with_message(
+			move |context, messages| async move {
+				let mut messages = messages.into_iter();
 				assert_eq!(messages.len(), 2);
 
 				let value_1: T = messages.next().unwrap().serialize_as().unwrap();
@@ -150,15 +149,11 @@ async fn test_transfer<T, F1, F2, F3>(
 				let old_value = value_1.clone();
 				context.transfer_messages([value_1, value_2]).unwrap();
 				assert_sent(&old_value);
-			}
-		})
-		.spawn(|_| ());
+			},
+			[value_1, value_2],
+		)
+		.unwrap();
 
-	let value_1 = init().await;
-	let value_2 = init().await;
-
-	let old_value = value_1.clone();
-	worker.transfer_messages([value_1, value_2]).unwrap();
 	assert_sent(&old_value);
 
 	flag.await;

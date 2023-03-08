@@ -71,7 +71,7 @@ impl WorkletBuilder<'_> {
 	{
 		let id_handle = Rc::clone(&self.id);
 		let message_handler_handle = Rc::downgrade(&self.message_handler);
-		RefCell::borrow_mut(&self.message_handler).replace(MessageHandler::classic({
+		RefCell::borrow_mut(&self.message_handler).replace(MessageHandler::function({
 			let mut handle = None;
 			move |event: web_sys::MessageEvent| {
 				let handle = handle.get_or_insert_with(|| {
@@ -122,7 +122,7 @@ impl WorkletBuilder<'_> {
 	where
 		F: 'static + FnMut(&WorkletContext, MessageEvent) + Send,
 	{
-		self.worker_message_handler = Some(SendMessageHandler::classic(|context| {
+		self.worker_message_handler = Some(SendMessageHandler::function(|context| {
 			move |event: web_sys::MessageEvent| {
 				message_handler(&context, MessageEvent::new(event));
 			}

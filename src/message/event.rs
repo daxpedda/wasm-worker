@@ -1,5 +1,3 @@
-use wasm_bindgen::JsCast;
-
 use super::{Messages, RawMessages};
 
 #[derive(Debug)]
@@ -22,15 +20,7 @@ impl MessageEvent {
 			return None;
 		}
 
-		let data = self.event.data();
-
-		if data.is_array() {
-			Some(Messages(RawMessages::Array(data.unchecked_into())))
-		} else if data.is_undefined() {
-			Some(Messages(RawMessages::None))
-		} else {
-			Some(Messages(RawMessages::Single(data)))
-		}
+		Some(Messages(RawMessages::from_js(self.event.data())))
 	}
 
 	#[must_use]

@@ -308,7 +308,7 @@ trait WorkletOrRef: Debug + Sized {
 			let handle = self.handle_ref();
 
 			let mut message_handler = RefCell::borrow_mut(&message_handler);
-			let message_handler = message_handler.insert(MessageHandler::classic(move |event| {
+			let message_handler = message_handler.insert(MessageHandler::function(move |event| {
 				new_message_handler(&handle, MessageEvent::new(event));
 			}));
 

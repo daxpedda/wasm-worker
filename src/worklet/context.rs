@@ -88,7 +88,7 @@ impl WorkletContext {
 		F: 'static + FnMut(&Self, MessageEvent),
 	{
 		let context = self.clone();
-		let message_handler = MessageHandler::classic(move |event| {
+		let message_handler = MessageHandler::function(move |event| {
 			message_handler(&context, MessageEvent::new(event));
 		});
 
