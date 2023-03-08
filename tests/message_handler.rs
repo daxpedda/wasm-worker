@@ -676,15 +676,13 @@ async fn context_no_message() {
 async fn handle_multi_message() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
-	let request = Flag::new();
-	let response = Flag::new();
+	let flag = Flag::new();
 
-	let worker = wasm_worker::spawn_async({
-		let request = request.clone();
-		let response = response.clone();
-
-		|context| async move {
-			context.set_message_handler(move |_, event| {
+	let worker = WorkerBuilder::new()
+		.unwrap()
+		.worker_message_handler({
+			let flag = flag.clone();
+			move |_, event| {
 				let messages = event.messages().unwrap().into_iter();
 				assert_eq!(messages.len(), 3);
 
@@ -698,14 +696,10 @@ async fn handle_multi_message() {
 					assert!(output[..index.into()].iter().all(|value| *value == index));
 				}
 
-				response.signal();
-			});
-
-			request.signal();
-		}
-	});
-
-	request.await;
+				flag.signal();
+			}
+		})
+		.spawn(|_| ());
 
 	let buffer_1 = ArrayBuffer::new(1);
 	let array = Uint8Array::new(&buffer_1);
@@ -723,7 +717,7 @@ async fn handle_multi_message() {
 		.transfer_messages([buffer_1, buffer_2, buffer_3])
 		.unwrap();
 
-	response.await;
+	flag.await;
 
 	worker.terminate();
 }
@@ -734,67 +728,49 @@ async fn handle_multi_message() {
 async fn handle_ref_multi_message() {
 	assert!(Message::has_array_buffer_support().is_ok());
 
-	let request = Flag::new();
-	let response = Flag::new();
+	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
 		.unwrap()
-		.message_handler_async({
-			let request = request.clone();
-			move |worker, _| {
-				let request = request.clone();
-				let worker = worker.clone();
+		.message_handler(move |worker, _| {
+			let buffer_1 = ArrayBuffer::new(1);
+			let array = Uint8Array::new(&buffer_1);
+			array.copy_from(&[1]);
 
-				async move {
-					request.await;
+			let buffer_2 = ArrayBuffer::new(2);
+			let array = Uint8Array::new(&buffer_2);
+			array.copy_from(&[2; 2]);
 
-					let buffer_1 = ArrayBuffer::new(1);
-					let array = Uint8Array::new(&buffer_1);
-					array.copy_from(&[1]);
+			let buffer_3 = ArrayBuffer::new(3);
+			let array = Uint8Array::new(&buffer_3);
+			array.copy_from(&[3; 3]);
 
-					let buffer_2 = ArrayBuffer::new(2);
-					let array = Uint8Array::new(&buffer_2);
-					array.copy_from(&[2; 2]);
+			worker
+				.transfer_messages([buffer_1, buffer_2, buffer_3])
+				.unwrap();
+		})
+		.worker_message_handler({
+			let flag = flag.clone();
+			move |_, event| {
+				let messages = event.messages().unwrap().into_iter();
+				assert_eq!(messages.len(), 3);
 
-					let buffer_3 = ArrayBuffer::new(3);
-					let array = Uint8Array::new(&buffer_3);
-					array.copy_from(&[3; 3]);
+				for (index, message) in (1_u8..).zip(messages) {
+					let buffer: ArrayBuffer = message.serialize_as().unwrap();
 
-					worker
-						.transfer_messages([buffer_1, buffer_2, buffer_3])
-						.unwrap();
+					let array = Uint8Array::new(&buffer);
+					assert_eq!(buffer.byte_length(), index.into());
+					let mut output = [0; 3];
+					array.copy_to(&mut output[..index.into()]);
+					assert!(output[..index.into()].iter().all(|value| *value == index));
 				}
+
+				flag.signal();
 			}
 		})
-		.spawn_async({
-			let request = request.clone();
-			let response = response.clone();
+		.spawn(|context| context.transfer_messages(iter::empty::<Message>()).unwrap());
 
-			|context| async move {
-				context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
-
-				context.set_message_handler(move |_, event| {
-					let messages = event.messages().unwrap().into_iter();
-					assert_eq!(messages.len(), 3);
-
-					for (index, message) in (1_u8..).zip(messages) {
-						let buffer: ArrayBuffer = message.serialize_as().unwrap();
-
-						let array = Uint8Array::new(&buffer);
-						assert_eq!(buffer.byte_length(), index.into());
-						let mut output = [0; 3];
-						array.copy_to(&mut output[..index.into()]);
-						assert!(output[..index.into()].iter().all(|value| *value == index));
-					}
-
-					response.signal();
-				});
-
-				request.signal();
-			}
-		});
-
-	response.await;
+	flag.await;
 
 	worker.terminate();
 }
