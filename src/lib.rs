@@ -15,7 +15,7 @@
 //! - Note Chrome silently failing on unsupported messages: <https://bugs.chromium.org/p/chromium/issues/detail?id=1341844>.
 //!
 //! TODO:
-//! - Test that all functions (e.g. support checks) also work in workers in
+//! - Test that all functions (e.g. support checks) also work in workers and
 //!   worklets and adjust appropriately.
 //! - Implement support for `MessagePort`.
 //! - Support sending additional messages that are not transfered.
