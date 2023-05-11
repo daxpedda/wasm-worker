@@ -9,7 +9,7 @@ use web_sys::BaseAudioContext;
 
 pub use self::builder::{WorkletBuilder, WorkletFuture, WorkletInitError};
 pub use self::context::WorkletContext;
-pub use self::url::{ImportSupportFuture, WorkletUrl, WorkletUrlError, WorkletUrlFuture};
+pub use self::url::{WorkletUrl, WorkletUrlError, WorkletUrlFuture};
 pub use self::worklet::Worklet;
 #[cfg(feature = "message")]
 pub use self::worklet::WorkletRef;

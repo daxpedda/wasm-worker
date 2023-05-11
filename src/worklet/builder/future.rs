@@ -42,7 +42,7 @@ struct Inner<'context> {
 
 #[derive(Debug)]
 enum State {
-	Url(WorkletUrlFuture<'static, 'static, true>),
+	Url(WorkletUrlFuture<'static, true>),
 	Add(JsFuture),
 }
 

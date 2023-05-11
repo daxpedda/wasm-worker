@@ -37,7 +37,7 @@ pub struct WorkletBuilder<'url> {
 
 #[derive(Debug)]
 enum DefaultOrUrl<'url> {
-	Default(WorkletUrlFuture<'static, 'static, true>),
+	Default(WorkletUrlFuture<'static, true>),
 	Url(&'url WorkletUrl),
 }
 

@@ -1,7 +1,5 @@
 mod future;
-mod support;
 
-use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
@@ -12,7 +10,6 @@ use wasm_bindgen::JsValue;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 pub use self::future::WorkletUrlFuture;
-pub use self::support::ImportSupportFuture;
 use crate::common::{ShimFormat, SHIM_URL};
 
 static DEFAULT_URL: OnceCell<Option<WorkletUrl>> = OnceCell::new();
@@ -22,18 +19,15 @@ pub struct WorkletUrl(pub(super) String);
 
 impl WorkletUrl {
 	#[allow(clippy::should_implement_trait)]
-	pub fn default() -> WorkletUrlFuture<'static, 'static, true> {
+	pub fn default() -> WorkletUrlFuture<'static, true> {
 		WorkletUrlFuture::new(SHIM_URL.deref(), ShimFormat::default())
 	}
 
 	#[allow(clippy::new_ret_no_self)]
-	pub fn new<'url, 'format, URL>(
-		url: URL,
+	pub fn new<'format>(
+		url: &str,
 		format: ShimFormat<'format>,
-	) -> WorkletUrlFuture<'url, 'format, false>
-	where
-		URL: Into<Cow<'url, str>>,
-	{
+	) -> WorkletUrlFuture<'format, false> {
 		WorkletUrlFuture::new(url, format)
 	}
 
@@ -62,10 +56,6 @@ impl WorkletUrl {
 		let url = Url::create_object_url_with_blob(&blob).unwrap();
 
 		Self(url)
-	}
-
-	pub fn has_import_support() -> ImportSupportFuture {
-		ImportSupportFuture::new()
 	}
 
 	#[must_use]

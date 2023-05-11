@@ -23,8 +23,6 @@ async fn main() {
 
 	console::log_1(&worker::has_async_support().unwrap().await.into());
 
-	console::log_1(&WorkletUrl::has_import_support().await.into());
-
 	let worker = wasm_worker::spawn(|context| {
 		context.set_message_handler(|_, _| console::log_1(&"received".into()));
 	});

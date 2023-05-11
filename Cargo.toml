@@ -80,11 +80,6 @@ name = "message_handler"
 required-features = ["message"]
 
 [[test]]
-name = "no_import_support"
-required-features = ["worklet"]
-test = false
-
-[[test]]
 name = "no_module_support"
 test = false
 
@@ -98,10 +93,6 @@ required-features = ["message"]
 
 [[test]]
 name = "race_worklet_module_default"
-required-features = ["worklet"]
-
-[[test]]
-name = "race_worklet_module_has_support"
 required-features = ["worklet"]
 
 [[test]]
