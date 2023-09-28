@@ -38,7 +38,9 @@ impl WorkletUrlFuture<'_, true> {
 	pub fn into_inner(&mut self) -> Option<Result<&'static WorkletUrl, WorkletUrlError>> {
 		Self::into_inner_internal(self).map(|result| {
 			result.map(|url| {
-				let CowUrl::Borrowed(url) = url else { unreachable!()};
+				let CowUrl::Borrowed(url) = url else {
+					unreachable!()
+				};
 				url
 			})
 		})
@@ -50,7 +52,9 @@ impl WorkletUrlFuture<'_, false> {
 	pub fn into_inner(&mut self) -> Option<Result<WorkletUrl, WorkletUrlError>> {
 		Self::into_inner_internal(self).map(|result| {
 			result.map(|url| {
-				let CowUrl::Owned(sequence) = url else { unreachable!()};
+				let CowUrl::Owned(sequence) = url else {
+					unreachable!()
+				};
 				WorkletUrl::new_internal(&sequence)
 			})
 		})
@@ -111,7 +115,9 @@ impl<'format, const DEFAULT: bool> WorkletUrlFuture<'format, DEFAULT> {
 		}
 
 		if let State::Ready(_) = state {
-			let Some(State::Ready(url)) = self.0.take() else { unreachable!() };
+			let Some(State::Ready(url)) = self.0.take() else {
+				unreachable!()
+			};
 			Some(url)
 		} else {
 			None
@@ -144,7 +150,9 @@ impl<'format, const DEFAULT: bool> WorkletUrlFuture<'format, DEFAULT> {
 			match self.0.as_mut().unwrap() {
 				State::Fetch { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(State::Fetch { global, abort, .. }) = self.0.take() else { unreachable!() };
+					let Some(State::Fetch { global, abort, .. }) = self.0.take() else {
+						unreachable!()
+					};
 
 					let response: Response =
 						result.map_err(WorkletUrlError::Fetch)?.unchecked_into();
@@ -158,7 +166,9 @@ impl<'format, const DEFAULT: bool> WorkletUrlFuture<'format, DEFAULT> {
 				}
 				State::Text { future, .. } => {
 					let result = ready!(Pin::new(future).poll(cx));
-					let Some(State::Text { global, .. }) = self.0.take() else { unreachable!() };
+					let Some(State::Text { global, .. }) = self.0.take() else {
+						unreachable!()
+					};
 
 					let shim = result.map_err(WorkletUrlError::Fetch)?.unchecked_into();
 
@@ -167,7 +177,9 @@ impl<'format, const DEFAULT: bool> WorkletUrlFuture<'format, DEFAULT> {
 					)));
 				}
 				State::Ready(_) => {
-					let Some(State::Ready(url)) = self.0.take() else { unreachable!() };
+					let Some(State::Ready(url)) = self.0.take() else {
+						unreachable!()
+					};
 					return Poll::Ready(url);
 				}
 			}
@@ -204,7 +216,9 @@ impl Future for WorkletUrlFuture<'_, true> {
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		Self::poll_internal(self, cx).map_ok(|url| {
-			let CowUrl::Borrowed(url) = url else { unreachable!()};
+			let CowUrl::Borrowed(url) = url else {
+				unreachable!()
+			};
 			url
 		})
 	}
@@ -215,7 +229,9 @@ impl Future for WorkletUrlFuture<'_, false> {
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		Self::poll_internal(self, cx).map_ok(|url| {
-			let CowUrl::Owned(sequence) = url else { unreachable!()};
+			let CowUrl::Owned(sequence) = url else {
+				unreachable!()
+			};
 			WorkletUrl::new_internal(&sequence)
 		})
 	}
