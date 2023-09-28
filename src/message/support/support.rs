@@ -43,6 +43,7 @@ impl MessageSupportFuture {
 	}
 
 	#[track_caller]
+	#[allow(clippy::wrong_self_convention)]
 	pub fn into_inner(&mut self) -> Option<bool> {
 		match self.0.as_mut().expect("polled after `Ready`") {
 			State::Ready(support) => {

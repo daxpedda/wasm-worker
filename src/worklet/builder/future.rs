@@ -20,9 +20,8 @@ use {
 	std::ops::Deref,
 };
 
-use super::super::url::{WorkletUrl, WorkletUrlError, WorkletUrlFuture};
-use super::super::Worklet;
-use super::{Data, DefaultOrUrl, Task};
+use super::super::{Worklet, WORKLET_URL};
+use super::{Data, Task};
 use crate::common::ID_COUNTER;
 
 #[derive(Debug)]
@@ -37,19 +36,12 @@ struct Inner<'context> {
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
 	#[cfg(feature = "message")]
 	worklet_message_handler: Option<SendMessageHandler<WorkletContext>>,
-	state: State,
-}
-
-#[derive(Debug)]
-enum State {
-	Url(WorkletUrlFuture<'static, true>),
-	Add(JsFuture),
+	promise: JsFuture,
 }
 
 impl<'context> WorkletFuture<'context> {
 	pub(super) fn new(
 		context: Cow<'context, BaseAudioContext>,
-		url: DefaultOrUrl<'_>,
 		task: Task,
 		id: Rc<Cell<Result<u64, u64>>>,
 		#[cfg(feature = "message")] message_handler: Rc<RefCell<Option<MessageHandler>>>,
@@ -57,10 +49,13 @@ impl<'context> WorkletFuture<'context> {
 			SendMessageHandler<WorkletContext>,
 		>,
 	) -> Self {
-		let state = match url {
-			DefaultOrUrl::Default(future) => State::Url(future),
-			DefaultOrUrl::Url(url) => State::new_add(&context, url),
-		};
+		let promise = JsFuture::from(WORKLET_URL.with(|url| {
+			context
+				.audio_worklet()
+				.unwrap()
+				.add_module(url.as_raw())
+				.unwrap()
+		}));
 
 		Self(Some(Inner {
 			context,
@@ -70,7 +65,7 @@ impl<'context> WorkletFuture<'context> {
 			message_handler,
 			#[cfg(feature = "message")]
 			worklet_message_handler,
-			state,
+			promise,
 		}))
 	}
 
@@ -84,7 +79,7 @@ impl<'context> WorkletFuture<'context> {
 			     message_handler,
 			     #[cfg(feature = "message")]
 			     worklet_message_handler,
-			     state,
+			     promise: state,
 			 }| Inner {
 				context: Cow::Owned(context.into_owned()),
 				task,
@@ -93,96 +88,72 @@ impl<'context> WorkletFuture<'context> {
 				message_handler,
 				#[cfg(feature = "message")]
 				worklet_message_handler,
-				state,
+				promise: state,
 			},
 		))
 	}
 }
 
-impl State {
-	fn new_add(context: &BaseAudioContext, url: &WorkletUrl) -> Self {
-		let promise = context.audio_worklet().unwrap().add_module(&url.0).unwrap();
-
-		Self::Add(JsFuture::from(promise))
-	}
-}
-
 impl Future for WorkletFuture<'_> {
-	type Output = Result<Worklet, WorkletUrlError>;
+	type Output = Worklet;
 
 	#[track_caller]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		loop {
-			let inner = self.0.as_mut().expect("polled after `Ready`");
+		let inner = self.0.as_mut().expect("polled after `Ready`");
 
-			match &mut inner.state {
-				State::Url(future) => {
-					let result = ready!(Pin::new(future).poll(cx));
-					let mut inner = self.0.take().unwrap();
+		let result = ready!(Pin::new(&mut inner.promise).poll(cx));
+		let Inner {
+			context,
+			task,
+			id,
+			#[cfg(feature = "message")]
+			message_handler,
+			#[cfg(feature = "message")]
+			worklet_message_handler,
+			..
+		} = self.0.take().unwrap();
 
-					let url = result?;
+		let result = result.unwrap();
+		debug_assert!(
+			result.is_undefined(),
+			"expected `Worklet.addModule()` to return `undefined`"
+		);
 
-					inner.state = State::new_add(&inner.context, url);
-					self.0 = Some(inner);
-				}
-				State::Add(future) => {
-					let result = ready!(Pin::new(future).poll(cx));
-					let Inner {
-						context,
-						task,
-						id,
-						#[cfg(feature = "message")]
-						message_handler,
-						#[cfg(feature = "message")]
-						worklet_message_handler,
-						..
-					} = self.0.take().unwrap();
+		let new_id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+		id.set(Ok(new_id));
+		let data = Box::into_raw(Box::new(Data {
+			id: new_id,
+			task,
+			#[cfg(feature = "message")]
+			message_handler: worklet_message_handler,
+		}));
 
-					let result = result.unwrap();
-					debug_assert!(result.is_undefined());
+		let mut options = AudioWorkletNodeOptions::new();
+		options.processor_options(Some(&Array::of3(
+			&wasm_bindgen::module(),
+			&wasm_bindgen::memory(),
+			&data.into(),
+		)));
 
-					let new_id = ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-					id.set(Ok(new_id));
-					let data = Box::into_raw(Box::new(Data {
-						id: new_id,
-						task,
-						#[cfg(feature = "message")]
-						message_handler: worklet_message_handler,
-					}));
+		let node = AudioWorkletNode::new_with_options(&context, "__wasm_worker_InitWasm", &options)
+			.unwrap();
 
-					let mut options = AudioWorkletNodeOptions::new();
-					options.processor_options(Some(&Array::of3(
-						&wasm_bindgen::module(),
-						&wasm_bindgen::memory(),
-						&data.into(),
-					)));
+		#[cfg(feature = "message")]
+		let port = node.port().unwrap();
 
-					let node = AudioWorkletNode::new_with_options(
-						&context,
-						"__wasm_worker_InitWasm",
-						&options,
-					)
-					.unwrap();
-
-					#[cfg(feature = "message")]
-					let port = node.port().unwrap();
-
-					#[cfg(feature = "message")]
-					if let Some(message_handler) = RefCell::borrow(&message_handler).deref() {
-						port.set_onmessage(Some(message_handler));
-					}
-
-					return Poll::Ready(Ok(Worklet::new(
-						node,
-						id,
-						#[cfg(feature = "message")]
-						port,
-						#[cfg(feature = "message")]
-						message_handler,
-					)));
-				}
-			}
+		#[cfg(feature = "message")]
+		if let Some(message_handler) = RefCell::borrow(&message_handler).deref() {
+			port.set_onmessage(Some(message_handler));
 		}
+
+		Poll::Ready(Worklet::new(
+			node,
+			id,
+			#[cfg(feature = "message")]
+			port,
+			#[cfg(feature = "message")]
+			message_handler,
+		))
 	}
 }
 
@@ -194,11 +165,12 @@ impl FusedFuture for WorkletFuture<'_> {
 }
 
 impl Debug for Inner<'_> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_struct("Inner")
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_struct("Inner")
 			.field("context", &self.context)
 			.field("f", &"Box<FnOnce>")
-			.field("state", &self.state)
+			.field("state", &self.promise)
 			.finish()
 	}
 }

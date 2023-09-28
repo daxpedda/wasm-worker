@@ -77,7 +77,8 @@ fn test_support(data: &JsValue) -> bool {
 	if let Err(error) = result {
 		debug_assert_eq!(
 			DomException::unchecked_from_js(error).code(),
-			DomException::DATA_CLONE_ERR
+			DomException::DATA_CLONE_ERR,
+			"found unexpected error"
 		);
 
 		false
@@ -90,8 +91,8 @@ fn test_support(data: &JsValue) -> bool {
 pub struct MessageSupportError;
 
 impl Display for MessageSupportError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "context can't be used to determine support")
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		write!(formatter, "context can't be used to determine support")
 	}
 }
 

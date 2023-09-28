@@ -5,31 +5,32 @@ use web_sys::{Blob, BlobPropertyBag, Url};
 use crate::common::SHIM_URL;
 
 thread_local! {
-	pub(super) static WORKER_URL: Lazy<WorkerUrl> = Lazy::new(WorkerUrl::new);
+	pub(super) static WORKLET_URL: Lazy<WorkletUrl> = Lazy::new(WorkletUrl::new);
 }
 
-#[derive(Debug)]
-pub(super) struct WorkerUrl(String);
-
-impl Drop for WorkerUrl {
+impl Drop for WorkletUrl {
 	fn drop(&mut self) {
 		Url::revoke_object_url(&self.0).unwrap();
 	}
 }
 
-impl WorkerUrl {
+#[derive(Debug)]
+pub(super) struct WorkletUrl(String);
+
+impl WorkletUrl {
 	fn new() -> Self {
-		let script = format!(
-			"import {{initSync, __wasm_worker_worker_entry}} from '{}';\n\n{}",
-			*SHIM_URL,
-			include_str!("worker.js")
+		let import = format!(
+			"import {{initSync, __wasm_worker_worklet_entry}} from '{}';\n\n",
+			*SHIM_URL
 		);
 
-		let sequence = Array::of1(&script.into());
 		let mut property = BlobPropertyBag::new();
 		property.type_("text/javascript");
-		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap();
-
+		let blob = Blob::new_with_str_sequence_and_options(
+			&Array::of2(&import.into(), &include_str!("worklet.js").into()),
+			&property,
+		)
+		.unwrap();
 		let url = Url::create_object_url_with_blob(&blob).unwrap();
 
 		Self(url)

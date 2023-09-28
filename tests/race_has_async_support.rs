@@ -1,5 +1,8 @@
 //! Tests behavior of [`worker::has_async_support()`].
 
+#![cfg(test)]
+#![allow(clippy::missing_assert_message)]
+
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;

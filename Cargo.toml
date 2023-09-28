@@ -14,7 +14,6 @@ message = [
 	"web-sys/ImageBitmap",
 	"web-sys/ImageData",
 	"web-sys/MessageChannel",
-	"web-sys/MessageEvent",
 	"web-sys/MessagePort",
 	"web-sys/OffscreenCanvas",
 	"web-sys/ReadableStream",
@@ -36,9 +35,6 @@ worklet = [
 	"web-sys/AudioWorkletProcessor",
 	"web-sys/BaseAudioContext",
 	"web-sys/OfflineAudioContext",
-	"web-sys/RequestCache",
-	"web-sys/RequestInit",
-	"web-sys/Response",
 ]
 
 [dependencies]
@@ -51,6 +47,7 @@ web-sys = { version = "0.3", features = [
 	"Blob",
 	"BlobPropertyBag",
 	"DedicatedWorkerGlobalScope",
+	"MessageEvent",
 	"Url",
 	"Window",
 	"Worker",
@@ -80,10 +77,6 @@ name = "message_handler"
 required-features = ["message"]
 
 [[test]]
-name = "no_module_support"
-test = false
-
-[[test]]
 name = "race_has_image_bitmap_support"
 required-features = ["message"]
 
@@ -92,23 +85,9 @@ name = "race_message_has_support"
 required-features = ["message"]
 
 [[test]]
-name = "race_worklet_module_default"
-required-features = ["worklet"]
-
-[[test]]
 name = "transfer"
 required-features = ["message"]
 
 [[test]]
 name = "worklet"
 required-features = ["worklet"]
-
-[patch.crates-io]
-# Waiting for PR's to be merged and a new version to be released.
-# https://github.com/rustwasm/wasm-bindgen/pull/3168
-# https://github.com/rustwasm/wasm-bindgen/pull/3247
-js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
-wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
-wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
-wasm-bindgen-test = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }
-web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "despair" }

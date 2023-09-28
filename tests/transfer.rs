@@ -1,6 +1,9 @@
 //! Test each transferable type to be sent and received successfully. This is
 //! important to assert that the support methods of [`Message`] are correct.
 
+#![cfg(test)]
+#![allow(clippy::missing_assert_message)]
+
 mod util;
 
 use std::fmt::Debug;
@@ -34,12 +37,11 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// [`RawMessage::serialize()`](wasm_worker::RawMessage::serialize).
 #[wasm_bindgen_test]
 async fn serialize() {
-	assert!(Message::has_array_buffer_support().is_ok());
+	Message::has_array_buffer_support().unwrap();
 
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.spawn_with_message(
 			{
 				let flag = flag.clone();
@@ -110,7 +112,6 @@ async fn test_transfer<T, F1, F2, F3>(
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler_async({
 			let assert_received = assert_received.clone();
 			let flag = flag.clone();

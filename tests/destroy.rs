@@ -1,5 +1,8 @@
 //! Tests destroying a worker.
 
+#![cfg(test)]
+#![allow(clippy::missing_assert_message)]
+
 mod util;
 
 use futures_channel::oneshot;
@@ -38,7 +41,7 @@ async fn handle() {
 
 	let tls = receiver.await.unwrap();
 
-	assert!(worker.destroy(tls).is_ok());
+	worker.destroy(tls).unwrap();
 
 	// The worker will never respond if destroyed.
 	request.signal();
@@ -99,7 +102,7 @@ async fn handle_wrong() {
 #[wasm_bindgen_test]
 #[cfg(feature = "message")]
 async fn handle_ref() {
-	assert!(Message::has_array_buffer_support().is_ok());
+	Message::has_array_buffer_support().unwrap();
 
 	let request = Flag::new();
 	let mut response = Flag::new();
@@ -107,7 +110,6 @@ async fn handle_ref() {
 	let receiver = Rc::new(RefCell::new(receiver));
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler_async({
 			let request = request.clone();
 			move |worker, _| {
@@ -118,7 +120,7 @@ async fn handle_ref() {
 				async move {
 					let tls = RefCell::borrow_mut(&receiver).deref_mut().await.unwrap();
 
-					assert!(worker.destroy(tls).is_ok());
+					worker.destroy(tls).unwrap();
 
 					request.signal();
 				}
@@ -153,7 +155,6 @@ async fn handle_ref_twice() {
 	let receiver = Rc::new(RefCell::new(receiver));
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler_async({
 			let flag = flag.clone();
 			let receiver = Rc::clone(&receiver);
@@ -203,7 +204,6 @@ async fn handle_ref_wrong() {
 		context.close();
 	});
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler_async({
 			let flag = flag.clone();
 			let receiver_wrong = Rc::clone(&receiver_wrong);

@@ -1,5 +1,8 @@
 //! Tests behavior of [`Message::has_support()`] with [`Message::ImageBitmap`].
 
+#![cfg(test)]
+#![allow(clippy::missing_assert_message)]
+
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::message::Message;

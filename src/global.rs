@@ -11,8 +11,8 @@ impl Global {
 		static GLOBAL: Lazy<Global> = Lazy::new(|| js_sys::global().unchecked_into());
 	}
 
-	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> R {
-		Self::GLOBAL.with(|global| f(global))
+	pub(crate) fn with<R>(task: impl FnOnce(&Self) -> R) -> R {
+		Self::GLOBAL.with(|global| task(global))
 	}
 
 	pub(crate) fn has_worker() -> bool {
@@ -24,10 +24,7 @@ impl Global {
 	}
 }
 
-#[cfg_attr(
-	not(any(feature = "message", feature = "worklet")),
-	allow(unused_tuple_struct_fields)
-)]
+#[cfg_attr(not(feature = "message"), allow(unused_tuple_struct_fields))]
 pub(crate) enum GlobalContext {
 	Window(Window),
 	Worker(WorkerGlobalScope),
@@ -52,8 +49,8 @@ impl GlobalContext {
 		});
 	}
 
-	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> R {
-		Self::THIS.with(|this| f(this.deref()))
+	pub(crate) fn with<R>(task: impl FnOnce(&Self) -> R) -> R {
+		Self::THIS.with(|this| task(this.deref()))
 	}
 }
 

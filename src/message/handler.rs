@@ -72,8 +72,9 @@ impl<C> SendMessageHandler<C> {
 }
 
 impl<C> Debug for SendMessageHandler<C> {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		f.debug_tuple("SendMessageHandler")
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_tuple("SendMessageHandler")
 			.field(&"Box<FnOnce(C) -> MessageHandler>")
 			.finish()
 	}

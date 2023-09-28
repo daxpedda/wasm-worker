@@ -74,6 +74,7 @@ impl WorkerContext {
 
 	#[must_use]
 	#[cfg(feature = "message")]
+	#[allow(clippy::unused_self)]
 	pub fn has_message_handler(&self) -> bool {
 		Self::MESSAGE_HANDLER.with(|message_handler| message_handler.borrow().is_some())
 	}

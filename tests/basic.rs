@@ -1,5 +1,8 @@
 //! Tests basic functionality.
 
+#![cfg(test)]
+#![allow(clippy::missing_assert_message)]
+
 mod util;
 
 use futures_util::future::{self, Either};

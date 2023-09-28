@@ -1,32 +1,32 @@
 mod builder;
 mod context;
+mod handle;
 mod support;
 mod url;
-mod worker;
 
 use std::future::Future;
 
 pub use self::builder::WorkerBuilder;
 pub use self::context::WorkerContext;
-pub use self::support::{has_async_support, AsyncSupportError, AsyncSupportFuture};
-pub use self::url::{ModuleSupportError, WorkerUrl};
-pub use self::worker::Worker;
+pub use self::handle::Worker;
 #[cfg(feature = "message")]
-pub use self::worker::WorkerRef;
+pub use self::handle::WorkerRef;
+pub use self::support::{has_async_support, AsyncSupportError, AsyncSupportFuture};
+use self::url::WORKER_URL;
 
 #[track_caller]
-pub fn spawn<F>(f: F) -> Worker
+pub fn spawn<F>(task: F) -> Worker
 where
 	F: 'static + FnOnce(WorkerContext) + Send,
 {
-	WorkerBuilder::new().unwrap().spawn(f)
+	WorkerBuilder::new().spawn(task)
 }
 
 #[track_caller]
-pub fn spawn_async<F1, F2>(f: F1) -> Worker
+pub fn spawn_async<F1, F2>(task: F1) -> Worker
 where
 	F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
 	F2: 'static + Future<Output = ()>,
 {
-	WorkerBuilder::new().unwrap().spawn_async(f)
+	WorkerBuilder::new().spawn_async(task)
 }

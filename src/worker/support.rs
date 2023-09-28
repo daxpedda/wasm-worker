@@ -56,7 +56,10 @@ pub fn has_async_support() -> Result<AsyncSupportFuture, AsyncSupportError> {
 
 	if let State::Ready(support) = state {
 		if let Err((old_support, _)) = SUPPORT.try_insert(support) {
-			debug_assert_eq!(support, *old_support);
+			debug_assert_eq!(
+				support, *old_support,
+				"determining support has yielded different results"
+			);
 		}
 	}
 
@@ -78,12 +81,16 @@ enum State {
 }
 
 impl AsyncSupportFuture {
+	#[allow(clippy::wrong_self_convention)]
 	pub fn into_inner(&mut self) -> Option<bool> {
 		let state = self.0.as_ref().expect("polled after `Ready`");
 
 		if let Some(support) = SUPPORT.get() {
 			if let Some(new_support) = self.abort() {
-				debug_assert_eq!(*support, new_support);
+				debug_assert_eq!(
+					*support, new_support,
+					"determining support has yielded different results"
+				);
 			}
 
 			return Some(*support);
@@ -140,7 +147,10 @@ impl Future for AsyncSupportFuture {
 
 		if let Some(support) = SUPPORT.get() {
 			if let Some(new_support) = self.abort() {
-				debug_assert_eq!(*support, new_support);
+				debug_assert_eq!(
+					*support, new_support,
+					"determining support has yielded different results"
+				);
 			}
 
 			return Poll::Ready(*support);
@@ -161,7 +171,10 @@ impl Future for AsyncSupportFuture {
 				self.0.take();
 
 				if let Err((old_support, _)) = SUPPORT.try_insert(support) {
-					debug_assert_eq!(support, *old_support);
+					debug_assert_eq!(
+						support, *old_support,
+						"determining support has yielded different results"
+					);
 				}
 
 				Poll::Ready(support)
@@ -181,8 +194,8 @@ impl FusedFuture for AsyncSupportFuture {
 pub struct AsyncSupportError;
 
 impl Display for AsyncSupportError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "context can't be used to determine support")
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		write!(formatter, "context can't be used to determine support")
 	}
 }
 

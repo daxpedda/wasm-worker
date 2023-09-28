@@ -79,8 +79,9 @@ impl<T> Display for MessageError<T>
 where
 	T: Debug,
 {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "unexpected message type for: {:?}", self.0)
+	#[allow(clippy::use_debug)]
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		write!(formatter, "unexpected message type for: {:?}", self.0)
 	}
 }
 

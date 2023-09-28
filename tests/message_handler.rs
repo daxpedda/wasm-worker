@@ -2,6 +2,9 @@
 //! [`WorkerBuilder`], [`Worker`](wasm_worker::worker::Worker) and
 //! [`WorkerContext`](wasm_worker::worker::WorkerContext).
 
+#![cfg(test)]
+#![allow(clippy::indexing_slicing, clippy::missing_assert_message)]
+
 mod util;
 
 use std::iter;
@@ -24,7 +27,6 @@ async fn builder_clear_message_handler() {
 	let response = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let response = response.clone();
 			move |_, _| response.signal()
@@ -146,7 +148,6 @@ async fn context_clear_message_handler() {
 #[wasm_bindgen_test]
 fn builder_has_message_handler() {
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler(|_, _| ())
 		.spawn(|context| context.close());
 	assert!(worker.has_message_handler());
@@ -161,7 +162,6 @@ async fn builder_worker_has_message_handler() {
 	let flag = Flag::new();
 
 	WorkerBuilder::new()
-		.unwrap()
 		.worker_message_handler(|_, _| ())
 		.spawn({
 			let flag = flag.clone();
@@ -202,7 +202,6 @@ async fn handle_ref_has_message_handler() {
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |worker, _| {
@@ -252,7 +251,6 @@ async fn builder_message_handler() {
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |_, _| flag.signal()
@@ -274,7 +272,6 @@ async fn builder_worker_message_handler() {
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.worker_message_handler({
 			let flag = flag.clone();
 			move |_, _| flag.signal()
@@ -318,7 +315,6 @@ async fn handle_ref_message_handler() {
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |worker, _| {
@@ -369,7 +365,6 @@ async fn builder_message_handler_async() {
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler_async({
 			let flag = flag.clone();
 			move |_, _| {
@@ -394,7 +389,6 @@ async fn builder_worker_message_handler_async() {
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.worker_message_handler_async({
 			let flag = flag.clone();
 			move |_, _| {
@@ -444,7 +438,6 @@ async fn handle_ref_message_handler_async() {
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |worker, _| {
@@ -503,7 +496,6 @@ async fn builder_drop_message_handler() {
 	let response = Flag::new();
 
 	WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let response = response.clone();
 			move |_, _| response.signal()
@@ -561,13 +553,12 @@ async fn handle_no_message() {
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.worker_message_handler({
 			let flag = flag.clone();
 			move |_, event| {
 				let mut messages = event.messages().unwrap().into_iter();
 				assert_eq!(messages.len(), 0);
-				assert!(matches!(messages.next(), None));
+				assert!(messages.next().is_none());
 
 				flag.signal();
 			}
@@ -588,7 +579,6 @@ async fn handle_ref_no_message() {
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler(move |worker, _| {
 			worker.transfer_messages(iter::empty::<Message>()).unwrap();
 		})
@@ -597,7 +587,7 @@ async fn handle_ref_no_message() {
 			move |_, event| {
 				let mut messages = event.messages().unwrap().into_iter();
 				assert_eq!(messages.len(), 0);
-				assert!(matches!(messages.next(), None));
+				assert!(messages.next().is_none());
 
 				flag.signal();
 			}
@@ -616,13 +606,12 @@ async fn context_no_message() {
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |_, event| {
 				let mut messages = event.messages().unwrap().into_iter();
 				assert_eq!(messages.len(), 0);
-				assert!(matches!(messages.next(), None));
+				assert!(messages.next().is_none());
 
 				flag.signal();
 			}
@@ -640,12 +629,11 @@ async fn context_no_message() {
 /// [`Worker::transfer_messages()`](wasm_worker::worker::Worker::transfer_messages).
 #[wasm_bindgen_test]
 async fn handle_multi_message() {
-	assert!(Message::has_array_buffer_support().is_ok());
+	Message::has_array_buffer_support().unwrap();
 
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.worker_message_handler({
 			let flag = flag.clone();
 			move |_, event| {
@@ -692,12 +680,11 @@ async fn handle_multi_message() {
 /// [`WorkerRef::transfer_messages()`](wasm_worker::worker::WorkerRef::transfer_messages).
 #[wasm_bindgen_test]
 async fn handle_ref_multi_message() {
-	assert!(Message::has_array_buffer_support().is_ok());
+	Message::has_array_buffer_support().unwrap();
 
 	let flag = Flag::new();
 
 	let worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler(move |worker, _| {
 			let buffer_1 = ArrayBuffer::new(1);
 			let array = Uint8Array::new(&buffer_1);
@@ -745,12 +732,11 @@ async fn handle_ref_multi_message() {
 /// [`WorkerContext::transfer_messages()`](wasm_worker::worker::WorkerContext::transfer_messages).
 #[wasm_bindgen_test]
 async fn context_multi_message() {
-	assert!(Message::has_array_buffer_support().is_ok());
+	Message::has_array_buffer_support().unwrap();
 
 	let flag = Flag::new();
 
 	let _worker = WorkerBuilder::new()
-		.unwrap()
 		.message_handler({
 			let flag = flag.clone();
 			move |_, event| {

@@ -1,6 +1,9 @@
 //! Tests behavior of
 //! [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::message::ImageBitmapSupportFuture::into_inner).
 
+#![cfg(test)]
+#![allow(clippy::missing_assert_message)]
+
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::message::Message;

@@ -1,7 +1,12 @@
 #![feature(stdsimd)]
-#![allow(clippy::missing_docs_in_private_items, missing_docs)]
+#![allow(
+	clippy::indexing_slicing,
+	clippy::missing_docs_in_private_items,
+	missing_docs
+)]
 
 use core::arch::wasm32;
+use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
@@ -13,9 +18,9 @@ use utf16_lit::utf16;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use wasm_worker::worklet::{WorkletExt, WorkletUrl};
+use wasm_worker::worklet::WorkletExt;
 use wasm_worker::{worker, WorkletBuilder};
-use web_sys::{console, DedicatedWorkerGlobalScope, OfflineAudioContext, Response, Window};
+use web_sys::{console, DedicatedWorkerGlobalScope, OfflineAudioContext, Window};
 
 #[wasm_bindgen(main)]
 async fn main() {
@@ -32,18 +37,7 @@ async fn main() {
 	let audio =
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 			.unwrap();
-	audio
-		.add_wasm(|_| console::log_1(&lit_js!("audio")))
-		.await
-		.unwrap();
-
-	let module = WorkletUrl::default().await.unwrap();
-	let promise = web_sys::window().unwrap().fetch_with_str(module.as_raw());
-	let response: Response = JsFuture::from(promise).await.unwrap().unchecked_into();
-	let promise = response.text().unwrap();
-	let text: JsString = JsFuture::from(promise).await.unwrap().unchecked_into();
-
-	console::log_1(&text);
+	audio.add_wasm(|_| console::log_1(&lit_js!("audio"))).await;
 
 	wasm_worker::spawn(|context| {
 		wasm_bindgen_futures::spawn_local(async { console::log_1(&"from future".into()) });
@@ -72,13 +66,12 @@ async fn main() {
 				message.as_raw().data()
 			));
 		})
-		.add(&audio, move |context| {
+		.add(Cow::Borrowed(&audio), move |context| {
 			console::log_1(&lit_js!("audio 2"));
 			context.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 		})
 		.unwrap()
-		.await
-		.unwrap();
+		.await;
 
 	worklet.transfer_messages([ArrayBuffer::new(1)]).unwrap();
 

@@ -130,8 +130,9 @@ pub struct TransferError {
 }
 
 impl Display for TransferError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "error transferring type: {:?}", self.error)
+	#[allow(clippy::use_debug)]
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		write!(formatter, "error transferring type: {:?}", self.error)
 	}
 }
 

@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::ops::Deref;
@@ -14,30 +13,21 @@ use crate::worker::WorkerContext;
 #[cfg(feature = "worklet")]
 use crate::worklet::WorkletContext;
 
-const ERROR: &str = "expected wasm-bindgen `web` or `no-modules` target";
+pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| {
+	#[wasm_bindgen]
+	extern "C" {
+		#[wasm_bindgen]
+		type Meta;
 
-#[derive(Clone, Debug)]
-pub enum ShimFormat<'global> {
-	EsModule,
-	Classic { global: Cow<'global, str> },
-}
+		#[wasm_bindgen(js_namespace = import, js_name = meta)]
+		static META: Meta;
 
-pub(crate) static SHIM_URL: Lazy<String> = Lazy::new(|| wasm_bindgen::shim_url().expect(ERROR));
-
-impl ShimFormat<'_> {
-	pub(crate) fn default() -> Self {
-		static SHIM_URL: Lazy<ShimFormat<'static>> =
-			Lazy::new(|| match wasm_bindgen::shim_format() {
-				Some(wasm_bindgen::ShimFormat::EsModule) => ShimFormat::EsModule,
-				Some(wasm_bindgen::ShimFormat::NoModules { global_name }) => ShimFormat::Classic {
-					global: global_name.into(),
-				},
-				Some(_) | None => unreachable!("{ERROR}"),
-			});
-
-		SHIM_URL.clone()
+		#[wasm_bindgen(method, getter)]
+		fn url(this: &Meta) -> String;
 	}
-}
+
+	META.url()
+});
 
 #[derive(Debug)]
 pub enum Context {
@@ -48,7 +38,7 @@ pub enum Context {
 
 impl Context {
 	pub fn new() -> Option<Self> {
-		#[cfg_attr(not(feature = "message"), allow(clippy::let_and_return))]
+		#[cfg_attr(not(feature = "worklet"), allow(clippy::let_and_return))]
 		let result = WorkerContext::new().map(Self::Worker);
 		#[cfg(feature = "worklet")]
 		let result = result.or_else(|| WorkletContext::new().map(Self::Worklet));
@@ -95,8 +85,8 @@ impl Exports {
 		static EXPORTS: Lazy<Exports> = Lazy::new(|| wasm_bindgen::exports().unchecked_into());
 	}
 
-	pub(crate) fn with<R>(f: impl FnOnce(&Self) -> R) -> R {
-		Self::EXPORTS.with(|exports| f(exports.deref()))
+	pub(crate) fn with<R>(task: impl FnOnce(&Self) -> R) -> R {
+		Self::EXPORTS.with(|exports| task(exports.deref()))
 	}
 }
 
@@ -115,7 +105,7 @@ impl Tls {
 		static DESCRIPTOR: Lazy<Object> = Lazy::new(|| {
 			let descriptor = Object::new();
 			let result = Reflect::set(&descriptor, &"value".into(), &"i32".into()).unwrap();
-			debug_assert!(result);
+			debug_assert!(result, "expected setting value to be successful");
 			descriptor
 		});
 	}
@@ -159,11 +149,14 @@ impl<T> Display for DestroyError<T>
 where
 	T: Debug,
 {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::Already(_) => write!(f, "this worker was already destroyed"),
+			Self::Already(_) => write!(formatter, "this worker was already destroyed"),
 			Self::Match { .. } => {
-				write!(f, "`Tls` value given does not belong to this worker")
+				write!(
+					formatter,
+					"`Tls` value given does not belong to this worker"
+				)
 			}
 		}
 	}

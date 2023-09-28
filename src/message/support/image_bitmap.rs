@@ -59,12 +59,16 @@ impl ImageBitmapSupportFuture {
 	}
 
 	#[track_caller]
+	#[allow(clippy::wrong_self_convention)]
 	pub fn into_inner(&mut self) -> Option<bool> {
 		let state = self.0.as_ref().expect("polled after `Ready`");
 
 		if let Some(support) = SUPPORT.get() {
 			if let State::Ready(new_support) = self.0.take().unwrap() {
-				debug_assert_eq!(*support, new_support);
+				debug_assert_eq!(
+					*support, new_support,
+					"determining support has yielded different results"
+				);
 			}
 
 			return Some(*support);
@@ -90,7 +94,10 @@ impl Future for ImageBitmapSupportFuture {
 
 		if let Some(support) = SUPPORT.get() {
 			if let State::Ready(new_support) = self.0.take().unwrap() {
-				debug_assert_eq!(*support, new_support);
+				debug_assert_eq!(
+					*support, new_support,
+					"determining support has yielded different results"
+				);
 			}
 
 			return Poll::Ready(*support);
@@ -112,7 +119,10 @@ impl Future for ImageBitmapSupportFuture {
 				let support = super::test_support(&bitmap);
 
 				if let Err((old_support, _)) = SUPPORT.try_insert(support) {
-					debug_assert_eq!(support, *old_support);
+					debug_assert_eq!(
+						support, *old_support,
+						"determining support has yielded different results"
+					);
 				}
 
 				Poll::Ready(support)

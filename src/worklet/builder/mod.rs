@@ -22,12 +22,11 @@ use {
 };
 
 pub use self::future::WorkletFuture;
-use super::{WorkletContext, WorkletUrl, WorkletUrlFuture};
+use super::WorkletContext;
 
 #[must_use = "does nothing unless spawned"]
 #[derive(Debug)]
-pub struct WorkletBuilder<'url> {
-	url: DefaultOrUrl<'url>,
+pub struct WorkletBuilder {
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
@@ -35,28 +34,15 @@ pub struct WorkletBuilder<'url> {
 	worklet_message_handler: Option<SendMessageHandler<WorkletContext>>,
 }
 
-#[derive(Debug)]
-enum DefaultOrUrl<'url> {
-	Default(WorkletUrlFuture<'static, true>),
-	Url(&'url WorkletUrl),
+impl Default for WorkletBuilder {
+	fn default() -> Self {
+		Self::new()
+	}
 }
 
-impl WorkletBuilder<'_> {
-	pub fn new() -> WorkletBuilder<'static> {
-		WorkletBuilder {
-			url: DefaultOrUrl::Default(WorkletUrl::default()),
-			id: Rc::new(Cell::new(Err(0))),
-			#[cfg(feature = "message")]
-			message_handler: Rc::new(RefCell::new(None)),
-			#[cfg(feature = "message")]
-			worklet_message_handler: None,
-		}
-	}
-
-	#[cfg_attr(not(feature = "message"), allow(clippy::missing_const_for_fn))]
-	pub fn new_with_url(url: &WorkletUrl) -> WorkletBuilder<'_> {
-		WorkletBuilder {
-			url: DefaultOrUrl::Url(url),
+impl WorkletBuilder {
+	pub fn new() -> Self {
+		Self {
 			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
 			message_handler: Rc::new(RefCell::new(None)),
@@ -145,26 +131,26 @@ impl WorkletBuilder<'_> {
 
 	pub fn add<F>(
 		self,
-		context: &BaseAudioContext,
-		f: F,
+		context: Cow<'_, BaseAudioContext>,
+		task: F,
 	) -> Result<WorkletFuture<'_>, WorkletInitError>
 	where
 		F: 'static + FnOnce(WorkletContext) + Send,
 	{
-		self.add_internal(context, Task::Function(Box::new(f)))
+		self.add_internal(context, Task::Function(Box::new(task)))
 	}
 
 	pub fn add_async<F1, F2>(
 		self,
-		context: &BaseAudioContext,
-		f: F1,
+		context: Cow<'_, BaseAudioContext>,
+		task: F1,
 	) -> Result<WorkletFuture<'_>, WorkletInitError>
 	where
 		F1: 'static + FnOnce(WorkletContext) -> F2 + Send,
 		F2: 'static + Future<Output = ()>,
 	{
 		let task = Task::Future(Box::new(move |context| {
-			Box::pin(async move { f(context).await })
+			Box::pin(async move { task(context).await })
 		}));
 
 		self.add_internal(context, task)
@@ -172,24 +158,29 @@ impl WorkletBuilder<'_> {
 
 	fn add_internal(
 		self,
-		context: &BaseAudioContext,
+		context: Cow<'_, BaseAudioContext>,
 		task: Task,
 	) -> Result<WorkletFuture<'_>, WorkletInitError> {
-		let init = Reflect::get(context, &"__wasm_worker_init".into()).unwrap();
+		let init = Reflect::get(&context, &"__wasm_worker_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
-			debug_assert!(init);
+			debug_assert!(
+				init,
+				"expected only valid value to be set previously to be `true`"
+			);
 
 			return Err(WorkletInitError);
 		}
 
-		debug_assert!(init.is_undefined());
-		let result = Reflect::set(context, &"__wasm_worker_init".into(), &true.into()).unwrap();
-		debug_assert!(result);
+		debug_assert!(
+			init.is_undefined(),
+			"expected no value to be set not `true`"
+		);
+		let result = Reflect::set(&context, &"__wasm_worker_init".into(), &true.into()).unwrap();
+		debug_assert!(result, "expected setting value to be successful");
 
 		Ok(WorkletFuture::new(
-			Cow::Borrowed(context),
-			self.url,
+			context,
 			task,
 			self.id,
 			#[cfg(feature = "message")]
@@ -244,8 +235,8 @@ pub unsafe fn __wasm_worker_worklet_entry(this: AudioWorkletProcessor, data: *mu
 	);
 
 	match data.task {
-		Task::Function(f) => {
-			f(context);
+		Task::Function(task) => {
+			task(context);
 		}
 		Task::Future(future) => wasm_bindgen_futures::spawn_local(future(context)),
 	}
@@ -255,8 +246,8 @@ pub unsafe fn __wasm_worker_worklet_entry(this: AudioWorkletProcessor, data: *mu
 pub struct WorkletInitError;
 
 impl Display for WorkletInitError {
-	fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-		write!(f, "already added a Wasm module to this worklet")
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		write!(formatter, "already added a Wasm module to this worklet")
 	}
 }
 

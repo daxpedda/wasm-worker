@@ -20,14 +20,13 @@ use {
 	std::rc::Weak,
 };
 
-use super::{ModuleSupportError, Worker, WorkerContext, WorkerUrl};
+use super::{Worker, WorkerContext, WORKER_URL};
 use crate::common::ID_COUNTER;
 
 #[must_use = "does nothing unless spawned"]
 #[derive(Debug)]
-pub struct WorkerBuilder<'url> {
-	url: &'url WorkerUrl,
-	options: Option<WorkerOptions>,
+pub struct WorkerBuilder {
+	options: WorkerOptions,
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]
 	message_handler: Rc<RefCell<Option<MessageHandler>>>,
@@ -35,22 +34,18 @@ pub struct WorkerBuilder<'url> {
 	worker_message_handler: Option<SendMessageHandler<WorkerContext>>,
 }
 
-impl WorkerBuilder<'_> {
-	pub fn new() -> Result<WorkerBuilder<'static>, ModuleSupportError> {
-		WorkerUrl::default().map(Self::new_with_url)
+impl Default for WorkerBuilder {
+	fn default() -> Self {
+		Self::new()
 	}
+}
 
-	pub fn new_with_url(url: &WorkerUrl) -> WorkerBuilder<'_> {
-		let options = if url.is_module() {
-			let mut options = WorkerOptions::new();
-			options.type_(WorkerType::Module);
-			Some(options)
-		} else {
-			None
-		};
+impl WorkerBuilder {
+	pub fn new() -> Self {
+		let mut options = WorkerOptions::new();
+		options.type_(WorkerType::Module);
 
-		WorkerBuilder {
-			url,
+		Self {
 			options,
 			id: Rc::new(Cell::new(Err(0))),
 			#[cfg(feature = "message")]
@@ -61,9 +56,7 @@ impl WorkerBuilder<'_> {
 	}
 
 	pub fn name(mut self, name: &str) -> Self {
-		self.options
-			.get_or_insert_with(WorkerOptions::new)
-			.name(name);
+		self.options.name(name);
 		self
 	}
 
@@ -139,12 +132,12 @@ impl WorkerBuilder<'_> {
 		self
 	}
 
-	pub fn spawn<F>(self, f: F) -> Worker
+	pub fn spawn<F>(self, task: F) -> Worker
 	where
 		F: 'static + FnOnce(WorkerContext) + Send,
 	{
 		self.spawn_internal(
-			Task::Function(Box::new(f)),
+			Task::Function(Box::new(task)),
 			#[cfg(feature = "message")]
 			None,
 		)
@@ -152,27 +145,27 @@ impl WorkerBuilder<'_> {
 	}
 
 	#[cfg(feature = "message")]
-	pub fn spawn_with_message<F, I, M>(self, f: F, messages: I) -> Result<Worker, TransferError>
+	pub fn spawn_with_message<F, I, M>(self, task: F, messages: I) -> Result<Worker, TransferError>
 	where
 		F: 'static + FnOnce(WorkerContext, Messages) + Send,
 		I: IntoIterator<Item = M>,
 		M: Into<Message>,
 	{
 		let messages = RawMessages::from_messages(messages);
-		self.spawn_internal(Task::FunctionWithMessage(Box::new(f)), Some(&messages))
+		self.spawn_internal(Task::FunctionWithMessage(Box::new(task)), Some(&messages))
 			.map_err(|error| TransferError {
 				error: error.into(),
 				messages: Messages(messages),
 			})
 	}
 
-	pub fn spawn_async<F1, F2>(self, f: F1) -> Worker
+	pub fn spawn_async<F1, F2>(self, task: F1) -> Worker
 	where
 		F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
 		F2: 'static + Future<Output = ()>,
 	{
 		let task = Task::Future(Box::new(move |context| {
-			Box::pin(async move { f(context).await })
+			Box::pin(async move { task(context).await })
 		}));
 
 		self.spawn_internal(
@@ -186,7 +179,7 @@ impl WorkerBuilder<'_> {
 	#[cfg(feature = "message")]
 	pub fn spawn_async_with_message<F1, F2, I, M>(
 		self,
-		f: F1,
+		task: F1,
 		messages: I,
 	) -> Result<Worker, TransferError>
 	where
@@ -197,7 +190,7 @@ impl WorkerBuilder<'_> {
 	{
 		let messages = RawMessages::from_messages(messages);
 		let task = Task::FutureWithMessage(Box::new(move |context, messages| {
-			Box::pin(async move { f(context, messages).await })
+			Box::pin(async move { task(context, messages).await })
 		}));
 
 		self.spawn_internal(task, Some(&messages))
@@ -223,12 +216,8 @@ impl WorkerBuilder<'_> {
 			message_handler: self.worker_message_handler,
 		}));
 
-		let worker = if let Some(options) = self.options {
-			web_sys::Worker::new_with_options(&self.url.url, &options)
-		} else {
-			web_sys::Worker::new(&self.url.url)
-		}
-		.unwrap();
+		let worker = WORKER_URL
+			.with(|url| web_sys::Worker::new_with_options(url.as_raw(), &self.options).unwrap());
 
 		#[cfg(feature = "message")]
 		if let Some(message_handler) = RefCell::borrow(&self.message_handler).deref() {
@@ -360,14 +349,14 @@ pub unsafe fn __wasm_worker_worker_entry(
 	);
 
 	match data.task {
-		Task::Function(f) => {
-			f(context);
+		Task::Function(task) => {
+			task(context);
 		}
 		#[cfg(feature = "message")]
-		Task::FunctionWithMessage(f) => {
+		Task::FunctionWithMessage(task) => {
 			let messages = Messages(RawMessages::from_js(messages));
 
-			f(context, messages);
+			task(context, messages);
 		}
 		Task::Future(future) => wasm_bindgen_futures::spawn_local(future(context)),
 		#[cfg(feature = "message")]

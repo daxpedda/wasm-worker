@@ -1,12 +1,16 @@
 //! Tests audio worklet functionality.
 
+#![cfg(test)]
+#![allow(clippy::missing_assert_message)]
+
 mod util;
+
+use std::borrow::Cow;
 
 use futures_util::future::{self, Either};
 use util::Flag;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::common::ShimFormat;
-use wasm_worker::worklet::{self, WorkletContext, WorkletInitError, WorkletUrl};
+use wasm_worker::worklet::{self, WorkletContext, WorkletInitError};
 use wasm_worker::{WorkletBuilder, WorkletExt};
 use web_sys::OfflineAudioContext;
 
@@ -27,8 +31,7 @@ async fn add() {
 			let flag = flag.clone();
 			move |_| flag.signal()
 		})
-		.await
-		.unwrap();
+		.await;
 
 	flag.await;
 }
@@ -50,8 +53,7 @@ async fn add_async() {
 			let flag = flag.clone();
 			move |_| async move { flag.signal() }
 		})
-		.await
-		.unwrap();
+		.await;
 
 	flag.await;
 }
@@ -69,13 +71,12 @@ async fn failure() {
 			let flag = flag.clone();
 			move |_| flag.signal()
 		})
-		.await
-		.unwrap();
+		.await;
 
 	flag.await;
 
 	let flag = Flag::new();
-	let result = WorkletBuilder::new().add(&context, {
+	let result = WorkletBuilder::new().add(Cow::Borrowed(&context), {
 		let flag = flag.clone();
 		move |_| flag.signal()
 	});
@@ -104,8 +105,7 @@ async fn context() {
 				flag.signal();
 			}
 		})
-		.await
-		.unwrap();
+		.await;
 
 	flag.await;
 }
@@ -125,13 +125,12 @@ async fn builder() {
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 			.unwrap();
 	WorkletBuilder::new()
-		.add(&context, {
+		.add(Cow::Borrowed(&context), {
 			let flag = flag.clone();
 			move |_| flag.signal()
 		})
 		.unwrap()
-		.await
-		.unwrap();
+		.await;
 
 	flag.await;
 }
@@ -149,46 +148,12 @@ async fn builder_async() {
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 			.unwrap();
 	WorkletBuilder::new()
-		.add_async(&context, {
+		.add_async(Cow::Borrowed(&context), {
 			let flag = flag.clone();
 			move |_| async move { flag.signal() }
 		})
 		.unwrap()
-		.await
-		.unwrap();
-
-	flag.await;
-}
-
-/// [`WorkletUrl::new()`], [`WorkletBuilder::new_with_url()`] and
-/// [`WorkletBuilder::add()`].
-#[wasm_bindgen_test]
-async fn builder_url() {
-	// We will just use the default `WorkletUrl` but build it ourselves.
-	let url = wasm_bindgen::shim_url().unwrap();
-	let format = match wasm_bindgen::shim_format().unwrap() {
-		wasm_bindgen::ShimFormat::EsModule => ShimFormat::EsModule,
-		wasm_bindgen::ShimFormat::NoModules { global_name } => ShimFormat::Classic {
-			global: global_name.into(),
-		},
-		_ => unreachable!("expected shim to be built for browsers"),
-	};
-
-	let url = WorkletUrl::new(&url, format).await.unwrap();
-
-	let flag = Flag::new();
-
-	let context =
-		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
-			.unwrap();
-	WorkletBuilder::new_with_url(&url)
-		.add(&context, {
-			let flag = flag.clone();
-			move |_| flag.signal()
-		})
-		.unwrap()
-		.await
-		.unwrap();
+		.await;
 
 	flag.await;
 }

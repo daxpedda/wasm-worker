@@ -1,5 +1,6 @@
 //! Utility functions for tests.
 
+#![cfg(test)]
 #![allow(dead_code, unreachable_pub)]
 
 use std::future::Future;

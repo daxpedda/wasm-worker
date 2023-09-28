@@ -31,6 +31,7 @@ pub enum Message {
 	#[cfg(web_sys_unstable_apis)]
 	AudioData(AudioData),
 	ImageBitmap(ImageBitmap),
+	#[allow(clippy::enum_variant_names)]
 	MessagePort(MessagePort),
 	OffscreenCanvas(OffscreenCanvas),
 	ReadableStream(ReadableStream),

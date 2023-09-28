@@ -1,10 +1,10 @@
 //! Tests functionality around [`WorkerBuilder`].
 
+#![allow(clippy::missing_assert_message)]
+
 mod util;
 
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::common::ShimFormat;
-use wasm_worker::worker::WorkerUrl;
 use wasm_worker::WorkerBuilder;
 
 use self::util::Flag;
@@ -16,7 +16,7 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 async fn spawn() {
 	let flag = Flag::new();
 
-	WorkerBuilder::new().unwrap().spawn({
+	WorkerBuilder::new().spawn({
 		let flag = flag.clone();
 		move |context| {
 			flag.signal();
@@ -32,37 +32,9 @@ async fn spawn() {
 async fn spawn_async() {
 	let flag = Flag::new();
 
-	WorkerBuilder::new().unwrap().spawn_async({
+	WorkerBuilder::new().spawn_async({
 		let flag = flag.clone();
 		|context| async move {
-			flag.signal();
-			context.close();
-		}
-	});
-
-	flag.await;
-}
-
-/// [`WorkerBuilder::new_with_url()`].
-#[wasm_bindgen_test]
-async fn url() {
-	let flag = Flag::new();
-
-	// We will just use the default `WorkerUrl` but build it ourselves.
-	let url = wasm_bindgen::shim_url().unwrap();
-	let format = match wasm_bindgen::shim_format().unwrap() {
-		wasm_bindgen::ShimFormat::EsModule => ShimFormat::EsModule,
-		wasm_bindgen::ShimFormat::NoModules { global_name } => ShimFormat::Classic {
-			global: global_name.into(),
-		},
-		_ => unreachable!("expected shim to be built for browsers"),
-	};
-
-	let url = WorkerUrl::new(&url, &format).unwrap();
-
-	WorkerBuilder::new_with_url(&url).spawn({
-		let flag = flag.clone();
-		move |context| {
 			flag.signal();
 			context.close();
 		}
@@ -76,7 +48,7 @@ async fn url() {
 async fn name() {
 	let flag = Flag::new();
 
-	WorkerBuilder::new().unwrap().name("test").spawn({
+	WorkerBuilder::new().name("test").spawn({
 		let flag = flag.clone();
 		move |context| {
 			assert_eq!(context.name(), Some(String::from("test")));
