@@ -67,7 +67,6 @@ pub struct Messages(pub(crate) RawMessages);
 
 impl Messages {
 	#[must_use]
-	#[allow(clippy::missing_const_for_fn)]
 	pub fn into_raw(self) -> RawMessages {
 		self.0
 	}

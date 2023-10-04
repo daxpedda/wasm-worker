@@ -65,7 +65,6 @@ impl WorkletContext {
 	}
 
 	#[must_use]
-	#[allow(clippy::missing_const_for_fn)]
 	pub fn into_raw(self) -> (AudioWorkletGlobalScope, AudioWorkletProcessor) {
 		(self.context, self.this)
 	}

@@ -192,8 +192,7 @@ impl WorkletBuilder {
 }
 
 #[doc(hidden)]
-#[allow(unreachable_pub)]
-pub struct Data
+struct Data
 where
 	Self: Send,
 {
@@ -217,7 +216,7 @@ enum Task {
 
 #[doc(hidden)]
 #[wasm_bindgen]
-#[allow(unreachable_pub)]
+#[allow(private_interfaces, unreachable_pub)]
 pub unsafe fn __wasm_worker_worklet_entry(this: AudioWorkletProcessor, data: *mut Data) {
 	let global = js_sys::global().unchecked_into();
 

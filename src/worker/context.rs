@@ -55,7 +55,6 @@ impl WorkerContext {
 		&self.context
 	}
 
-	#[allow(clippy::missing_const_for_fn)]
 	#[must_use]
 	pub fn into_raw(self) -> DedicatedWorkerGlobalScope {
 		self.context
