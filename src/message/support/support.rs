@@ -38,6 +38,14 @@ impl MessageSupportFuture {
 			Message::TransformStream(_) => State::Ready(Message::has_transform_stream_support()?),
 			#[cfg(web_sys_unstable_apis)]
 			Message::VideoFrame(_) => State::Ready(Message::has_video_frame_support()?),
+			#[cfg(web_sys_unstable_apis)]
+			Message::WebTransportReceiveStream(_) => {
+				State::Ready(Message::has_web_transport_receive_stream_support()?)
+			}
+			#[cfg(web_sys_unstable_apis)]
+			Message::WebTransportSendStream(_) => {
+				State::Ready(Message::has_web_transport_send_stream_support()?)
+			}
 			Message::WritableStream(_) => State::Ready(Message::has_writable_stream_support()?),
 		})))
 	}

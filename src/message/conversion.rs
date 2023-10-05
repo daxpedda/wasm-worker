@@ -1,6 +1,6 @@
 use js_sys::ArrayBuffer;
 #[cfg(web_sys_unstable_apis)]
-use web_sys::{AudioData, VideoFrame};
+use web_sys::{AudioData, VideoFrame, WebTransportReceiveStream, WebTransportSendStream};
 use web_sys::{
 	ImageBitmap, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel, TransformStream,
 	WritableStream,
@@ -160,6 +160,44 @@ impl TryFrom<Message> for VideoFrame {
 	fn try_from(value: Message) -> Result<Self, Self::Error> {
 		match value {
 			Message::VideoFrame(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
+	}
+}
+
+#[cfg(web_sys_unstable_apis)]
+impl From<WebTransportReceiveStream> for Message {
+	fn from(value: WebTransportReceiveStream) -> Self {
+		Self::WebTransportReceiveStream(value)
+	}
+}
+
+#[cfg(web_sys_unstable_apis)]
+impl TryFrom<Message> for WebTransportReceiveStream {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::WebTransportReceiveStream(value) => Ok(value),
+			_ => Err(MessageError(value)),
+		}
+	}
+}
+
+#[cfg(web_sys_unstable_apis)]
+impl From<WebTransportSendStream> for Message {
+	fn from(value: WebTransportSendStream) -> Self {
+		Self::WebTransportSendStream(value)
+	}
+}
+
+#[cfg(web_sys_unstable_apis)]
+impl TryFrom<Message> for WebTransportSendStream {
+	type Error = MessageError<Message>;
+
+	fn try_from(value: Message) -> Result<Self, Self::Error> {
+		match value {
+			Message::WebTransportSendStream(value) => Ok(value),
 			_ => Err(MessageError(value)),
 		}
 	}

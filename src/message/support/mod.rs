@@ -64,6 +64,16 @@ impl Message {
 		video_frame::support()
 	}
 
+	#[cfg(web_sys_unstable_apis)]
+	pub const fn has_web_transport_receive_stream_support() -> Result<bool, MessageSupportError> {
+		Err(MessageSupportError::Undeterminable)
+	}
+
+	#[cfg(web_sys_unstable_apis)]
+	pub const fn has_web_transport_send_stream_support() -> Result<bool, MessageSupportError> {
+		Err(MessageSupportError::Undeterminable)
+	}
+
 	pub fn has_writable_stream_support() -> Result<bool, MessageSupportError> {
 		writable_stream::support()
 	}
@@ -88,11 +98,19 @@ fn test_support(data: &JsValue) -> bool {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct MessageSupportError;
+pub enum MessageSupportError {
+	Context,
+	Undeterminable,
+}
 
 impl Display for MessageSupportError {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-		write!(formatter, "context can't be used to determine support")
+		let message = match self {
+			Self::Context => "context can't be used to determine support",
+			Self::Undeterminable => "support can't be determined",
+		};
+
+		write!(formatter, "{message}")
 	}
 }
 

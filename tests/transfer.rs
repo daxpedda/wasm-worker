@@ -13,7 +13,6 @@ use futures_util::future::{self, Either};
 use futures_util::FutureExt;
 use js_sys::{ArrayBuffer, Uint8Array};
 use wasm_bindgen::closure::Closure;
-#[cfg(not(web_sys_unstable_apis))]
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -23,7 +22,8 @@ use wasm_worker::WorkerBuilder;
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{
 	AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame,
-	VideoFrameBufferInit, VideoPixelFormat,
+	VideoFrameBufferInit, VideoPixelFormat, WebTransport, WebTransportBidirectionalStream,
+	WebTransportReceiveStream, WebTransportSendStream,
 };
 use web_sys::{
 	ImageBitmap, ImageData, MessageChannel, MessagePort, OffscreenCanvas, ReadableStream,
@@ -61,6 +61,14 @@ async fn serialize() {
 					#[cfg(web_sys_unstable_apis)]
 					{
 						message = message.serialize_as::<VideoFrame>().unwrap_err().0;
+						message = message
+							.serialize_as::<WebTransportReceiveStream>()
+							.unwrap_err()
+							.0;
+						message = message
+							.serialize_as::<WebTransportSendStream>()
+							.unwrap_err()
+							.0;
 					}
 					message.serialize_as::<WritableStream>().unwrap_err();
 
@@ -79,30 +87,36 @@ async fn serialize() {
 ///
 /// If `force` is `true` the test will fail if the type is not supported,
 /// otherwise the test will be skipped.
-async fn test_transfer<T, F1, F2, F3>(
+async fn test_transfer<S, R, F1, F2, F3>(
 	support: impl Fn() -> F1,
 	force: bool,
 	init: impl Fn() -> F2,
-	assert_sent: impl 'static + Copy + Fn(&T) + Send,
-	assert_received: impl 'static + Clone + Fn(&T) -> F3 + Send,
+	assert_sent: impl 'static + Copy + Fn(&R) + Send,
+	assert_received: impl 'static + Clone + Fn(&R) -> F3 + Send,
 ) where
-	T: Clone + JsCast + TryFrom<Message>,
-	Message: From<T>,
-	<T as TryFrom<Message>>::Error: Debug,
+	S: Clone + AsRef<R> + JsCast,
+	Message: From<S> + From<R>,
+	R: Clone + JsCast + TryFrom<Message>,
+	<R as TryFrom<Message>>::Error: Debug,
 	F1: Future<Output = Result<bool, MessageSupportError>>,
-	F2: Future<Output = T>,
+	F2: Future<Output = S>,
 	F3: Future<Output = ()>,
 {
-	let message = Message::from(JsValue::UNDEFINED.unchecked_into());
-	let mut future = message.has_support().unwrap();
-	assert!(future.into_inner().is_some());
+	let message = Message::from(JsValue::UNDEFINED.unchecked_into::<S>());
+	match message.has_support() {
+		Ok(mut future) => {
+			assert!(future.into_inner().is_some());
 
-	if !support().await.unwrap() {
-		if force {
-			panic!("type unsupported in this browser")
-		} else {
-			return;
+			if !support().await.unwrap() {
+				if force {
+					panic!("type unsupported in this browser")
+				} else {
+					return;
+				}
+			}
 		}
+		Err(MessageSupportError::Context) => panic!(),
+		Err(MessageSupportError::Undeterminable) => (),
 	}
 
 	let value_1 = init().await;
@@ -124,11 +138,11 @@ async fn test_transfer<T, F1, F2, F3>(
 					let mut messages = event.messages().unwrap().into_iter();
 					assert_eq!(messages.len(), 2);
 
-					let value: T = messages.next().unwrap().serialize_as().unwrap();
+					let value: R = messages.next().unwrap().serialize_as().unwrap();
 					assert_received(&value).await;
 
 					let value = messages.next().unwrap().serialize().unwrap();
-					let value: T = value.try_into().unwrap();
+					let value: R = value.try_into().unwrap();
 					assert_received(&value).await;
 
 					flag.signal();
@@ -140,11 +154,11 @@ async fn test_transfer<T, F1, F2, F3>(
 				let mut messages = messages.into_iter();
 				assert_eq!(messages.len(), 2);
 
-				let value_1: T = messages.next().unwrap().serialize_as().unwrap();
+				let value_1: R = messages.next().unwrap().serialize_as().unwrap();
 				assert_received(&value_1).await;
 
 				let value_2 = messages.next().unwrap().serialize().unwrap();
-				let value_2: T = value_2.try_into().unwrap();
+				let value_2: R = value_2.try_into().unwrap();
 				assert_received(&value_2).await;
 
 				let old_value = value_1.clone();
@@ -155,17 +169,17 @@ async fn test_transfer<T, F1, F2, F3>(
 		)
 		.unwrap();
 
-	assert_sent(&old_value);
+	assert_sent(old_value.as_ref());
 
 	flag.await;
 
 	worker.terminate();
 
-	assert!(Message::from(init().await)
-		.has_support()
-		.unwrap()
-		.into_inner()
-		.unwrap());
+	match Message::from(init().await).has_support() {
+		Ok(mut future) => assert!(future.into_inner().unwrap()),
+		Err(MessageSupportError::Context) => panic!(),
+		Err(MessageSupportError::Undeterminable) => (),
+	}
 }
 
 /// [`ArrayBuffer`].
@@ -180,7 +194,7 @@ async fn array_buffer() {
 			array.copy_from(&[42]);
 			buffer
 		},
-		|buffer| assert_eq!(buffer.byte_length(), 0),
+		|buffer: &ArrayBuffer| assert_eq!(buffer.byte_length(), 0),
 		|buffer| {
 			let array = Uint8Array::new(buffer);
 			assert_eq!(array.get_index(0), 42);
@@ -209,7 +223,7 @@ async fn audio_data() {
 			);
 			AudioData::new(&init).unwrap()
 		},
-		|data| assert_eq!(data.format(), None),
+		|data: &AudioData| assert_eq!(data.format(), None),
 		|data| {
 			let size = data.allocation_size(&AudioDataCopyToOptions::new(0));
 			assert_eq!(size, 42);
@@ -239,7 +253,7 @@ async fn image_bitmap() {
 				.map(Result::unwrap)
 				.map(ImageBitmap::unchecked_from_js)
 		},
-		|bitmap| {
+		|bitmap: &ImageBitmap| {
 			assert_eq!(bitmap.width(), 0);
 			assert_eq!(bitmap.height(), 0);
 		},
@@ -300,7 +314,7 @@ async fn offscreen_canvas() {
 		|| ready(Message::has_offscreen_canvas_support()),
 		false,
 		|| async { OffscreenCanvas::new(1, 1).unwrap() },
-		|canvas| {
+		|canvas: &OffscreenCanvas| {
 			assert_eq!(canvas.width(), 0);
 			assert_eq!(canvas.height(), 0);
 		},
@@ -338,7 +352,7 @@ async fn readable_stream() {
 				.unwrap()
 				.unchecked_into::<ReadableStream>()
 		},
-		|stream| assert!(stream.locked()),
+		|stream: &ReadableStream| assert!(stream.locked()),
 		|stream| {
 			assert!(!stream.locked());
 
@@ -358,7 +372,7 @@ async fn rtc_data_channel() {
 			let connection = RtcPeerConnection::new().unwrap();
 			connection.create_data_channel("")
 		},
-		|channel| assert_eq!(channel.ready_state(), RtcDataChannelState::Closed),
+		|channel: &RtcDataChannel| assert_eq!(channel.ready_state(), RtcDataChannelState::Closed),
 		|channel| {
 			assert_eq!(channel.ready_state(), RtcDataChannelState::Connecting);
 
@@ -392,7 +406,7 @@ async fn transform_stream() {
 				.unwrap()
 				.unchecked_into::<TransformStream>()
 		},
-		|stream| {
+		|stream: &TransformStream| {
 			assert!(stream.readable().locked());
 			assert!(stream.writable().locked());
 		},
@@ -420,7 +434,7 @@ async fn video_frame() {
 			)
 			.unwrap()
 		},
-		|frame| {
+		|frame: &VideoFrame| {
 			assert_eq!(frame.coded_width(), 0);
 			assert_eq!(frame.coded_height(), 0);
 			assert_eq!(frame.format(), None);
@@ -429,6 +443,88 @@ async fn video_frame() {
 			assert_eq!(frame.coded_width(), 1);
 			assert_eq!(frame.coded_height(), 1);
 			assert_eq!(frame.format(), Some(VideoPixelFormat::Rgba));
+
+			async {}
+		},
+	)
+	.await;
+}
+
+/// [`WebTransportReceiveStream`].
+#[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
+async fn web_transport_receive_stream() {
+	test_transfer(
+		|| {
+			#[wasm_bindgen]
+			extern "C" {
+				type WebTransportReceiveStreamTest;
+
+				#[wasm_bindgen(method, getter, js_name = WebTransport)]
+				fn has_web_transport(this: &WebTransportReceiveStreamTest) -> JsValue;
+			}
+
+			ready(Ok(!WebTransportReceiveStreamTest::unchecked_from_js(
+				js_sys::global().into(),
+			)
+			.has_web_transport()
+			.is_undefined()))
+		},
+		false,
+		|| async {
+			let transport = WebTransport::new("https://echo.webtransport.day").unwrap();
+			JsFuture::from(transport.ready()).await.unwrap();
+			let stream: WebTransportBidirectionalStream =
+				JsFuture::from(transport.create_bidirectional_stream())
+					.await
+					.unwrap()
+					.unchecked_into();
+			stream.readable()
+		},
+		|stream: &ReadableStream| assert!(stream.locked()),
+		|stream| {
+			assert!(!stream.locked());
+
+			async {}
+		},
+	)
+	.await;
+}
+
+/// [`WebTransportSendStream`].
+#[wasm_bindgen_test]
+#[cfg(web_sys_unstable_apis)]
+async fn web_transport_send_stream() {
+	test_transfer(
+		|| {
+			#[wasm_bindgen]
+			extern "C" {
+				type WebTransportSendStreamTest;
+
+				#[wasm_bindgen(method, getter, js_name = WebTransport)]
+				fn has_web_transport(this: &WebTransportSendStreamTest) -> JsValue;
+			}
+
+			ready(Ok(!WebTransportSendStreamTest::unchecked_from_js(
+				js_sys::global().into(),
+			)
+			.has_web_transport()
+			.is_undefined()))
+		},
+		false,
+		|| async {
+			let transport = WebTransport::new("https://echo.webtransport.day").unwrap();
+			JsFuture::from(transport.ready()).await.unwrap();
+			let stream: WebTransportBidirectionalStream =
+				JsFuture::from(transport.create_bidirectional_stream())
+					.await
+					.unwrap()
+					.unchecked_into();
+			stream.writable()
+		},
+		|stream: &WritableStream| assert!(stream.locked()),
+		|stream| {
+			assert!(!stream.locked());
 
 			async {}
 		},
@@ -460,7 +556,7 @@ async fn writable_stream() {
 				.unwrap()
 				.unchecked_into::<WritableStream>()
 		},
-		|stream| assert!(stream.locked()),
+		|stream: &WritableStream| assert!(stream.locked()),
 		|stream| {
 			assert!(!stream.locked());
 

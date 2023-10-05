@@ -12,7 +12,7 @@ use std::ops::Range;
 use js_sys::{Array, ArrayBuffer};
 use wasm_bindgen::JsValue;
 #[cfg(web_sys_unstable_apis)]
-use web_sys::{AudioData, VideoFrame};
+use web_sys::{AudioData, VideoFrame, WebTransportReceiveStream, WebTransportSendStream};
 use web_sys::{
 	ImageBitmap, MessagePort, OffscreenCanvas, ReadableStream, RtcDataChannel, TransformStream,
 	WritableStream,
@@ -25,6 +25,7 @@ pub(crate) use self::send::SendMessages;
 pub use self::send::TransferError;
 pub use self::support::{ImageBitmapSupportFuture, MessageSupportError, MessageSupportFuture};
 
+#[non_exhaustive]
 #[derive(Debug, Eq, PartialEq)]
 pub enum Message {
 	ArrayBuffer(ArrayBuffer),
@@ -39,6 +40,10 @@ pub enum Message {
 	TransformStream(TransformStream),
 	#[cfg(web_sys_unstable_apis)]
 	VideoFrame(VideoFrame),
+	#[cfg(web_sys_unstable_apis)]
+	WebTransportReceiveStream(WebTransportReceiveStream),
+	#[cfg(web_sys_unstable_apis)]
+	WebTransportSendStream(WebTransportSendStream),
 	WritableStream(WritableStream),
 }
 
@@ -57,6 +62,10 @@ impl Message {
 			Self::TransformStream(value) => value.into(),
 			#[cfg(web_sys_unstable_apis)]
 			Self::VideoFrame(value) => value.into(),
+			#[cfg(web_sys_unstable_apis)]
+			Self::WebTransportReceiveStream(value) => value.into(),
+			#[cfg(web_sys_unstable_apis)]
+			Self::WebTransportSendStream(value) => value.into(),
 			Self::WritableStream(value) => value.into(),
 		}
 	}

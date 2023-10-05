@@ -28,10 +28,10 @@ pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
 					if Global::has_worker() {
 						Ok(())
 					} else {
-						Err(MessageSupportError)
+						Err(MessageSupportError::Context)
 					}
 				}
-				GlobalContext::Worklet => Err(MessageSupportError),
+				GlobalContext::Worklet => Err(MessageSupportError::Context),
 			})?;
 
 			#[cfg(web_sys_unstable_apis)]

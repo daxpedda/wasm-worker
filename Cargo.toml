@@ -23,6 +23,8 @@ message = [
 	"web-sys/VideoFrame",
 	"web-sys/VideoFrameBufferInit",
 	"web-sys/VideoPixelFormat",
+	"web-sys/WebTransportReceiveStream",
+	"web-sys/WebTransportSendStream",
 	"web-sys/WritableStream",
 ]
 worklet = [
@@ -54,6 +56,8 @@ web-sys = { version = "0.3", features = [
 	"WorkerGlobalScope",
 	"WorkerOptions",
 	"WorkerType",
+	"WebTransport",
+	"WebTransportBidirectionalStream",
 ] }
 
 [dev-dependencies]

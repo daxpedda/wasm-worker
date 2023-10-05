@@ -34,10 +34,10 @@ impl ImageBitmapSupportFuture {
 					GlobalContext::Window(_) => (),
 					GlobalContext::Worker(_) => {
 						if !Global::has_worker() {
-							return Err(MessageSupportError);
+							return Err(MessageSupportError::Context);
 						}
 					}
-					GlobalContext::Worklet => return Err(MessageSupportError),
+					GlobalContext::Worklet => return Err(MessageSupportError::Context),
 				}
 
 				let image = ImageData::new_with_sw(1, 1).unwrap();

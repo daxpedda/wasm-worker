@@ -16,10 +16,10 @@ pub(in super::super) fn support() -> Result<bool, MessageSupportError> {
 					if Global::has_worker() {
 						Ok(())
 					} else {
-						Err(MessageSupportError)
+						Err(MessageSupportError::Context)
 					}
 				}
-				GlobalContext::Worklet => Err(MessageSupportError),
+				GlobalContext::Worklet => Err(MessageSupportError::Context),
 			})?;
 
 			if Global::with(Global::audio_data).is_undefined() {
