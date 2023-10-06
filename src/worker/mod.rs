@@ -14,7 +14,15 @@ pub use self::handle::WorkerRef;
 pub use self::support::{has_async_support, AsyncSupportError, AsyncSupportFuture};
 use self::url::WORKER_URL;
 
-#[track_caller]
+/// # Examples
+///
+/// ```
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[wasm_bindgen_test::wasm_bindgen_test]
+/// # fn test() {
+/// wasm_worker::spawn(|_| ());
+/// # }
+/// ```
 pub fn spawn<F>(task: F) -> Worker
 where
 	F: 'static + FnOnce(WorkerContext) + Send,
@@ -22,7 +30,15 @@ where
 	WorkerBuilder::new().spawn(task)
 }
 
-#[track_caller]
+/// # Examples
+///
+/// ```
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[wasm_bindgen_test::wasm_bindgen_test]
+/// # fn test() {
+/// wasm_worker::spawn_async(|_| async {});
+/// # }
+/// ```
 pub fn spawn_async<F1, F2>(task: F1) -> Worker
 where
 	F1: 'static + FnOnce(WorkerContext) -> F2 + Send,
