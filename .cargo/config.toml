@@ -20,6 +20,7 @@ rustflags = [
 	"-Wclippy::nursery",
 	"-Wclippy::pedantic",
 	# Clippy restriction lints.
+	"-Wclippy::absolute_paths",
 	"-Wclippy::allow_attributes",
 	"-Wclippy::allow_attributes_without_reason",
 	"-Wclippy::as_conversions",
@@ -31,6 +32,7 @@ rustflags = [
 	"-Wclippy::default_union_representation",
 	"-Wclippy::empty_drop",
 	"-Wclippy::empty_structs_with_brackets",
+	"-Wclippy::error_impl_error",
 	"-Wclippy::exit",
 	"-Wclippy::filetype_is_file",
 	"-Wclippy::float_cmp_const",
@@ -46,10 +48,7 @@ rustflags = [
 	"-Wclippy::missing_assert_message",
 	"-Wclippy::missing_docs_in_private_items",
 	"-Wclippy::mixed_read_write_in_expression",
-	# Breaks Rust Analyzer.
-	# "-Wclippy::multiple_unsafe_ops_per_block",
 	"-Wclippy::mutex_atomic",
-	"-Wclippy::needless_raw_strings",
 	"-Wclippy::non_ascii_literal",
 	"-Wclippy::partial_pub_fields",
 	"-Wclippy::print_stderr",
@@ -66,6 +65,7 @@ rustflags = [
 	"-Wclippy::single_char_lifetime_names",
 	"-Wclippy::str_to_string",
 	"-Wclippy::string_add",
+	"-Wclippy::string_lit_chars_any",
 	"-Wclippy::string_slice",
 	"-Wclippy::string_to_string",
 	"-Wclippy::suspicious_xor_used_as_pow",
@@ -81,7 +81,6 @@ rustflags = [
 	"-Wclippy::use_debug",
 	"-Wclippy::verbose_file_reads",
 	# Allowed Clippy lints.
-	"-Aclippy::await_holding_refcell_ref",
 	"-Aclippy::equatable_if_let",
 	"-Aclippy::explicit_deref_methods",
 	"-Aclippy::future_not_send",
@@ -101,7 +100,6 @@ rustflags = [
 	# Rust lints.
 	"-Wdeprecated_in_future",
 	"-Wffi_unwind_calls",
-	"-Winvalid-reference_casting",
 	"-Wmacro_use_extern_crate",
 	"-Wmeta_variable_misuse",
 	"-Wmissing_abi",
@@ -109,7 +107,6 @@ rustflags = [
 	"-Wmissing_debug_implementations",
 	"-Wmissing_docs",
 	"-Wnon_ascii_idents",
-	"-Wnoop_method_call",
 	"-Wsingle_use_lifetimes",
 	"-Wtrivial_casts",
 	"-Wtrivial_numeric_casts",

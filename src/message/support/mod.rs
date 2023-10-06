@@ -6,7 +6,6 @@ mod message_port;
 mod offscreen_canvas;
 mod readable_stream;
 mod rtc_data_channel;
-#[allow(clippy::module_inception)]
 mod support;
 mod transform_stream;
 #[cfg(web_sys_unstable_apis)]

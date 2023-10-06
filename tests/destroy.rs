@@ -117,6 +117,7 @@ async fn handle_ref() {
 				let receiver = Rc::clone(&receiver);
 				let worker = worker.clone();
 
+				#[allow(clippy::await_holding_refcell_ref)]
 				async move {
 					let tls = RefCell::borrow_mut(&receiver).deref_mut().await.unwrap();
 
@@ -164,6 +165,7 @@ async fn handle_ref_twice() {
 				let receiver = Rc::clone(&receiver);
 				let worker = worker.clone();
 
+				#[allow(clippy::await_holding_refcell_ref)]
 				async move {
 					let (tls_1, tls_2) = RefCell::borrow_mut(&receiver).deref_mut().await.unwrap();
 					worker.clone().destroy(tls_1).unwrap();
@@ -215,6 +217,7 @@ async fn handle_ref_wrong() {
 				let receiver_right = Rc::clone(&receiver_right);
 				let worker = worker.clone();
 
+				#[allow(clippy::await_holding_refcell_ref)]
 				async move {
 					let (tls_wrong_1, tls_wrong_2) = RefCell::borrow_mut(&receiver_wrong)
 						.deref_mut()
