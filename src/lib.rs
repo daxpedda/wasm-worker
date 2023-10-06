@@ -18,6 +18,7 @@
 //! - Implement support for `MessagePort`.
 //! - Support sending additional messages that are not transferred.
 //! - Implement a higher level implementation of this library.
+//! - Figure out why `VideoFrame` support detection fails on Safari.
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 

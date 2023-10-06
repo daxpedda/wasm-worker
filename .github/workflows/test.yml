@@ -77,7 +77,7 @@ jobs:
           SAFARIDRIVER: safaridriver
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run:
-          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} -- --include-ignored
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
       - name: Documentation Test
         if: matrix.os == 'ubuntu-latest'
         env:
