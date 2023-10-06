@@ -1,0 +1,41 @@
+name: Spellcheck
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  spellcheck:
+    name: Spellcheck
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-spellcheck
+      - name: Run Spellcheck
+        run: |
+          cargo spellcheck check -m 1
+          cargo spellcheck check -m 1 CHANGELOG.md
+
+  typos:
+    name: Typos
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: typos-cli
+      - name: Run Typos
+        run: typos

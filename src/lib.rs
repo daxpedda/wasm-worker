@@ -20,6 +20,8 @@
 //! - Support sending additional messages that are not transfered.
 //! - Implement a higher level implementation of this library.
 
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
 pub mod common;
 mod global;
 #[cfg(feature = "message")]

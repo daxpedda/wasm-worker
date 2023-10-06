@@ -1,0 +1,55 @@
+name: Lint
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  clippy-rustdoc:
+    name: Clippy & Rustdoc
+
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - { rustflags: "",                          features: "" }
+          - { rustflags: "",                          features: --features futures }
+          - { rustflags: "",                          features: --features message }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
+          - { rustflags: "",                          features: --features worklet }
+          - { rustflags: "",                          features: --features futures,message }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features futures,message }
+          - { rustflags: "",                          features: --features futures,worklet }
+          - { rustflags: "",                          features: --features message,worklet }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message,worklet }
+          - { rustflags: "",                          features: --all-features }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        run:
+          rustup toolchain install stable --profile minimal --component clippy
+          --target wasm32-unknown-unknown
+      - name: Run Clippy
+        env:
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run:
+          cargo +stable clippy ${{ matrix.features.features }} --all-targets -- -D warnings
+      - name: Run Rustdoc
+        env:
+          RUSTDOCFLAGS: -D warnings ${{ matrix.features.rustflags }} -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run:
+          cargo +stable doc ${{ matrix.features.features }} --no-deps --document-private-items --examples

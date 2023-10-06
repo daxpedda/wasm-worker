@@ -1,0 +1,122 @@
+name: Test
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-test:
+    name: Build & Test
+
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+        features:
+          - { rustflags: "",                          features: "" }
+          - { rustflags: "",                          features: --features futures }
+          - { rustflags: "",                          features: --features message }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
+          - { rustflags: "",                          features: --features worklet }
+          - { rustflags: "",                          features: --features futures,message }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features futures,message }
+          - { rustflags: "",                          features: --features futures,worklet }
+          - { rustflags: "",                          features: --features message,worklet }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message,worklet }
+          - { rustflags: "",                          features: --all-features }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-bindgen-cli
+      - name: Install Rust
+        run: |
+          rustup toolchain install nightly --profile minimal
+      - name: Build
+        env:
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run: cargo build ${{ matrix.features.features }}
+      - name: Documentation
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          RUSTDOCFLAGS: ${{ matrix.features.rustflags }} -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run: cargo doc --no-deps
+      - name: Test on Chrome
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          CHROMEDRIVER: chromedriver
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run:
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+      - name: Test on Firefox
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GECKODRIVER: geckodriver
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run:
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+      - name: Test on Safari
+        if: matrix.os == 'macos-latest'
+        env:
+          SAFARIDRIVER: safaridriver
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run:
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+      - name: Documentation Test
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run: cargo test --doc --no-fail-fast ${{ matrix.features.features }}
+
+  minimal-versions:
+    name: Minimal Versions
+
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: minimal-versions
+
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - { rustflags: "",                          features: "" }
+          - { rustflags: "",                          features: --features futures }
+          - { rustflags: "",                          features: --features message }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
+          - { rustflags: "",                          features: --features worklet }
+          - { rustflags: "",                          features: --features futures,message }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features futures,message }
+          - { rustflags: "",                          features: --features futures,worklet }
+          - { rustflags: "",                          features: --features message,worklet }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message,worklet }
+          - { rustflags: "",                          features: --all-features }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        run: rustup toolchain install nightly --profile minimal
+      - name: Build
+        env:
+          RUSTFLAGS: ${{ matrix.features.rustflags }}
+        run: |
+          cargo update -Z minimal-versions
+          cargo build ${{ matrix.features.features }}

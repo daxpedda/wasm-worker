@@ -1,7 +1,12 @@
 [package]
+categories = ["api-bindings", "concurrency", "wasm"]
+description = "Drop-in replacement for std::thread for Wasm in browsers"
 edition = "2021"
+include = ["CHANGELOG.md", "LICENSE-*", "src/**/*"]
+keywords = ["worker", "worklet", "wasm", "web", "thread"]
+license = "MIT OR Apache-2.0"
 name = "wasm-worker"
-publish = false
+repository = "https://github.com/daxpedda/wasm-worker"
 version = "0.0.0"
 
 [features]
@@ -44,7 +49,7 @@ futures-core = { version = "0.3", optional = true, default-features = false }
 js-sys = "0.3"
 once_cell = "1"
 wasm-bindgen = { version = "0.2", default-features = false }
-wasm-bindgen-futures = "0.4"
+wasm-bindgen-futures = "0.4.18"
 web-sys = { version = "0.3", features = [
 	"Blob",
 	"BlobPropertyBag",
@@ -73,6 +78,7 @@ web-sys = { version = "0.3", features = [
 ] }
 
 [[example]]
+doc-scrape-examples = true
 name = "testing"
 required-features = ["message", "worklet"]
 
@@ -95,3 +101,13 @@ required-features = ["message"]
 [[test]]
 name = "worklet"
 required-features = ["worklet"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustc-args = ["--cfg=web_sys_unstable_apis"]
+rustdoc-args = [
+	"--cfg=web_sys_unstable_apis",
+	"--cfg=docsrs",
+	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
+]
+targets = ["wasm32-unknown-unknown"]

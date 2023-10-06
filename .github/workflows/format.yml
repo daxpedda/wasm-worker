@@ -1,0 +1,40 @@
+name: Format
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+concurrency:
+  group: ${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  rustfmt:
+    name: Rustfmt
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust nightly
+        run:
+          rustup toolchain install nightly --profile minimal --component rustfmt
+          --allow-downgrade
+      - name: Run Rustfmt
+        run: cargo fmt --check
+
+  taplo:
+    name: Taplo
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli
+      - name: Run Taplo
+        run: taplo fmt --check
