@@ -1,11 +1,12 @@
-#![feature(stdsimd)]
+//#![feature(stdsimd)]
 #![allow(
 	clippy::indexing_slicing,
 	clippy::missing_docs_in_private_items,
+	clippy::unwrap_used,
 	missing_docs
 )]
 
-use core::arch::wasm32;
+//use core::arch::wasm32;
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
@@ -39,7 +40,7 @@ async fn main() {
 			.unwrap();
 	audio.add_wasm(|_| console::log_1(&lit_js!("audio"))).await;
 
-	wasm_worker::spawn(|context| {
+	/*wasm_worker::spawn(|context| {
 		wasm_bindgen_futures::spawn_local(async { console::log_1(&"from future".into()) });
 
 		context.close();
@@ -49,7 +50,7 @@ async fn main() {
 		// SAFETY: This shouldn't be unsafe.
 		unsafe { wasm32::memory_atomic_wait32(&mut value, value, -1) };
 		unreachable!()
-	});
+	});*/
 
 	let audio =
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)

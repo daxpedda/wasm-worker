@@ -262,7 +262,7 @@ impl WorkerBuilder {
 			};
 
 			if let Err(error) = result {
-				// SAFETY: We just wraped this above.
+				// SAFETY: We just wrapped this above.
 				drop(unsafe { Box::from_raw(data) });
 
 				return Err(error);

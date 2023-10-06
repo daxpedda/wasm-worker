@@ -27,11 +27,11 @@ jobs:
           - { rustflags: "",                          features: --features message }
           - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
           - { rustflags: "",                          features: --features worklet }
-          - { rustflags: "",                          features: --features futures,message }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features futures,message }
-          - { rustflags: "",                          features: --features futures,worklet }
-          - { rustflags: "",                          features: --features message,worklet }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message,worklet }
+          - { rustflags: "",                          features: "--features futures,message" }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features futures,message" }
+          - { rustflags: "",                          features: "--features futures,worklet" }
+          - { rustflags: "",                          features: "--features message,worklet" }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features message,worklet" }
           - { rustflags: "",                          features: --all-features }
           - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
 
@@ -44,7 +44,7 @@ jobs:
           --target wasm32-unknown-unknown
       - name: Run Clippy
         env:
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run:
           cargo +stable clippy ${{ matrix.features.features }} --all-targets -- -D warnings
       - name: Run Rustdoc

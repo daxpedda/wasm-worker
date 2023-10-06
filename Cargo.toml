@@ -2,7 +2,7 @@
 categories = ["api-bindings", "concurrency", "wasm"]
 description = "Drop-in replacement for std::thread for Wasm in browsers"
 edition = "2021"
-include = ["CHANGELOG.md", "LICENSE-*", "src/**/*"]
+include = ["CHANGELOG.md", "LICENSE-*", "src/**/*", "examples/**/*"]
 keywords = ["worker", "worklet", "wasm", "web", "thread"]
 license = "MIT OR Apache-2.0"
 name = "wasm-worker"
@@ -48,6 +48,8 @@ worklet = [
 futures-core = { version = "0.3", optional = true, default-features = false }
 js-sys = "0.3"
 once_cell = "1"
+# Any version below that is broken on nightly.
+proc-macro2 = "1.0.60"
 wasm-bindgen = { version = "0.2", default-features = false }
 wasm-bindgen-futures = "0.4.18"
 web-sys = { version = "0.3", features = [
@@ -84,22 +86,27 @@ required-features = ["message", "worklet"]
 
 [[test]]
 name = "message_handler"
+path = "tests/message_handler.rs"
 required-features = ["message"]
 
 [[test]]
 name = "race_has_image_bitmap_support"
+path = "tests/race_has_image_bitmap_support.rs"
 required-features = ["message"]
 
 [[test]]
 name = "race_message_has_support"
+path = "tests/race_message_has_support.rs"
 required-features = ["message"]
 
 [[test]]
 name = "transfer"
+path = "tests/transfer.rs"
 required-features = ["message"]
 
 [[test]]
 name = "worklet"
+path = "tests/worklet.rs"
 required-features = ["worklet"]
 
 [package.metadata.docs.rs]

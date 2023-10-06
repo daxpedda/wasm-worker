@@ -83,7 +83,7 @@ async fn serialize() {
 	flag.await;
 }
 
-/// Tests transfering `T`.
+/// Tests transferring `T`.
 ///
 /// If `force` is `true` the test will fail if the type is not supported,
 /// otherwise the test will be skipped.
@@ -296,7 +296,7 @@ async fn message_port() {
 				let mut flag = flag.clone();
 				async move {
 					// The worker message handler will never respond back if the sender was not
-					// properly transfered.
+					// properly transferred.
 					let result = future::select(&mut flag, util::sleep(SIGNAL_DURATION)).await;
 					assert!(matches!(result, Either::Left(((), _))));
 					flag.reset();

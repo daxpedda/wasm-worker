@@ -10,6 +10,4 @@ message = ["wasm-worker/message"]
 worklet = ["wasm-worker/worklet"]
 
 [dependencies]
-# Any version below that is broken on nightly.
-proc-macro2 = "1.0.60"
 wasm-worker = { path = ".." }

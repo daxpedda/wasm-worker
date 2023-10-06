@@ -30,11 +30,11 @@ jobs:
           - { rustflags: "",                          features: --features message }
           - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
           - { rustflags: "",                          features: --features worklet }
-          - { rustflags: "",                          features: --features futures,message }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features futures,message }
-          - { rustflags: "",                          features: --features futures,worklet }
-          - { rustflags: "",                          features: --features message,worklet }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message,worklet }
+          - { rustflags: "",                          features: "--features futures,message" }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features futures,message" }
+          - { rustflags: "",                          features: "--features futures,worklet" }
+          - { rustflags: "",                          features: "--features message,worklet" }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features message,worklet" }
           - { rustflags: "",                          features: --all-features }
           - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
 
@@ -49,7 +49,7 @@ jobs:
           rustup toolchain install nightly --profile minimal
       - name: Build
         env:
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run: cargo build ${{ matrix.features.features }}
       - name: Documentation
         if: matrix.os == 'ubuntu-latest'
@@ -61,27 +61,27 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         env:
           CHROMEDRIVER: chromedriver
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run:
           cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
       - name: Test on Firefox
         if: matrix.os == 'ubuntu-latest'
         env:
           GECKODRIVER: geckodriver
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run:
           cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
       - name: Test on Safari
         if: matrix.os == 'macos-latest'
         env:
           SAFARIDRIVER: safaridriver
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run:
           cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
       - name: Documentation Test
         if: matrix.os == 'ubuntu-latest'
         env:
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run: cargo test --doc --no-fail-fast ${{ matrix.features.features }}
 
   minimal-versions:
@@ -101,11 +101,11 @@ jobs:
           - { rustflags: "",                          features: --features message }
           - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
           - { rustflags: "",                          features: --features worklet }
-          - { rustflags: "",                          features: --features futures,message }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features futures,message }
-          - { rustflags: "",                          features: --features futures,worklet }
-          - { rustflags: "",                          features: --features message,worklet }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message,worklet }
+          - { rustflags: "",                          features: "--features futures,message" }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features futures,message" }
+          - { rustflags: "",                          features: "--features futures,worklet" }
+          - { rustflags: "",                          features: "--features message,worklet" }
+          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features message,worklet" }
           - { rustflags: "",                          features: --all-features }
           - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
 

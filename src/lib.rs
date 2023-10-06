@@ -8,8 +8,6 @@
 
 //! Notes:
 //! - Note Firefox nested worker issue: <https://bugzilla.mozilla.org/show_bug.cgi?id=1817152>.
-//! - Document that getting the default worker url will fail if using no-modules
-//!   and not starting in a document.
 //! - Note workaround for missing ports on worklet creation: <https://github.com/WebAudio/web-audio-api/issues/2456>.
 //! - Note Chrome silently failing on unsupported messages: <https://bugs.chromium.org/p/chromium/issues/detail?id=1341844>.
 //!
@@ -17,7 +15,7 @@
 //! - Test that all functions (e.g. support checks) also work in workers and
 //!   worklets and adjust appropriately.
 //! - Implement support for `MessagePort`.
-//! - Support sending additional messages that are not transfered.
+//! - Support sending additional messages that are not transferred.
 //! - Implement a higher level implementation of this library.
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
