@@ -70,14 +70,14 @@ jobs:
           GECKODRIVER: geckodriver
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run:
-          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} -- --include-ignored
       - name: Test on Safari
         if: matrix.os == 'macos-latest'
         env:
           SAFARIDRIVER: safaridriver
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run:
-          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} -- --include-ignored
       - name: Documentation Test
         if: matrix.os == 'ubuntu-latest'
         env:

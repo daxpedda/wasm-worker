@@ -20,6 +20,7 @@ use self::util::{Flag, SIGNAL_DURATION};
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 /// [`Worker::destroy()`](wasm_worker::worker::Worker::destroy).
+#[ignore = "Chrome has a bug that might lead to code continuing to execute even after termination"]
 #[wasm_bindgen_test]
 async fn handle() {
 	let request = Flag::new();
@@ -99,6 +100,7 @@ async fn handle_wrong() {
 }
 
 /// [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy).
+#[ignore = "Chrome has a bug that might lead to code continuing to execute even after termination"]
 #[wasm_bindgen_test]
 #[cfg(feature = "message")]
 async fn handle_ref() {

@@ -102,18 +102,18 @@ async fn test_transfer<S, R, F1, F2, F3>(
 	F2: Future<Output = S>,
 	F3: Future<Output = ()>,
 {
+	if !support().await.unwrap() {
+		if force {
+			panic!("type unsupported in this browser")
+		} else {
+			return;
+		}
+	}
+
 	let message = Message::from(JsValue::UNDEFINED.unchecked_into::<S>());
 	match message.has_support() {
 		Ok(mut future) => {
 			assert!(future.into_inner().is_some());
-
-			if !support().await.unwrap() {
-				if force {
-					panic!("type unsupported in this browser")
-				} else {
-					return;
-				}
-			}
 		}
 		Err(MessageSupportError::Context) => panic!(),
 		Err(MessageSupportError::Undeterminable) => (),

@@ -118,3 +118,7 @@ rustdoc-args = [
 	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
 ]
 targets = ["wasm32-unknown-unknown"]
+
+[patch.crates-io]
+wasm-bindgen-test = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "wasm-worker" }
+wasm-bindgen-test-macro = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "wasm-worker" }
