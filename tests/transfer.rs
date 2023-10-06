@@ -240,7 +240,7 @@ async fn image_bitmap() {
 	let _: bool = Message::has_image_bitmap_support().unwrap().await;
 
 	test_transfer(
-		|| async { Ok(Message::has_image_bitmap_support().unwrap().await) },
+		|| Message::has_image_bitmap_support().unwrap().map(Ok),
 		true,
 		|| {
 			let image = ImageData::new_with_sw(1, 1).unwrap();
