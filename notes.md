@@ -1,6 +1,6 @@
 # Documentation
 
-`RUSTDOCFLAGS="--crate-version=main --cfg=web_sys_unstable_apis --cfg=docsrs -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals" RUSTFLAGS=--cfg=web_sys_unstable_apis cargo doc --all-features --no-deps -Z rustdoc-map -Z rustdoc-scrape-examples`
+`RUSTDOCFLAGS="--crate-version=main --cfg=web_sys_unstable_apis --cfg=docsrs -Ctarget-feature=+atomics,+bulk-memory" RUSTFLAGS=--cfg=web_sys_unstable_apis cargo doc --all-features --no-deps -Z rustdoc-map -Z rustdoc-scrape-examples`
 
 # Run Examples
 

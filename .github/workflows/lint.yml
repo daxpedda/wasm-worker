@@ -39,17 +39,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        run:
-          rustup toolchain install stable --profile minimal --component clippy
-          --target wasm32-unknown-unknown
+        run: rustup toolchain install stable --profile minimal --component clippy --target wasm32-unknown-unknown
       - name: Run Clippy
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run:
-          cargo +stable clippy ${{ matrix.features.features }} --all-targets -- -D warnings
+        run: cargo +stable clippy ${{ matrix.features.features }} --all-targets -- -D warnings
       - name: Run Rustdoc
         env:
-          RUSTDOCFLAGS: -D warnings ${{ matrix.features.rustflags }} -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals
+          RUSTDOCFLAGS: -D warnings ${{ matrix.features.rustflags }}
           RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run:
-          cargo +stable doc ${{ matrix.features.features }} --no-deps --document-private-items --examples
+        run: cargo +stable doc ${{ matrix.features.features }} --no-deps --document-private-items --examples

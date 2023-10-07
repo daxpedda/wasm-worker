@@ -47,8 +47,7 @@ jobs:
         with:
           tool: wasm-bindgen-cli
       - name: Install Rust
-        run: |
-          rustup toolchain install nightly --profile minimal
+        run: rustup toolchain install nightly --profile minimal
       - name: Build
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
@@ -56,7 +55,7 @@ jobs:
       - name: Documentation
         if: matrix.os == 'ubuntu-latest'
         env:
-          RUSTDOCFLAGS: ${{ matrix.features.rustflags }} -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals
+          RUSTDOCFLAGS: ${{ matrix.features.rustflags }} -Ctarget-feature=+atomics,+bulk-memory
           RUSTFLAGS: ${{ matrix.features.rustflags }}
         run: cargo doc --no-deps
       - name: Test on Chrome
@@ -64,22 +63,19 @@ jobs:
         env:
           CHROMEDRIVER: chromedriver
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run:
-          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+        run: cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
       - name: Test on Firefox
         if: matrix.os == 'ubuntu-latest'
         env:
           GECKODRIVER: geckodriver
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run:
-          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} -- --include-ignored
+        run: cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} -- --include-ignored
       - name: Test on Safari
         if: matrix.os == 'macos-latest'
         env:
           SAFARIDRIVER: safaridriver
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run:
-          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+        run: cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
       - name: Documentation Test
         if: matrix.os == 'ubuntu-latest'
         env:

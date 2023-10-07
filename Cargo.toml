@@ -115,7 +115,7 @@ rustc-args = ["--cfg=web_sys_unstable_apis"]
 rustdoc-args = [
 	"--cfg=web_sys_unstable_apis",
 	"--cfg=docsrs",
-	"-Ctarget-feature=+atomics,+bulk-memory,+mutable-globals",
+	"-Ctarget-feature=+atomics,+bulk-memory",
 ]
 targets = ["wasm32-unknown-unknown"]
 

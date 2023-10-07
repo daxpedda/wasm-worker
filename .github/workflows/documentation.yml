@@ -33,10 +33,9 @@ jobs:
         run: rustup toolchain install nightly --profile minimal
       - name: Run Rustdoc
         env:
-          RUSTDOCFLAGS: --crate-version main --cfg=web_sys_unstable_apis --cfg=docsrs -Ctarget-feature=+atomics,+bulk-memory,+mutable-globals
+          RUSTDOCFLAGS: --crate-version main --cfg=web_sys_unstable_apis --cfg=docsrs -Ctarget-feature=+atomics,+bulk-memory
           RUSTFLAGS: --cfg=web_sys_unstable_apis
-        run:
-          cargo doc --all-features --no-deps -Z rustdoc-map -Z rustdoc-scrape-examples
+        run: cargo doc --all-features --no-deps -Z rustdoc-map -Z rustdoc-scrape-examples
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Fix permissions
