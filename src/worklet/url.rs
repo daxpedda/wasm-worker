@@ -1,11 +1,10 @@
 use js_sys::Array;
-use once_cell::unsync::Lazy;
 use web_sys::{Blob, BlobPropertyBag, Url};
 
 use crate::common::SHIM_URL;
 
 thread_local! {
-	pub(super) static WORKLET_URL: Lazy<WorkletUrl> = Lazy::new(WorkletUrl::new);
+	pub(super) static WORKLET_URL: WorkletUrl = WorkletUrl::new();
 }
 
 impl Drop for WorkletUrl {

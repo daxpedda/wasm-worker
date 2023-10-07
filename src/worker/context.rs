@@ -1,4 +1,5 @@
-use once_cell::unsync::OnceCell;
+use std::cell::OnceCell;
+
 use web_sys::DedicatedWorkerGlobalScope;
 #[cfg(feature = "message")]
 use {

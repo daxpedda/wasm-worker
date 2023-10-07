@@ -1,6 +1,3 @@
-use std::ops::Deref;
-
-use once_cell::unsync::Lazy;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Window, WorkerGlobalScope};
@@ -8,7 +5,7 @@ use web_sys::{Window, WorkerGlobalScope};
 impl Global {
 	thread_local! {
 		#[allow(clippy::use_self)]
-		static GLOBAL: Lazy<Global> = Lazy::new(|| js_sys::global().unchecked_into());
+		static GLOBAL: Global = js_sys::global().unchecked_into();
 	}
 
 	pub(crate) fn with<R>(task: impl FnOnce(&Self) -> R) -> R {
@@ -17,10 +14,10 @@ impl Global {
 
 	pub(crate) fn has_worker() -> bool {
 		thread_local! {
-			static WORKER: Lazy<bool> = Lazy::new(|| !Global::with(Global::worker).is_undefined())
+			static WORKER: bool = !Global::with(Global::worker).is_undefined();
 		}
 
-		WORKER.with(|worker| *worker.deref())
+		WORKER.with(|worker| *worker)
 	}
 }
 
@@ -34,7 +31,7 @@ pub(crate) enum GlobalContext {
 impl GlobalContext {
 	thread_local! {
 		#[allow(clippy::use_self)]
-		static THIS: Lazy<GlobalContext> = Lazy::new(|| {
+		static THIS: GlobalContext = {
 			Global::with(|global| {
 				if !global.window().is_undefined() {
 					GlobalContext::Window(global.clone().unchecked_into())
@@ -46,11 +43,11 @@ impl GlobalContext {
 					panic!("expected to be in a window, worker or audio worklet")
 				}
 			})
-		});
+		};
 	}
 
 	pub(crate) fn with<R>(task: impl FnOnce(&Self) -> R) -> R {
-		Self::THIS.with(|this| task(this.deref()))
+		Self::THIS.with(|this| task(this))
 	}
 }
 
