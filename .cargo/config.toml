@@ -1,5 +1,5 @@
 [build]
-rustdocflags = ["-Ctarget-feature=+atomics,+bulk-memory"]
+rustdocflags = ["-Wrustdoc::all", "-Ctarget-feature=+atomics,+bulk-memory"]
 target = "wasm32-unknown-unknown"
 
 [unstable]
@@ -87,8 +87,6 @@ rustflags = [
 	"-Aclippy::option_if_let_else",
 	"-Aclippy::redundant_pub_crate",
 	"-Aclippy::tabs_in_doc_comments",
-	# Rustdoc group.
-	"-Wrustdoc::all",
 	# Rust groups.
 	"-Wfuture_incompatible",
 	"-Wrust_2018_compatibility",

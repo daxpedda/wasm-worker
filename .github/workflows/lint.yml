@@ -46,6 +46,6 @@ jobs:
         run: cargo +stable clippy ${{ matrix.features.features }} --all-targets -- -D warnings
       - name: Run Rustdoc
         env:
-          RUSTDOCFLAGS: -D warnings ${{ matrix.features.rustflags }}
+          RUSTDOCFLAGS: -D warnings -W rustdoc::all ${{ matrix.features.rustflags }}
           RUSTFLAGS: ${{ matrix.features.rustflags }}
         run: cargo +stable doc ${{ matrix.features.features }} --no-deps --document-private-items --examples
