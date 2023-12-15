@@ -26,13 +26,9 @@ use web_sys::{
 };
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{
-	AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame,
+	AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, Response, VideoFrame,
 	VideoFrameBufferInit, VideoPixelFormat, WebTransport, WebTransportBidirectionalStream,
 	WebTransportReceiveStream, WebTransportSendStream,
-};
-use web_sys::{
-	ImageBitmap, ImageData, MessageChannel, MessagePort, OffscreenCanvas, ReadableStream,
-	RtcDataChannel, RtcDataChannelState, RtcPeerConnection, TransformStream, WritableStream,
 };
 
 use self::util::{Flag, SIGNAL_DURATION};
@@ -459,12 +455,33 @@ async fn video_frame() {
 	.await;
 }
 
+#[cfg(web_sys_unstable_apis)]
+async fn web_transport_echo_server_available() -> bool {
+	let available = if let Ok(response) = JsFuture::from(
+		web_sys::window()
+			.unwrap()
+			.fetch_with_str("https://echo.webtransport.day"),
+	)
+	.await
+	{
+		Response::unchecked_from_js(response).ok()
+	} else {
+		false
+	};
+
+	if !available {
+		console::error_1(&"<https://echo.webtransport.day> is not available".into());
+	}
+
+	available
+}
+
 /// [`WebTransportReceiveStream`].
 #[wasm_bindgen_test]
 #[cfg(web_sys_unstable_apis)]
 async fn web_transport_receive_stream() {
 	test_transfer(
-		|| {
+		|| async {
 			#[wasm_bindgen]
 			extern "C" {
 				type WebTransportReceiveStreamTest;
@@ -473,11 +490,11 @@ async fn web_transport_receive_stream() {
 				fn has_web_transport(this: &WebTransportReceiveStreamTest) -> JsValue;
 			}
 
-			ready(Ok(!WebTransportReceiveStreamTest::unchecked_from_js(
-				js_sys::global().into(),
+			Ok(
+				!WebTransportReceiveStreamTest::unchecked_from_js(js_sys::global().into())
+					.has_web_transport()
+					.is_undefined() && web_transport_echo_server_available().await,
 			)
-			.has_web_transport()
-			.is_undefined()))
 		},
 		false,
 		|| async {
@@ -505,7 +522,7 @@ async fn web_transport_receive_stream() {
 #[cfg(web_sys_unstable_apis)]
 async fn web_transport_send_stream() {
 	test_transfer(
-		|| {
+		|| async {
 			#[wasm_bindgen]
 			extern "C" {
 				type WebTransportSendStreamTest;
@@ -514,11 +531,11 @@ async fn web_transport_send_stream() {
 				fn has_web_transport(this: &WebTransportSendStreamTest) -> JsValue;
 			}
 
-			ready(Ok(!WebTransportSendStreamTest::unchecked_from_js(
-				js_sys::global().into(),
+			Ok(
+				!WebTransportSendStreamTest::unchecked_from_js(js_sys::global().into())
+					.has_web_transport()
+					.is_undefined() && web_transport_echo_server_available().await,
 			)
-			.has_web_transport()
-			.is_undefined()))
 		},
 		false,
 		|| async {
