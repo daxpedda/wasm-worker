@@ -15,6 +15,7 @@ use crate::common::{DestroyError, Exports, Tls};
 
 #[derive(Clone, Debug)]
 pub struct Worker {
+	#[allow(clippy::struct_field_names)]
 	worker: web_sys::Worker,
 	id: Rc<Cell<Result<u64, u64>>>,
 	#[cfg(feature = "message")]

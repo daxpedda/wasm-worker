@@ -96,6 +96,7 @@ pub(crate) static ID_COUNTER: AtomicU64 = AtomicU64::new(0);
 #[allow(missing_copy_implementations)]
 pub struct Tls {
 	pub(crate) id: u64,
+	#[allow(clippy::struct_field_names)]
 	tls_base: f64,
 	stack_alloc: f64,
 }
