@@ -6,7 +6,7 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -43,19 +43,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: taiki-e/install-action@v2
+      - name: Install `wasm-bindgen-cli`
+        uses: taiki-e/install-action@v2
         with:
           tool: wasm-bindgen-cli
       - name: Install Rust
         run: rustup toolchain install nightly --profile minimal
       - name: Build
+        if: matrix.os == 'ubuntu-latest'
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run: cargo build ${{ matrix.features.features }}
       - name: Documentation
         if: matrix.os == 'ubuntu-latest'
         env:
-          RUSTDOCFLAGS: ${{ matrix.features.rustflags }} -Ctarget-feature=+atomics,+bulk-memory
+          RUSTDOCFLAGS: -Ctarget-feature=+atomics,+bulk-memory ${{ matrix.features.rustflags }}
           RUSTFLAGS: ${{ matrix.features.rustflags }}
         run: cargo doc --no-deps
       - name: Test on Chrome
@@ -114,7 +116,7 @@ jobs:
         run: rustup toolchain install nightly --profile minimal
       - name: Build
         env:
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
         run: |
           cargo update -Z minimal-versions
           cargo build ${{ matrix.features.features }}

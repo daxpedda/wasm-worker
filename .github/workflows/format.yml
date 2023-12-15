@@ -6,8 +6,11 @@ on:
   pull_request:
 
 concurrency:
-  group: ${{ github.head_ref || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
   rustfmt:
@@ -19,7 +22,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust nightly
-        run: rustup toolchain install nightly --profile minimal --component rustfmt --allow-downgrade
+        run: |
+          rustup toolchain install nightly --profile minimal --component rustfmt --allow-downgrade
       - name: Run Rustfmt
         run: cargo fmt --check
 
@@ -31,7 +35,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: taiki-e/install-action@v2
+      - name: Install Taplo
+        uses: taiki-e/install-action@v2
         with:
           tool: taplo-cli
       - name: Run Taplo
