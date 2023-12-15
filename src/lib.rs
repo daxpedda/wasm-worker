@@ -11,6 +11,7 @@
 //! - Note workaround for missing ports on worklet creation: <https://github.com/WebAudio/web-audio-api/issues/2456>.
 //! - Note Chrome silently failing on unsupported messages: <https://bugs.chromium.org/p/chromium/issues/detail?id=1341844>.
 //! - Note Chrome termination isn't immediate: <https://bugs.chromium.org/p/chromium/issues/detail?id=1455812>.
+//! - Note Safari has issue with sending multiple `VideoFrame`s: <https://bugs.webkit.org/show_bug.cgi?id=264516>.
 //!
 //! TODO:
 //! - Test that all functions (e.g. support checks) also work in workers and
@@ -18,7 +19,6 @@
 //! - Implement support for `MessagePort`.
 //! - Support sending additional messages that are not transferred.
 //! - Implement a higher level implementation of this library.
-//! - Figure out why `VideoFrame` support detection fails on Safari.
 
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
