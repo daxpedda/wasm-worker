@@ -315,7 +315,7 @@ async fn message_port() {
 async fn offscreen_canvas() {
 	test_transfer(
 		|| ready(Message::has_offscreen_canvas_support()),
-		false,
+		true,
 		|| async { OffscreenCanvas::new(1, 1).unwrap() },
 		|canvas: &OffscreenCanvas| {
 			assert_eq!(canvas.width(), 0);
