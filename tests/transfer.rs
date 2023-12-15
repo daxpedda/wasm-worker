@@ -6,6 +6,7 @@
 
 mod util;
 
+use std::any::{self, Any};
 use std::fmt::Debug;
 use std::future::{ready, Future};
 
@@ -19,6 +20,10 @@ use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
 use wasm_worker::message::{Message, MessageSupportError};
 use wasm_worker::WorkerBuilder;
+use web_sys::{
+	console, ImageBitmap, ImageData, MessageChannel, MessagePort, OffscreenCanvas, ReadableStream,
+	RtcDataChannel, RtcDataChannelState, RtcPeerConnection, TransformStream, WritableStream,
+};
 #[cfg(web_sys_unstable_apis)]
 use web_sys::{
 	AudioData, AudioDataCopyToOptions, AudioDataInit, AudioSampleFormat, VideoFrame,
@@ -94,7 +99,7 @@ async fn test_transfer<S, R, F1, F2, F3>(
 	assert_sent: impl 'static + Copy + Fn(&R) + Send,
 	assert_received: impl 'static + Clone + Fn(&R) -> F3 + Send,
 ) where
-	S: Clone + AsRef<R> + JsCast,
+	S: Any + Clone + AsRef<R> + JsCast,
 	Message: From<S> + From<R>,
 	R: Clone + JsCast + TryFrom<Message>,
 	<R as TryFrom<Message>>::Error: Debug,
@@ -106,6 +111,8 @@ async fn test_transfer<S, R, F1, F2, F3>(
 		if force {
 			panic!("type unsupported in this browser")
 		} else {
+			let type_name = any::type_name::<S>().split("::").last().unwrap();
+			console::error_1(&format!("`{type_name}` unsupported").into());
 			return;
 		}
 	}
