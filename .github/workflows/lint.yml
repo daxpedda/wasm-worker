@@ -48,4 +48,4 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings --cfg=docsrs -Ctarget-feature=+atomics,+bulk-memory ${{ matrix.features.rustflags }}
           RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo doc ${{ matrix.features.features }} --no-deps --document-private-items --examples
+        run: cargo doc ${{ matrix.features.features }} --no-deps --document-private-items --lib --examples
