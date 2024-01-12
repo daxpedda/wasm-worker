@@ -21,7 +21,7 @@ impl Global {
 	}
 }
 
-#[cfg_attr(not(feature = "message"), allow(unused_tuple_struct_fields))]
+#[cfg_attr(not(feature = "message"), allow(dead_code))]
 pub(crate) enum GlobalContext {
 	Window(Window),
 	Worker(WorkerGlobalScope),

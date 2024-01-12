@@ -21,9 +21,9 @@ pub struct WorkerContext {
 impl WorkerContext {
 	thread_local! {
 		#[cfg(feature = "message")]
-		static MESSAGE_HANDLER: RefCell<Option<MessageHandler>> = RefCell::new(None);
+		static MESSAGE_HANDLER: RefCell<Option<MessageHandler>> = const { RefCell::new(None) };
 		#[allow(clippy::use_self)]
-		static BACKUP: OnceCell<WorkerContext> = OnceCell::new();
+		static BACKUP: OnceCell<WorkerContext> = const { OnceCell::new() };
 	}
 
 	pub(super) fn init(

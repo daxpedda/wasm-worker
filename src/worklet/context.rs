@@ -25,9 +25,9 @@ pub struct WorkletContext {
 impl WorkletContext {
 	thread_local! {
 		#[cfg(feature = "message")]
-		static MESSAGE_HANDLER: RefCell<Option<MessageHandler>> = RefCell::new(None);
+		static MESSAGE_HANDLER: RefCell<Option<MessageHandler>> = const { RefCell::new(None) };
 		#[allow(clippy::use_self)]
-		static BACKUP: OnceCell<WorkletContext>  = OnceCell::new();
+		static BACKUP: OnceCell<WorkletContext>  = const { OnceCell::new() };
 	}
 
 	pub(super) fn init(
