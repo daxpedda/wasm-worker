@@ -5,9 +5,9 @@ publish = false
 version = "0.0.0"
 
 [features]
-futures = ["wasm-worker/futures"]
-message = ["wasm-worker/message"]
-worklet = ["wasm-worker/worklet"]
+futures = ["web-thread/futures"]
+message = ["web-thread/message"]
+worklet = ["web-thread/worklet"]
 
 [dependencies]
-wasm-worker = { path = ".." }
+web-thread = { path = ".." }

@@ -1,6 +1,6 @@
-self.onmessage = __wasm_worker_event => {
-	const [__wasm_worker_module, __wasm_worker_memory, __wasm_worker_data, __wasm_worker_messages] = __wasm_worker_event.data;
+self.onmessage = __web_thread_event => {
+	const [__web_thread_module, __web_thread_memory, __web_thread_data, __web_thread_messages] = __web_thread_event.data;
 
-	initSync(__wasm_worker_module, __wasm_worker_memory);
-	__wasm_worker_worker_entry(__wasm_worker_data, __wasm_worker_messages);
+	initSync(__web_thread_module, __web_thread_memory);
+	__web_thread_worker_entry(__web_thread_data, __web_thread_messages);
 };

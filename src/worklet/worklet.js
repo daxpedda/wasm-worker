@@ -1,11 +1,11 @@
-globalThis.registerProcessor('__wasm_worker_InitWasm', class __wasm_worker_InitWasm extends AudioWorkletProcessor {
-	constructor(__wasm_worker_options) {
+globalThis.registerProcessor('__web_thread_InitWasm', class __web_thread_InitWasm extends AudioWorkletProcessor {
+	constructor(__web_thread_options) {
 		super();
 
-		const [__wasm_worker_module, __wasm_worker_memory, __wasm_worker_data] = __wasm_worker_options.processorOptions;
+		const [__web_thread_module, __web_thread_memory, __web_thread_data] = __web_thread_options.processorOptions;
 
-		initSync(__wasm_worker_module, __wasm_worker_memory);
-		__wasm_worker_worklet_entry(this, __wasm_worker_data);
+		initSync(__web_thread_module, __web_thread_memory);
+		__web_thread_worklet_entry(this, __web_thread_data);
 	}
 
 	process() {

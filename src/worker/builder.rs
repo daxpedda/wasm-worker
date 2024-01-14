@@ -327,7 +327,7 @@ enum Task {
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
 #[cfg_attr(not(feature = "message"), allow(clippy::needless_pass_by_value))]
-pub unsafe fn __wasm_worker_worker_entry(
+pub unsafe fn __web_thread_worker_entry(
 	data: *mut Data,
 	#[cfg_attr(not(feature = "message"), allow(unused_variables))] messages: JsValue,
 ) {
@@ -336,7 +336,7 @@ pub unsafe fn __wasm_worker_worker_entry(
 	global.set_onmessage(None);
 
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
-	// `__wasm_worker_worker_entry` from `worker.js`. The data sent to it should
+	// `__web_thread_worker_entry` from `worker.js`. The data sent to it should
 	// only come from `WorkerBuilder::spawn_internal()`.
 	let data = *unsafe { Box::from_raw(data) };
 

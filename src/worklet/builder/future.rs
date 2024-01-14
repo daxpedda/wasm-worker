@@ -135,7 +135,7 @@ impl Future for WorkletFuture<'_> {
 			&data.into(),
 		)));
 
-		let node = AudioWorkletNode::new_with_options(&context, "__wasm_worker_InitWasm", &options)
+		let node = AudioWorkletNode::new_with_options(&context, "__web_thread_InitWasm", &options)
 			.unwrap();
 
 		#[cfg(feature = "message")]

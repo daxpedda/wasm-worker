@@ -10,8 +10,8 @@ use std::borrow::Cow;
 use futures_util::future::{self, Either};
 use util::Flag;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::worklet::{self, WorkletContext, WorkletInitError};
-use wasm_worker::{WorkletBuilder, WorkletExt};
+use web_thread::worklet::{self, WorkletContext, WorkletInitError};
+use web_thread::{WorkletBuilder, WorkletExt};
 use web_sys::OfflineAudioContext;
 
 use crate::util::SIGNAL_DURATION;

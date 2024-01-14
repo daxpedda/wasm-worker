@@ -161,7 +161,7 @@ impl WorkletBuilder {
 		context: Cow<'_, BaseAudioContext>,
 		task: Task,
 	) -> Result<WorkletFuture<'_>, WorkletInitError> {
-		let init = Reflect::get(&context, &"__wasm_worker_init".into()).unwrap();
+		let init = Reflect::get(&context, &"__web_thread_init".into()).unwrap();
 
 		if let Some(init) = init.as_bool() {
 			debug_assert!(
@@ -176,7 +176,7 @@ impl WorkletBuilder {
 			init.is_undefined(),
 			"expected no value to be set not `true`"
 		);
-		let result = Reflect::set(&context, &"__wasm_worker_init".into(), &true.into()).unwrap();
+		let result = Reflect::set(&context, &"__web_thread_init".into(), &true.into()).unwrap();
 		debug_assert!(result, "expected setting value to be successful");
 
 		Ok(WorkletFuture::new(
@@ -216,11 +216,11 @@ enum Task {
 
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
-pub unsafe fn __wasm_worker_worklet_entry(this: AudioWorkletProcessor, data: *mut Data) {
+pub unsafe fn __web_thread_worklet_entry(this: AudioWorkletProcessor, data: *mut Data) {
 	let global = js_sys::global().unchecked_into();
 
 	// SAFETY: Has to be a valid pointer to `Data`. We only call
-	// `__wasm_worker_worklet_entry` from `worklet.js`. The data sent to it should
+	// `__web_thread_worklet_entry` from `worklet.js`. The data sent to it should
 	// only come from `WorkletFuture::poll()`.
 	let data = *unsafe { Box::from_raw(data) };
 

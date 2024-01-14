@@ -7,18 +7,18 @@ mod util;
 
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::worker::WorkerContext;
+use web_thread::worker::WorkerContext;
 
 use self::util::{Flag, CLOSE_DURATION, SIGNAL_DURATION};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`wasm_worker::spawn()`].
+/// [`web_thread::spawn()`].
 #[wasm_bindgen_test]
 async fn spawn() {
 	let flag = Flag::new();
 
-	wasm_worker::spawn({
+	web_thread::spawn({
 		let flag = flag.clone();
 		move |context| {
 			flag.signal();
@@ -29,12 +29,12 @@ async fn spawn() {
 	flag.await;
 }
 
-/// [`wasm_worker::spawn_async()`].
+/// [`web_thread::spawn_async()`].
 #[wasm_bindgen_test]
 async fn spawn_async() {
 	let flag = Flag::new();
 
-	wasm_worker::spawn_async({
+	web_thread::spawn_async({
 		let flag = flag.clone();
 		|context| async move {
 			flag.signal();
@@ -50,12 +50,12 @@ async fn spawn_async() {
 async fn nested() {
 	let inner = Flag::new();
 
-	wasm_worker::spawn_async({
+	web_thread::spawn_async({
 		let outer = inner.clone();
 		|context| async move {
 			let inner = Flag::new();
 
-			wasm_worker::spawn({
+			web_thread::spawn({
 				let outer = inner.clone();
 				move |context| {
 					outer.signal();
@@ -79,17 +79,17 @@ async fn nested() {
 async fn nested_nested() {
 	let inner = Flag::new();
 
-	wasm_worker::spawn_async({
+	web_thread::spawn_async({
 		let outer = inner.clone();
 		|context| async move {
 			let inner = Flag::new();
 
-			wasm_worker::spawn_async({
+			web_thread::spawn_async({
 				let outer = inner.clone();
 				|context| async move {
 					let inner = Flag::new();
 
-					wasm_worker::spawn({
+					web_thread::spawn({
 						let outer = inner.clone();
 						move |context| {
 							outer.signal();
@@ -116,13 +116,13 @@ async fn nested_nested() {
 	inner.await;
 }
 
-/// [`Worker::terminate()`](wasm_worker::Worker::terminate).
+/// [`Worker::terminate()`](web_thread::Worker::terminate).
 #[wasm_bindgen_test]
 async fn terminate() {
 	let request = Flag::new();
 	let response = Flag::new();
 
-	let worker = wasm_worker::spawn_async({
+	let worker = web_thread::spawn_async({
 		let request = request.clone();
 		let response = response.clone();
 
@@ -147,7 +147,7 @@ async fn close() {
 	let request = Flag::new();
 	let response = Flag::new();
 
-	wasm_worker::spawn_async({
+	web_thread::spawn_async({
 		let request = request.clone();
 		let response = response.clone();
 
@@ -178,7 +178,7 @@ async fn close() {
 async fn context() {
 	let flag = Flag::new();
 
-	wasm_worker::spawn({
+	web_thread::spawn({
 		let flag = flag.clone();
 		move |context| {
 			WorkerContext::new().unwrap();
@@ -203,7 +203,7 @@ fn context_fail() {
 async fn name() {
 	let flag = Flag::new();
 
-	wasm_worker::spawn({
+	web_thread::spawn({
 		let flag = flag.clone();
 		move |context| {
 			assert!(context.name().is_none());

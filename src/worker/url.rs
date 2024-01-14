@@ -19,7 +19,7 @@ impl Drop for WorkerUrl {
 impl WorkerUrl {
 	fn new() -> Self {
 		let script = format!(
-			"import {{initSync, __wasm_worker_worker_entry}} from '{}';\n\n{}",
+			"import {{initSync, __web_thread_worker_entry}} from '{}';\n\n{}",
 			*SHIM_URL,
 			include_str!("worker.js")
 		);

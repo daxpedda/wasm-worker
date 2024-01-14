@@ -8,18 +8,18 @@ mod util;
 use futures_channel::oneshot;
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::common::DestroyError;
+use web_thread::common::DestroyError;
 #[cfg(feature = "message")]
 use {
-	std::cell::RefCell, std::iter, std::ops::DerefMut, std::rc::Rc, wasm_worker::message::Message,
-	wasm_worker::WorkerBuilder,
+	std::cell::RefCell, std::iter, std::ops::DerefMut, std::rc::Rc, web_thread::message::Message,
+	web_thread::WorkerBuilder,
 };
 
 use self::util::{Flag, SIGNAL_DURATION};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`Worker::destroy()`](wasm_worker::worker::Worker::destroy).
+/// [`Worker::destroy()`](web_thread::worker::Worker::destroy).
 #[ignore = "Chrome has a bug that might lead to code continuing to execute even after termination"]
 #[wasm_bindgen_test]
 async fn handle() {
@@ -27,7 +27,7 @@ async fn handle() {
 	let response = Flag::new();
 	let (sender, receiver) = oneshot::channel();
 
-	let worker = wasm_worker::spawn_async({
+	let worker = web_thread::spawn_async({
 		let request = request.clone();
 		let response = response.clone();
 
@@ -50,13 +50,13 @@ async fn handle() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// Calling [`Worker::destroy()`](wasm_worker::worker::Worker::destroy) twice
+/// Calling [`Worker::destroy()`](web_thread::worker::Worker::destroy) twice
 /// on the same worker.
 #[wasm_bindgen_test]
 async fn handle_twice() {
 	let (sender, receiver) = oneshot::channel();
 
-	let worker = wasm_worker::spawn(|context| sender.send((context.tls(), context.tls())).unwrap());
+	let worker = web_thread::spawn(|context| sender.send((context.tls(), context.tls())).unwrap());
 
 	let (tls_1, tls_2) = receiver.await.unwrap();
 	worker.clone().destroy(tls_1).unwrap();
@@ -67,19 +67,19 @@ async fn handle_twice() {
 	));
 }
 
-/// Calling [`Worker::destroy()`](wasm_worker::worker::Worker::destroy) with
-/// the wrong [`Tls`](wasm_worker::common::Tls).
+/// Calling [`Worker::destroy()`](web_thread::worker::Worker::destroy) with
+/// the wrong [`Tls`](web_thread::common::Tls).
 #[wasm_bindgen_test]
 async fn handle_wrong() {
 	let (sender_wrong, receiver_wrong) = oneshot::channel();
 	let (sender_right, receiver_right) = oneshot::channel();
 
-	wasm_worker::spawn(|context| {
+	web_thread::spawn(|context| {
 		sender_wrong.send((context.tls(), context.tls())).unwrap();
 		context.close();
 	});
 	let worker =
-		wasm_worker::spawn(|context| sender_right.send((context.tls(), context.tls())).unwrap());
+		web_thread::spawn(|context| sender_right.send((context.tls(), context.tls())).unwrap());
 
 	let (tls_wrong_1, tls_wrong_2) = receiver_wrong.await.unwrap();
 	let (tls_right_1, tls_right_2) = receiver_right.await.unwrap();
@@ -99,7 +99,7 @@ async fn handle_wrong() {
 	));
 }
 
-/// [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy).
+/// [`WorkerRef::destroy()`](web_thread::worker::WorkerRef::destroy).
 #[ignore = "Chrome has a bug that might lead to code continuing to execute even after termination"]
 #[wasm_bindgen_test]
 #[cfg(feature = "message")]
@@ -148,7 +148,7 @@ async fn handle_ref() {
 	assert!(matches!(result, Either::Right(((), _))));
 }
 
-/// Calling [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy)
+/// Calling [`WorkerRef::destroy()`](web_thread::worker::WorkerRef::destroy)
 /// twice on the same worker.
 #[wasm_bindgen_test]
 #[cfg(feature = "message")]
@@ -190,8 +190,8 @@ async fn handle_ref_twice() {
 	flag.await;
 }
 
-/// Calling [`WorkerRef::destroy()`](wasm_worker::worker::WorkerRef::destroy)
-/// with the wrong [`Tls`](wasm_worker::common::Tls).
+/// Calling [`WorkerRef::destroy()`](web_thread::worker::WorkerRef::destroy)
+/// with the wrong [`Tls`](web_thread::common::Tls).
 #[wasm_bindgen_test]
 #[cfg(feature = "message")]
 async fn handle_ref_wrong() {
@@ -203,7 +203,7 @@ async fn handle_ref_wrong() {
 	let receiver_wrong = Rc::new(RefCell::new(receiver_wrong));
 	let receiver_right = Rc::new(RefCell::new(receiver_right));
 
-	wasm_worker::spawn(|context| {
+	web_thread::spawn(|context| {
 		sender_wrong.send((context.tls(), context.tls())).unwrap();
 		context.close();
 	});

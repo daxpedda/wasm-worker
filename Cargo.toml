@@ -5,8 +5,8 @@ edition = "2021"
 include = ["CHANGELOG.md", "LICENSE-*", "src/**/*", "examples/**/*"]
 keywords = ["worker", "worklet", "wasm", "web", "thread"]
 license = "MIT OR Apache-2.0"
-name = "wasm-worker"
-repository = "https://github.com/daxpedda/wasm-worker"
+name = "web-thread"
+repository = "https://github.com/daxpedda/web-thread"
 version = "0.0.0"
 
 [features]

@@ -18,8 +18,8 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::message::{Message, MessageSupportError};
-use wasm_worker::WorkerBuilder;
+use web_thread::message::{Message, MessageSupportError};
+use web_thread::WorkerBuilder;
 use web_sys::{
 	console, ImageBitmap, ImageData, MessageChannel, MessagePort, OffscreenCanvas, ReadableStream,
 	RtcDataChannel, RtcDataChannelState, RtcPeerConnection, TransformStream, WritableStream,
@@ -35,7 +35,7 @@ use self::util::{Flag, SIGNAL_DURATION};
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`RawMessage::serialize()`](wasm_worker::RawMessage::serialize).
+/// [`RawMessage::serialize()`](web_thread::RawMessage::serialize).
 #[wasm_bindgen_test]
 async fn serialize() {
 	Message::has_array_buffer_support().unwrap();

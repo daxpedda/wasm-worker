@@ -19,7 +19,7 @@ pub(super) struct WorkletUrl(String);
 impl WorkletUrl {
 	fn new() -> Self {
 		let import = format!(
-			"import {{initSync, __wasm_worker_worklet_entry}} from '{}';\n\n",
+			"import {{initSync, __web_thread_worklet_entry}} from '{}';\n\n",
 			*SHIM_URL
 		);
 

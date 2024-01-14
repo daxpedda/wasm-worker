@@ -5,7 +5,7 @@
 mod util;
 
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::WorkerBuilder;
+use web_thread::WorkerBuilder;
 
 use self::util::Flag;
 

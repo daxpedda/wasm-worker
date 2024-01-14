@@ -5,12 +5,12 @@
 
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
-use wasm_worker::message::Message;
+use web_thread::message::Message;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 /// [`Message::has_support`] and
-/// [`ImageBitmapSupportFuture::into_inner()`](wasm_worker::message::ImageBitmapSupportFuture::into_inner).
+/// [`ImageBitmapSupportFuture::into_inner()`](web_thread::message::ImageBitmapSupportFuture::into_inner).
 #[wasm_bindgen_test]
 async fn test() {
 	let message = Message::ImageBitmap(JsValue::UNDEFINED.unchecked_into());

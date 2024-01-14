@@ -21,8 +21,8 @@ use utf16_lit::utf16;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use wasm_worker::worklet::WorkletExt;
-use wasm_worker::{worker, WorkletBuilder};
+use web_thread::worklet::WorkletExt;
+use web_thread::{worker, WorkletBuilder};
 use web_sys::{console, DedicatedWorkerGlobalScope, OfflineAudioContext, Window};
 
 #[wasm_bindgen(main)]
@@ -31,7 +31,7 @@ async fn main() {
 
 	console::log_1(&worker::has_async_support().unwrap().await.into());
 
-	let worker = wasm_worker::spawn(|context| {
+	let worker = web_thread::spawn(|context| {
 		context.set_message_handler(|_, _| console::log_1(&"received".into()));
 	});
 
@@ -42,7 +42,7 @@ async fn main() {
 			.unwrap();
 	audio.add_wasm(|_| console::log_1(&lit_js!("audio"))).await;
 
-	/*wasm_worker::spawn(|context| {
+	/*web_thread::spawn(|context| {
 		wasm_bindgen_futures::spawn_local(async { console::log_1(&"from future".into()) });
 
 		context.close();

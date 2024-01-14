@@ -20,7 +20,7 @@ use self::url::WORKER_URL;
 /// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// # #[wasm_bindgen_test::wasm_bindgen_test]
 /// # fn test() {
-/// wasm_worker::spawn(|_| ());
+/// web_thread::spawn(|_| ());
 /// # }
 /// ```
 pub fn spawn<F>(task: F) -> Worker
@@ -36,7 +36,7 @@ where
 /// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// # #[wasm_bindgen_test::wasm_bindgen_test]
 /// # fn test() {
-/// wasm_worker::spawn_async(|_| async {});
+/// web_thread::spawn_async(|_| async {});
 /// # }
 /// ```
 pub fn spawn_async<F1, F2>(task: F1) -> Worker
