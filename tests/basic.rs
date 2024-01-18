@@ -1,218 +1,82 @@
-//! Tests basic functionality.
-
 #![cfg(test)]
-#![allow(clippy::missing_assert_message)]
+#![cfg(any(not(target_family = "wasm"), target_feature = "atomics"))]
 
-mod util;
+#[cfg(not(target_family = "wasm"))]
+use std::time;
+use std::time::Duration;
 
-use futures_util::future::{self, Either};
-use wasm_bindgen_test::wasm_bindgen_test;
-use web_thread::worker::WorkerContext;
+#[cfg(target_family = "wasm")]
+use thread::web::JoinHandleExt;
+use time::Instant;
+use web_thread as thread;
+#[cfg(target_family = "wasm")]
+use web_time as time;
 
-use self::util::{Flag, CLOSE_DURATION, SIGNAL_DURATION};
-
+#[cfg(target_family = "wasm")]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
-/// [`web_thread::spawn()`].
-#[wasm_bindgen_test]
-async fn spawn() {
-	let flag = Flag::new();
-
-	web_thread::spawn({
-		let flag = flag.clone();
-		move |context| {
-			flag.signal();
-			context.close();
-		}
-	});
-
-	flag.await;
+#[cfg_attr(not(target_family = "wasm"), test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test::wasm_bindgen_test)]
+fn available_parallelism() {
+	thread::available_parallelism().unwrap();
 }
 
-/// [`web_thread::spawn_async()`].
-#[wasm_bindgen_test]
-async fn spawn_async() {
-	let flag = Flag::new();
-
-	web_thread::spawn_async({
-		let flag = flag.clone();
-		|context| async move {
-			flag.signal();
-			context.close();
-		}
-	});
-
-	flag.await;
+#[cfg_attr(not(target_family = "wasm"), test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test::wasm_bindgen_test)]
+fn thread() {
+	let thread = thread::current();
+	let _ = thread.id();
+	let _ = thread.name();
+	thread.unpark();
 }
 
-/// Nested workers.
-#[wasm_bindgen_test]
-async fn nested() {
-	let inner = Flag::new();
-
-	web_thread::spawn_async({
-		let outer = inner.clone();
-		|context| async move {
-			let inner = Flag::new();
-
-			web_thread::spawn({
-				let outer = inner.clone();
-				move |context| {
-					outer.signal();
-					context.close();
-				}
-			});
-
-			inner.await;
-
-			outer.signal();
-
-			context.close();
-		}
-	});
-
-	inner.await;
+#[cfg_attr(not(target_family = "wasm"), test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test::wasm_bindgen_test)]
+fn panicking() {
+	assert!(!thread::panicking());
 }
 
-/// Nested workers in nested workers.
-#[wasm_bindgen_test]
-async fn nested_nested() {
-	let inner = Flag::new();
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test::wasm_bindgen_test)]
+async fn park() {
+	let start = Instant::now();
 
-	web_thread::spawn_async({
-		let outer = inner.clone();
-		|context| async move {
-			let inner = Flag::new();
-
-			web_thread::spawn_async({
-				let outer = inner.clone();
-				|context| async move {
-					let inner = Flag::new();
-
-					web_thread::spawn({
-						let outer = inner.clone();
-						move |context| {
-							outer.signal();
-							context.close();
-						}
-					});
-
-					inner.await;
-
-					outer.signal();
-
-					context.close();
-				}
-			});
-
-			inner.await;
-
-			outer.signal();
-
-			context.close();
-		}
+	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
+	let mut handle = thread::spawn(|| {
+		thread::park();
+		thread::park_timeout(Duration::from_secs(1));
+		#[allow(deprecated)]
+		thread::park_timeout_ms(1000);
 	});
 
-	inner.await;
+	handle.thread().unpark();
+	handle.thread().unpark();
+	handle.thread().unpark();
+
+	#[cfg(not(target_family = "wasm"))]
+	handle.join().unwrap();
+	#[cfg(target_family = "wasm")]
+	handle.join_async().await.unwrap();
+
+	assert!(start.elapsed().as_secs() >= 2);
 }
 
-/// [`Worker::terminate()`](web_thread::Worker::terminate).
-#[wasm_bindgen_test]
-async fn terminate() {
-	let request = Flag::new();
-	let response = Flag::new();
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test::wasm_bindgen_test)]
+async fn sleep() {
+	let start = Instant::now();
 
-	let worker = web_thread::spawn_async({
-		let request = request.clone();
-		let response = response.clone();
-
-		|_| async move {
-			// Worker will be terminated before the request signal is sent.
-			request.await;
-			response.signal();
-		}
+	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
+	let mut handle = thread::spawn(|| {
+		thread::sleep(Duration::from_secs(1));
+		#[allow(deprecated)]
+		thread::sleep_ms(1000);
 	});
 
-	worker.terminate();
-	request.signal();
+	#[cfg(not(target_family = "wasm"))]
+	handle.join().unwrap();
+	#[cfg(target_family = "wasm")]
+	handle.join_async().await.unwrap();
 
-	// The worker will never respond if terminated.
-	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
-	assert!(matches!(result, Either::Right(((), _))));
-}
-
-/// [`WorkerContext::close()`].
-#[wasm_bindgen_test]
-async fn close() {
-	let request = Flag::new();
-	let response = Flag::new();
-
-	web_thread::spawn_async({
-		let request = request.clone();
-		let response = response.clone();
-
-		|context| async move {
-			wasm_bindgen_futures::spawn_local(async move {
-				request.await;
-				response.signal();
-			});
-
-			context.close();
-		}
-	});
-
-	// Wait for the worker to potentially stay alive.
-	// This delay is intentionally big because `close()` can unfortunately take very
-	// long.
-	util::sleep(CLOSE_DURATION).await;
-
-	request.signal();
-
-	// The worker will never respond if terminated.
-	let result = future::select(response, util::sleep(SIGNAL_DURATION)).await;
-	assert!(matches!(result, Either::Right(((), _))));
-}
-
-/// [`WorkerContext::new()`].
-#[wasm_bindgen_test]
-async fn context() {
-	let flag = Flag::new();
-
-	web_thread::spawn({
-		let flag = flag.clone();
-		move |context| {
-			WorkerContext::new().unwrap();
-			// Flag will never signal if `WorkerContext::new` panics.
-			flag.signal();
-
-			context.close();
-		}
-	});
-
-	flag.await;
-}
-
-/// [`WorkerContext::new()`] fails outside worker.
-#[wasm_bindgen_test]
-fn context_fail() {
-	assert!(WorkerContext::new().is_none());
-}
-
-/// [`WorkerContext::name()`].
-#[wasm_bindgen_test]
-async fn name() {
-	let flag = Flag::new();
-
-	web_thread::spawn({
-		let flag = flag.clone();
-		move |context| {
-			assert!(context.name().is_none());
-			// Flag will never signal if `assert!` panics.
-			flag.signal();
-
-			context.close();
-		}
-	});
-
-	flag.await;
+	assert!(start.elapsed().as_secs() >= 2);
 }

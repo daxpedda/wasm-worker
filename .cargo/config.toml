@@ -1,11 +1,2 @@
-[build]
-rustdocflags = ["-Ctarget-feature=+atomics,+bulk-memory"]
-target = "wasm32-unknown-unknown"
-
-[unstable]
-build-std = ["panic_abort", "std"]
-doctest-xcompile = true
-
 [target.wasm32-unknown-unknown]
 runner = "wasm-bindgen-test-runner"
-rustflags = ["-Ctarget-feature=+atomics,+bulk-memory"]

@@ -21,31 +21,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features:
-          - { rustflags: "",                          features: "" }
-          - { rustflags: "",                          features: --features futures }
-          - { rustflags: "",                          features: --features message }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
-          - { rustflags: "",                          features: --features worklet }
-          - { rustflags: "",                          features: "--features futures,message" }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features futures,message" }
-          - { rustflags: "",                          features: "--features futures,worklet" }
-          - { rustflags: "",                          features: "--features message,worklet" }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features message,worklet" }
-          - { rustflags: "",                          features: --all-features }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
+        target:
+          - x86_64-unknown-linux-gnu
+        rust:
+          - { version: stable }
+        include:
+          - target: wasm32-unknown-unknown
+            rust: {
+              version: nightly,
+              component: ",rust-src",
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+              docargs: "-Zdoctest-xcompile",
+            }
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
-        run: rustup toolchain install nightly --profile minimal --component clippy --allow-downgrade --target wasm32-unknown-unknown
+        run: rustup toolchain install ${{ matrix.rust.version }} --profile minimal --component clippy${{ matrix.rust.component }} --allow-downgrade --target ${{ matrix.target }}
       - name: Run Clippy
         env:
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo clippy ${{ matrix.features.features }} --all-targets -- -D warnings
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo clippy --all-targets --target ${{ matrix.target }} ${{ matrix.rust.args }} -- -D warnings
       - name: Run Rustdoc
         env:
-          RUSTDOCFLAGS: -D warnings --cfg=docsrs -Ctarget-feature=+atomics,+bulk-memory ${{ matrix.features.rustflags }}
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo doc ${{ matrix.features.features }} --no-deps --document-private-items --lib --examples
+          RUSTDOCFLAGS: -D warnings --cfg=docsrs ${{ matrix.rust.flags }}
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: |
+          cargo doc --no-deps --document-private-items --lib --examples --target ${{ matrix.target }} ${{ matrix.rust.args }} ${{ matrix.rust.docargs }}

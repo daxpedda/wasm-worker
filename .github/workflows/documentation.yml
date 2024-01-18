@@ -35,8 +35,8 @@ jobs:
       - name: Run Rustdoc
         env:
           RUSTDOCFLAGS: --crate-version main --cfg=docsrs -Ctarget-feature=+atomics,+bulk-memory --cfg=web_sys_unstable_apis
-          RUSTFLAGS: --cfg=web_sys_unstable_apis
-        run: cargo doc --all-features --no-deps -Z rustdoc-map -Z rustdoc-scrape-examples
+          RUSTFLAGS: -Ctarget-feature=+atomics,+bulk-memory --cfg=web_sys_unstable_apis
+        run: cargo doc --all-features --no-deps -Z rustdoc-map -Z rustdoc-scrape-examples -Z doctest-xcompile
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Fix permissions

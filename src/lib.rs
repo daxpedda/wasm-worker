@@ -1,40 +1,23 @@
-#![allow(
-	clippy::missing_docs_in_private_items,
-	clippy::missing_errors_doc,
-	clippy::missing_panics_doc,
-	clippy::unwrap_used,
-	missing_docs
-)]
+//! TODO
 
-//! Notes:
-//! - Note Firefox nested worker issue: <https://bugzilla.mozilla.org/show_bug.cgi?id=1817152>.
-//! - Note workaround for missing ports on worklet creation: <https://github.com/WebAudio/web-audio-api/issues/2456>.
-//! - Note Chrome silently failing on unsupported messages: <https://bugs.chromium.org/p/chromium/issues/detail?id=1341844>.
-//! - Note Chrome termination isn't immediate: <https://bugs.chromium.org/p/chromium/issues/detail?id=1455812>.
-//! - Note Safari has issue with sending multiple `VideoFrame`s: <https://bugs.webkit.org/show_bug.cgi?id=264516>.
-//!
-//! TODO:
-//! - Test that all functions (e.g. support checks) also work in workers and
-//!   worklets and adjust appropriately.
-//! - Implement support for `MessagePort`.
-//! - Support sending additional messages that are not transferred.
-//! - Implement a higher level implementation of this library.
+#![cfg_attr(target_feature = "atomics", feature(stdsimd))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+mod thread;
+#[cfg(any(all(target_family = "wasm", target_os = "unknown",), docsrs))]
+#[cfg_attr(docsrs, doc(cfg(Web)))]
+pub mod web;
 
-pub mod common;
-mod global;
-#[cfg(feature = "message")]
-pub mod message;
-pub mod worker;
-#[cfg(feature = "worklet")]
-pub mod worklet;
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+pub use std::thread::*;
 
-#[doc(no_inline)]
-pub use self::worker::WorkerBuilder;
-pub use self::worker::{spawn, spawn_async};
-#[doc(no_inline)]
-#[cfg(feature = "worklet")]
-pub use self::worklet::WorkletBuilder;
-#[cfg(feature = "worklet")]
-pub use self::worklet::WorkletExt;
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+pub use self::thread::*;
+
+#[cfg(all(
+	target_family = "wasm",
+	target_os = "unknown",
+	target_feature = "exception-handling"
+))]
+compile_error!("this library does not work correctly with the exception handling proposal");

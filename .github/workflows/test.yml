@@ -25,20 +25,27 @@ jobs:
       matrix:
         os:
           - ubuntu-latest
-          - macos-latest
-        features:
-          - { rustflags: "",                          features: "" }
-          - { rustflags: "",                          features: --features futures }
-          - { rustflags: "",                          features: --features message }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
-          - { rustflags: "",                          features: --features worklet }
-          - { rustflags: "",                          features: "--features futures,message" }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features futures,message" }
-          - { rustflags: "",                          features: "--features futures,worklet" }
-          - { rustflags: "",                          features: "--features message,worklet" }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features message,worklet" }
-          - { rustflags: "",                          features: --all-features }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
+        target:
+          - { target: x86_64-unknown-linux-gnu, web: false }
+        include:
+          - os: ubuntu-latest
+            rust: {
+              version: nightly,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+              docargs: "-Zdoctest-xcompile",
+            }
+            target: { target: wasm32-unknown-unknown, web: true }
+          - os: macos-latest
+            rust: {
+              version: nightly,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+              docargs: "-Zdoctest-xcompile",
+            }
+            target: { target: wasm32-unknown-unknown, web: true }
 
     steps:
       - name: Checkout
@@ -48,41 +55,46 @@ jobs:
         with:
           tool: wasm-bindgen-cli
       - name: Install Rust
-        run: rustup toolchain install nightly --profile minimal
+        run: |
+          rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
+          rustup default ${{ matrix.rust.version }}
       - name: Build
         if: matrix.os == 'ubuntu-latest'
         env:
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo build ${{ matrix.features.features }}
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo build --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Documentation
         if: matrix.os == 'ubuntu-latest'
         env:
-          RUSTDOCFLAGS: -Ctarget-feature=+atomics,+bulk-memory ${{ matrix.features.rustflags }}
-          RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo doc --no-deps
+          RUSTDOCFLAGS: ${{ matrix.rust.flags }}
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo doc --no-deps --target ${{ matrix.target.target }} ${{ matrix.rust.args }} ${{ matrix.rust.docargs }}
+      - name: Test
+        if: matrix.target.web == false
+        run: cargo test --all-targets --no-fail-fast
       - name: Test on Chrome
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
         env:
           CHROMEDRIVER: chromedriver
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test on Firefox
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
         env:
           GECKODRIVER: geckodriver
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} -- --include-ignored
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test on Safari
-        if: matrix.os == 'macos-latest'
+        if: matrix.target.web == true && matrix.os == 'macos-latest'
         env:
           SAFARIDRIVER: safaridriver
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo test --all-targets --no-fail-fast ${{ matrix.features.features }}
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Documentation Test
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.target.web == false
         env:
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
-        run: cargo test --doc --no-fail-fast ${{ matrix.features.features }}
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo test --doc --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
 
   minimal-versions:
     name: Minimal Versions
@@ -95,28 +107,32 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features:
-          - { rustflags: "",                          features: "" }
-          - { rustflags: "",                          features: --features futures }
-          - { rustflags: "",                          features: --features message }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --features message }
-          - { rustflags: "",                          features: --features worklet }
-          - { rustflags: "",                          features: "--features futures,message" }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features futures,message" }
-          - { rustflags: "",                          features: "--features futures,worklet" }
-          - { rustflags: "",                          features: "--features message,worklet" }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: "--features message,worklet" }
-          - { rustflags: "",                          features: --all-features }
-          - { rustflags: --cfg=web_sys_unstable_apis, features: --all-features }
+        rust:
+          - { version: "1.60" }
+          - { version: stable }
+        target:
+          - x86_64-unknown-linux-gnu
+        include:
+          - rust: {
+              version: nightly,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            target: wasm32-unknown-unknown
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install Rust
+        run: |
+          rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
+          rustup default ${{ matrix.rust.version }}
+      - name: Install Rust nightly
         run: rustup toolchain install nightly --profile minimal
       - name: Build
         env:
-          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: ${{ matrix.features.rustflags }}
+          RUSTFLAGS: ${{ matrix.rust.flags }}
         run: |
-          cargo update -Z minimal-versions
-          cargo build ${{ matrix.features.features }}
+          cargo +nightly update -Z minimal-versions
+          cargo build --target ${{ matrix.target.target }} ${{ matrix.rust.args }}

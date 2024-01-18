@@ -7,117 +7,40 @@ keywords = ["worker", "worklet", "wasm", "web", "thread"]
 license = "MIT OR Apache-2.0"
 name = "web-thread"
 repository = "https://github.com/daxpedda/web-thread"
+rust-version = "1.60"
 version = "0.0.0"
 
-[features]
-futures = ["dep:futures-core"]
-message = [
-	"web-sys/AudioData",
-	"web-sys/AudioDataInit",
-	"web-sys/AudioSampleFormat",
-	"web-sys/DomException",
-	"web-sys/ImageBitmap",
-	"web-sys/ImageData",
-	"web-sys/MessageChannel",
-	"web-sys/MessagePort",
-	"web-sys/OffscreenCanvas",
-	"web-sys/ReadableStream",
-	"web-sys/RtcDataChannel",
-	"web-sys/RtcPeerConnection",
-	"web-sys/TransformStream",
-	"web-sys/VideoFrame",
-	"web-sys/VideoFrameBufferInit",
-	"web-sys/VideoPixelFormat",
-	"web-sys/WebTransportReceiveStream",
-	"web-sys/WebTransportSendStream",
-	"web-sys/WritableStream",
-]
-worklet = [
-	"web-sys/AbortController",
-	"web-sys/AbortSignal",
-	"web-sys/AudioWorklet",
-	"web-sys/AudioWorkletGlobalScope",
-	"web-sys/AudioWorkletNode",
-	"web-sys/AudioWorkletNodeOptions",
-	"web-sys/AudioWorkletProcessor",
-	"web-sys/BaseAudioContext",
-	"web-sys/OfflineAudioContext",
-]
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+js-sys = "0.3.20"
+wasm-bindgen = { version = "0.2.70", default-features = false }
+web-sys = { version = "0.3.20", features = [
+	"DedicatedWorkerGlobalScope",
+	"Navigator",
+	"Window",
+	"WorkerNavigator",
+] }
 
-[dependencies]
-futures-core = { version = "0.3", optional = true, default-features = false }
-js-sys = "0.3"
-once_cell = "1"
-# Any version below that is broken on nightly.
-proc-macro2 = "1.0.60"
-wasm-bindgen = { version = "0.2", default-features = false }
-wasm-bindgen-futures = "0.4.18"
-web-sys = { version = "0.3.67", features = [
+[target.'cfg(all(target_family = "wasm", target_os = "unknown", target_feature = "atomics"))'.dependencies]
+atomic-waker = "1"
+wasm-bindgen-futures = "0.4.20"
+web-sys = { version = "0.3.20", features = [
 	"Blob",
 	"BlobPropertyBag",
-	"DedicatedWorkerGlobalScope",
-	"MessageEvent",
 	"Url",
-	"Window",
 	"Worker",
-	"WorkerGlobalScope",
 	"WorkerOptions",
 	"WorkerType",
-	"WebTransport",
-	"WebTransportBidirectionalStream",
 ] }
 
-[dev-dependencies]
-console_error_panic_hook = "0.1"
-futures-channel = { version = "0.3", default-features = false, features = ["alloc"] }
-futures-util = { version = "0.3", default-features = false, features = ["alloc"] }
-utf16_lit = "2"
-wasm-bindgen-test = "0.3.39"
-web-sys = { version = "0.3", features = [
-	"AudioDataCopyToOptions",
-	"console",
-	"Response",
-	"RtcDataChannelState",
-] }
+[target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dev-dependencies]
+pollster = { version = "0.3", features = ["macro"] }
 
-[[example]]
-doc-scrape-examples = true
-name = "testing"
-required-features = ["message", "worklet"]
-
-[[test]]
-name = "message_handler"
-path = "tests/message_handler.rs"
-required-features = ["message"]
-
-[[test]]
-name = "race_has_image_bitmap_support"
-path = "tests/race_has_image_bitmap_support.rs"
-required-features = ["message"]
-
-[[test]]
-name = "race_message_has_support"
-path = "tests/race_message_has_support.rs"
-required-features = ["message"]
-
-[[test]]
-name = "transfer"
-path = "tests/transfer.rs"
-required-features = ["message"]
-
-[[test]]
-name = "worklet"
-path = "tests/worklet.rs"
-required-features = ["worklet"]
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+web-time = "1"
 
 [package.metadata.docs.rs]
-all-features = true
-rustc-args = ["--cfg=web_sys_unstable_apis"]
-rustdoc-args = [
-	"--cfg=docsrs",
-	"-Ctarget-feature=+atomics,+bulk-memory",
-	"--cfg=web_sys_unstable_apis",
-]
+rustdoc-args = ["--cfg=docsrs", "-Ctarget-feature=+atomics,+bulk-memory"]
 targets = ["wasm32-unknown-unknown"]
 
 [lints.rust]
