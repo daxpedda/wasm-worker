@@ -267,7 +267,7 @@ pub unsafe fn __web_thread_entry(task: *mut Box<dyn FnOnce() -> u32>) -> u32 {
 		.unchecked_into::<DedicatedWorkerGlobalScope>()
 		.set_onmessage(None);
 
-	// SAFETY: Has to be a valid pointer to a `Box<dyn FnOnce() -> i32>`. We only
+	// SAFETY: Has to be a valid pointer to a `Box<dyn FnOnce() -> u32>`. We only
 	// call `__web_thread_entry` from `worker.js`. The data sent to it should
 	// only come from `self::spawn_internal()`.
 	let task = *unsafe { Box::from_raw(task) };
