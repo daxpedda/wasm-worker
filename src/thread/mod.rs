@@ -2,24 +2,28 @@
 
 #[cfg(target_feature = "atomics")]
 mod atomics;
-mod global;
 mod js;
 #[cfg(not(target_feature = "atomics"))]
 mod unsupported;
+mod util;
 
+use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Error, ErrorKind};
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::thread;
 pub use std::thread::*;
 use std::time::Duration;
 
+use r#impl::Parker;
+
 #[cfg(target_feature = "atomics")]
 use self::atomics as r#impl;
-use self::global::{Global, GLOBAL};
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
+use self::util::{Global, GLOBAL};
 
 /// See [`std::thread::Builder`].
 #[derive(Debug)]
@@ -112,25 +116,60 @@ impl<T> JoinHandle<T> {
 
 /// See [`std::thread::Thread`].
 #[derive(Clone, Debug)]
-pub struct Thread(r#impl::Thread);
+pub struct Thread(Arc<ThreadInner>);
+
+/// Inner shared wrapper for [`Thread`].
+#[derive(Debug)]
+struct ThreadInner {
+	/// [`ThreadId`].
+	id: ThreadId,
+	/// Name of the thread.
+	name: Option<String>,
+	/// Parker implementation.
+	parker: Parker,
+}
+
+thread_local! {
+	/// Holds this threads [`Thread`].
+	static THREAD: OnceCell<Thread> = OnceCell::new();
+}
 
 impl Thread {
+	/// Create a new [`Thread`].
+	fn new() -> Self {
+		let name = GLOBAL.with(|global| match global.as_ref()? {
+			Global::Worker(worker) => Some(worker.name()),
+			Global::Window(_) | Global::Worklet => None,
+		});
+
+		Self(Arc::new(ThreadInner {
+			id: ThreadId::new(),
+			name,
+			parker: Parker::new(),
+		}))
+	}
+
+	/// Gets the current [`Thread`] and instantiates it if not set.
+	pub(super) fn current() -> Self {
+		THREAD.with(|cell| cell.get_or_init(Self::new).clone())
+	}
+
 	/// See [`std::thread::Thread::id()`].
 	#[must_use]
 	pub fn id(&self) -> ThreadId {
-		self.0.id()
+		self.0.id
 	}
 
 	/// See [`std::thread::Thread::name()`].
 	#[must_use]
 	pub fn name(&self) -> Option<&str> {
-		self.0.name()
+		self.0.name.as_deref()
 	}
 
 	/// See [`std::thread::Thread::unpark()`].
 	#[inline]
 	pub fn unpark(&self) {
-		self.0.unpark();
+		self.0.parker.unpark();
 	}
 }
 
@@ -161,7 +200,7 @@ impl ThreadId {
 #[allow(clippy::missing_panics_doc)]
 pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 	let value = GLOBAL.with(|global| {
-		let global = global.as_ref().ok_or_else(global::unsupported_global)?;
+		let global = global.as_ref().ok_or_else(util::unsupported_global)?;
 
 		match global {
 			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
@@ -188,7 +227,7 @@ pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 /// See [`std::thread::current()`].
 #[must_use]
 pub fn current() -> Thread {
-	Thread(r#impl::Thread::current())
+	Thread::current()
 }
 
 /// See [`std::thread::park()`].
@@ -196,10 +235,16 @@ pub fn current() -> Thread {
 /// # Notes
 ///
 /// Unlike [`std::thread::park()`] this will not panic on the main thread,
-/// worklet or any other unsupported thread type when using `target_feature =
-/// "atomics"`.
+/// worklet or any other unsupported thread type.
 pub fn park() {
-	r#impl::park();
+	GLOBAL.with(|global| {
+		if let Some(Global::Worker(_)) = global {
+			// SAFETY: park_timeout is called on the parker owned by this thread.
+			unsafe {
+				Thread::current().0.parker.park();
+			}
+		}
+	});
 }
 
 /// See [`std::thread::park_timeout()`].
@@ -207,10 +252,16 @@ pub fn park() {
 /// # Notes
 ///
 /// Unlike [`std::thread::park_timeout()`] this will not panic on the main
-/// thread, worklet or any other unsupported thread type when using
-/// `target_feature = "atomics"`.
+/// thread, worklet or any other unsupported thread type.
 pub fn park_timeout(dur: Duration) {
-	r#impl::park_timeout(dur);
+	GLOBAL.with(|global| {
+		if let Some(Global::Worker(_)) = global {
+			// SAFETY: park_timeout is called on the parker owned by this thread.
+			unsafe {
+				Thread::current().0.parker.park_timeout(dur);
+			}
+		}
+	});
 }
 
 /// See [`std::thread::park_timeout_ms()`].
@@ -218,11 +269,14 @@ pub fn park_timeout(dur: Duration) {
 /// # Notes
 ///
 /// Unlike [`std::thread::park_timeout_ms()`] this will not panic on the main
-/// thread, worklet or any other unsupported thread type when using
-/// `target_feature = "atomics"`.
+/// thread, worklet or any other unsupported thread type.
 #[deprecated(note = "replaced by `web_thread::park_timeout`")]
 pub fn park_timeout_ms(ms: u32) {
-	r#impl::park_timeout_ms(ms);
+	GLOBAL.with(|global| {
+		if let Some(Global::Worker(_)) = global {
+			park_timeout(Duration::from_millis(ms.into()));
+		}
+	});
 }
 
 /// See [`std::thread::scope()`].
@@ -241,7 +295,13 @@ where
 /// This call will panic unless called from a thread type that allows blocking,
 /// e.g. a Web worker.
 pub fn sleep(dur: Duration) {
-	r#impl::sleep(dur);
+	GLOBAL.with(|global| {
+		if let Some(Global::Worker(_)) = global {
+			r#impl::sleep(dur);
+		} else {
+			panic!("current thread type cannot be blocked")
+		}
+	});
 }
 
 /// See [`std::thread::sleep_ms()`].
@@ -252,7 +312,13 @@ pub fn sleep(dur: Duration) {
 /// e.g. a Web worker.
 #[deprecated(note = "replaced by `web_thread::sleep`")]
 pub fn sleep_ms(ms: u32) {
-	r#impl::sleep_ms(ms);
+	GLOBAL.with(|global| {
+		if let Some(Global::Worker(_)) = global {
+			r#impl::sleep_ms(ms);
+		} else {
+			panic!("current thread type cannot be blocked")
+		}
+	});
 }
 
 /// See [`std::thread::spawn()`].

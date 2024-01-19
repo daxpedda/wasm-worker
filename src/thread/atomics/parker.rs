@@ -4,7 +4,6 @@
 
 // See <https://github.com/rust-lang/rust/blob/1.75.0/library/std/src/sys_common/thread_parking/futex.rs>.
 
-use std::pin::Pin;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::time::Duration;

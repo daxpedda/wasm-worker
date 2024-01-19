@@ -7,17 +7,14 @@ mod spawn;
 mod url;
 mod wait_async;
 
-use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
 use std::io;
 use std::sync::{Arc, PoisonError};
 use std::thread::Result;
 use std::time::Duration;
 
-use self::parker::Parker;
-use super::global::{Global, GLOBAL};
-use super::{Scope, ScopedJoinHandle, ThreadId};
-use crate::thread;
+pub(super) use self::parker::Parker;
+use super::{Scope, ScopedJoinHandle, Thread, THREAD};
 
 /// Implementation of [`std::thread::Builder`].
 #[derive(Debug)]
@@ -67,7 +64,7 @@ pub(crate) struct JoinHandle<T> {
 	/// Shared state between [`JoinHandle`] and thread.
 	pub(crate) shared: Arc<spawn::Shared<T>>,
 	/// Corresponding [`Thread`].
-	pub(crate) thread: thread::Thread,
+	pub(crate) thread: Thread,
 }
 
 impl<T> Debug for JoinHandle<T> {
@@ -108,105 +105,16 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation of [`std::thread::JoinHandle::thread()`].
 	#[allow(clippy::missing_const_for_fn)]
-	pub(super) fn thread(&self) -> &thread::Thread {
+	pub(super) fn thread(&self) -> &Thread {
 		&self.thread
 	}
 }
 
-/// Implementation of [`std::thread::Thread`].
-#[derive(Clone, Debug)]
-pub(super) struct Thread(Arc<ThreadInner>);
-
-/// Inner shared wrapper for [`Thread`].
-#[derive(Debug)]
-struct ThreadInner {
-	/// [`ThreadId`].
-	id: ThreadId,
-	/// Name of the thread.
-	name: Option<String>,
-	/// Parker implementation.
-	parker: Parker,
-}
-
-thread_local! {
-	/// Holds this threads [`Thread`].
-	static THREAD: OnceCell<Thread> = OnceCell::new();
-}
-
 impl Thread {
-	/// Create a new [`Thread`].
-	fn new() -> Self {
-		let name = GLOBAL.with(|global| match global.as_ref()? {
-			Global::Worker(worker) => Some(worker.name()),
-			Global::Window(_) | Global::Worklet => None,
-		});
-
-		Self(Arc::new(ThreadInner {
-			id: ThreadId::new(),
-			name,
-			parker: Parker::new(),
-		}))
-	}
-
-	/// Gets the current [`Thread`] and instantiates it if not set.
-	pub(super) fn current() -> Self {
-		THREAD.with(|cell| cell.get_or_init(Self::new).clone())
-	}
-
 	/// Registers the given `thread`.
-	#[cfg(target_feature = "atomics")]
 	fn register(thread: Self) {
 		THREAD.with(|cell| cell.set(thread).expect("`Thread` already registered"));
 	}
-
-	/// Implementation of [`std::thread::Thread::id()`].
-	pub(super) fn id(&self) -> ThreadId {
-		self.0.id
-	}
-
-	/// Implementation of [`std::thread::Thread::name()`].
-	#[must_use]
-	pub(super) fn name(&self) -> Option<&str> {
-		self.0.name.as_deref()
-	}
-
-	/// Implementation of [`std::thread::Thread::unpark()`].
-	pub(super) fn unpark(&self) {
-		self.0.parker.unpark();
-	}
-}
-
-/// Implementation of [`std::thread::park()`].
-pub(super) fn park() {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			// SAFETY: park_timeout is called on the parker owned by this thread.
-			unsafe {
-				Thread::current().0.parker.park();
-			}
-		}
-	});
-}
-
-/// Implementation of [`std::thread::park_timeout()`].
-pub(super) fn park_timeout(dur: Duration) {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			// SAFETY: park_timeout is called on the parker owned by this thread.
-			unsafe {
-				Thread::current().0.parker.park_timeout(dur);
-			}
-		}
-	});
-}
-
-/// Implementation of [`std::thread::park_timeout_ms()`].
-pub(super) fn park_timeout_ms(ms: u32) {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			park_timeout(Duration::from_millis(ms.into()));
-		}
-	});
 }
 
 /// Implementation of [`std::thread::scope()`].

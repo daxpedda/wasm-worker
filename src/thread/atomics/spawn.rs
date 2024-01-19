@@ -14,12 +14,13 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
+use super::super::util::{MEMORY, MODULE};
 use super::channel::Sender;
 use super::js::{Exports, GlobalDescriptor, META};
 use super::url::ScriptUrl;
 use super::wait_async::Atomics;
 use super::{channel, JoinHandle, Thread};
-use crate::thread::{self, ThreadId};
+use crate::thread::ThreadId;
 
 /// Saves the [`ThreadId`] of the main thread.
 static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
@@ -212,10 +213,7 @@ where
 			.expect("`Receiver` was somehow dropped from the main thread");
 	}
 
-	Ok(JoinHandle {
-		shared,
-		thread: thread::Thread(thread),
-	})
+	Ok(JoinHandle { shared, thread })
 }
 
 /// Spawning thread regardless of being nested.
@@ -242,11 +240,9 @@ fn spawn_internal(id: ThreadId, task: Box<dyn FnOnce() -> u32>, name: Option<&st
 		.with(|url| Worker::new_with_options(url.as_raw(), &options))
 		.expect("`new Worker()` is not expected to fail with a local script");
 
-	let message = Array::of3(
-		&wasm_bindgen::module(),
-		&wasm_bindgen::memory(),
-		&Box::into_raw(Box::new(task)).into(),
-	);
+	let message = MEMORY.with(|memory| {
+		MODULE.with(|module| Array::of3(module, memory, &Box::into_raw(Box::new(task)).into()))
+	});
 
 	worker
 		.post_message(&message)

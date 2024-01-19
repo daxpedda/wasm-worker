@@ -5,13 +5,13 @@ use std::future;
 use std::rc::Rc;
 use std::task::{Poll, Waker};
 
-use js_sys::WebAssembly::Memory;
-use js_sys::{Array, Int32Array};
+use js_sys::Array;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Worker;
 
+use super::super::util::{MEMORY, MEMORY_ARRAY};
 use super::js;
 use super::url::ScriptUrl;
 
@@ -30,13 +30,11 @@ impl Atomics {
 		}
 
 		if HAS_WAIT_ASYNC.with(bool::clone) {
-			let memory = wasm_bindgen::memory().unchecked_into::<Memory>();
-			let array = Int32Array::new(&memory.buffer());
 			let index: *const i32 = value;
 			#[allow(clippy::as_conversions)]
 			let index = index as u32 / 4;
 
-			let result = js::Atomics::wait_async(&array, index, check);
+			let result = MEMORY_ARRAY.with(|array| js::Atomics::wait_async(array, index, check));
 
 			if result.async_() {
 				JsFuture::from(result.value())
@@ -49,7 +47,8 @@ impl Atomics {
 	}
 }
 
-///
+/// Polyfills [`Atomics::wait_async`](js_sys::Atomics::wait_async) if not
+/// available.
 async fn wait_async(value: &i32, check: i32) {
 	thread_local! {
 		/// Object URL to the worker script.
@@ -95,11 +94,8 @@ async fn wait_async(value: &i32, check: i32) {
 	#[allow(clippy::as_conversions)]
 	let index = index as u32 / 4;
 
-	let message = Array::of3(
-		&wasm_bindgen::memory(),
-		&JsValue::from(index),
-		&JsValue::from(check),
-	);
+	let message =
+		MEMORY.with(|memory| Array::of3(memory, &JsValue::from(index), &JsValue::from(check)));
 
 	worker
 		.post_message(&message)
