@@ -1,42 +1,28 @@
 //! Worker script.
 
 use js_sys::Array;
-use web_sys::{Blob, BlobPropertyBag};
-
-use crate::thread::js::META;
-
-thread_local! {
-	/// Object URL to the worker script.
-	pub(super) static URL: Url = Url::new();
-}
+use web_sys::{Blob, BlobPropertyBag, Url};
 
 /// Wrapper around object URL to the worker script.
 #[derive(Debug)]
-pub(super) struct Url(String);
+pub(super) struct ScriptUrl(String);
 
-impl Drop for Url {
+impl Drop for ScriptUrl {
 	fn drop(&mut self) {
-		web_sys::Url::revoke_object_url(&self.0)
-			.expect("`URL.revokeObjectURL()` should never throw");
+		Url::revoke_object_url(&self.0).expect("`URL.revokeObjectURL()` should never throw");
 	}
 }
 
-impl Url {
+impl ScriptUrl {
 	/// Creates a new [`Url`].
-	fn new() -> Self {
-		let script = format!(
-			"import {{initSync, __web_thread_entry}} from '{}';\n\n{}",
-			META.url(),
-			include_str!("worker.js")
-		);
-
+	pub(super) fn new(script: &str) -> Self {
 		let sequence = Array::of1(&script.into());
 		let mut property = BlobPropertyBag::new();
 		property.type_("text/javascript");
 		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property)
 			.expect("`new Blob()` should never throw");
 
-		let url = web_sys::Url::create_object_url_with_blob(&blob)
+		let url = Url::create_object_url_with_blob(&blob)
 			.expect("`URL.createObjectURL()` should never throw");
 
 		Self(url)

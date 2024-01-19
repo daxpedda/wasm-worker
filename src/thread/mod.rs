@@ -2,6 +2,7 @@
 
 #[cfg(target_feature = "atomics")]
 mod atomics;
+mod global;
 mod js;
 
 use std::cell::OnceCell;
@@ -21,7 +22,7 @@ use std::time::Duration;
 #[cfg(not(target_feature = "atomics"))]
 use js_sys::{Atomics, Int32Array, SharedArrayBuffer};
 
-use self::js::{Global, GLOBAL};
+use self::global::{Global, GLOBAL};
 
 /// See [`std::thread::Builder`].
 #[derive(Debug)]
@@ -296,7 +297,7 @@ impl ThreadId {
 #[allow(clippy::missing_panics_doc)]
 pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 	let value = GLOBAL.with(|global| {
-		let global = global.as_ref().ok_or_else(js::unsupported_global)?;
+		let global = global.as_ref().ok_or_else(global::unsupported_global)?;
 
 		match global {
 			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),

@@ -36,6 +36,7 @@ web-sys = { version = "0.3.20", features = [
 pollster = { version = "0.3", features = ["macro"] }
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dev-dependencies]
+console_error_panic_hook = "0.1"
 wasm-bindgen-test = "0.3"
 web-time = "1"
 
