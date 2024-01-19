@@ -16,7 +16,7 @@ use super::js;
 use super::url::ScriptUrl;
 
 /// Arbitrary limited amount of workers to cache.
-const POLYFILL_WORKER_LIMIT: usize = 10;
+const POLYFILL_WORKER_CACHE: usize = 10;
 
 /// Mimics the interface we need from [`Atomics`](js_sys::Atomics).
 pub(super) struct Atomics;
@@ -79,7 +79,7 @@ async fn wait_async(value: &i32, check: i32) {
 			WORKERS.with(move |workers| {
 				let mut workers = workers.borrow_mut();
 				workers.push(worker);
-				workers.truncate(POLYFILL_WORKER_LIMIT);
+				workers.truncate(POLYFILL_WORKER_CACHE);
 			});
 
 			finished.set(true);
