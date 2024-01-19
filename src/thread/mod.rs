@@ -4,45 +4,38 @@
 mod atomics;
 mod global;
 mod js;
+#[cfg(not(target_feature = "atomics"))]
+mod unsupported;
 
-use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Error, ErrorKind};
-#[cfg(not(target_feature = "atomics"))]
-use std::marker::PhantomData;
 use std::num::NonZeroUsize;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-#[cfg(target_feature = "atomics")]
-use std::sync::PoisonError;
 use std::thread;
 pub use std::thread::*;
 use std::time::Duration;
 
-#[cfg(not(target_feature = "atomics"))]
-use js_sys::{Atomics, Int32Array, SharedArrayBuffer};
-
+#[cfg(target_feature = "atomics")]
+use self::atomics as r#impl;
 use self::global::{Global, GLOBAL};
+#[cfg(not(target_feature = "atomics"))]
+use self::unsupported as r#impl;
 
 /// See [`std::thread::Builder`].
 #[derive(Debug)]
 #[must_use = "must eventually spawn the thread"]
-pub struct Builder {
-	/// Name of the thread.
-	name: Option<String>,
-}
+pub struct Builder(r#impl::Builder);
 
 impl Builder {
 	/// See [`std::thread::Builder::new()`].
-	#[allow(clippy::missing_const_for_fn, clippy::new_without_default)]
+	#[allow(clippy::new_without_default)]
 	pub fn new() -> Self {
-		Self { name: None }
+		Self(r#impl::Builder::new())
 	}
 
 	/// See [`std::thread::Builder::name()`].
-	pub fn name(mut self, name: String) -> Self {
-		self.name = Some(name);
-		self
+	pub fn name(self, name: String) -> Self {
+		Self(self.0.name(name))
 	}
 
 	/// See [`std::thread::Builder::spawn()`].
@@ -52,27 +45,13 @@ impl Builder {
 	/// This function will always return an error if the atomics target
 	/// feature is not enabled.
 	#[allow(clippy::missing_errors_doc, clippy::type_repetition_in_bounds)]
-	#[cfg_attr(not(target_feature = "atomics"), allow(clippy::unused_self))]
-	pub fn spawn<F, T>(
-		self,
-		#[allow(clippy::min_ident_chars)]
-		#[cfg_attr(not(target_feature = "atomics"), allow(unused))]
-		f: F,
-	) -> io::Result<JoinHandle<T>>
+	pub fn spawn<F, T>(self, #[allow(clippy::min_ident_chars)] f: F) -> io::Result<JoinHandle<T>>
 	where
 		F: FnOnce() -> T,
 		F: Send + 'static,
 		T: Send + 'static,
 	{
-		#[cfg(target_feature = "atomics")]
-		{
-			atomics::spawn(f, self.name)
-		}
-		#[cfg(not(target_feature = "atomics"))]
-		Err(Error::new(
-			ErrorKind::Unsupported,
-			"operation not supported on this platform without the atomics target feature",
-		))
+		self.0.spawn(f).map(JoinHandle)
 	}
 
 	/// See [`std::thread::Builder::spawn_scoped()`].
@@ -86,15 +65,7 @@ impl Builder {
 		F: FnOnce() -> T + Send + 'scope,
 		T: Send + 'scope,
 	{
-		#[cfg(target_feature = "atomics")]
-		{
-			todo!()
-		}
-		#[cfg(not(target_feature = "atomics"))]
-		Err(Error::new(
-			ErrorKind::Unsupported,
-			"operation not supported on this platform without the atomics target feature",
-		))
+		self.0.spawn_scoped(scope, f)
 	}
 
 	/// See [`std::thread::Builder::stack_size()`].
@@ -111,162 +82,55 @@ impl Builder {
 }
 
 /// See [`std::thread::JoinHandle`].
-pub struct JoinHandle<T> {
-	/// Shared state between [`JoinHandle`] and thread.
-	#[cfg(target_feature = "atomics")]
-	pub(crate) shared: Arc<atomics::Shared<T>>,
-	/// Corresponding [`Thread`].
-	#[cfg(target_feature = "atomics")]
-	pub(crate) thread: Thread,
-	#[cfg(not(target_feature = "atomics"))]
-	_value: PhantomData<T>,
-}
+pub struct JoinHandle<T>(pub(crate) r#impl::JoinHandle<T>);
 
 impl<T> Debug for JoinHandle<T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-		let mut debug = formatter.debug_struct("JoinHandle");
-
-		#[cfg(target_feature = "atomics")]
-		{
-			debug
-				.field("shared", &self.shared)
-				.field("thread", &self.thread);
-		}
-		#[cfg(not(target_feature = "atomics"))]
-		{
-			let _ = debug.finish_non_exhaustive();
-		}
-
-		debug.finish()
+		formatter.debug_tuple("JoinHandle").field(&self.0).finish()
 	}
 }
 
 impl<T> JoinHandle<T> {
 	/// See [`std::thread::JoinHandle::is_finished()`].
 	#[allow(clippy::must_use_candidate)]
-	#[cfg_attr(not(target_feature = "atomics"), allow(clippy::unused_self))]
 	pub fn is_finished(&self) -> bool {
-		#[cfg(target_feature = "atomics")]
-		{
-			Arc::strong_count(&self.shared) == 1
-		}
-		#[cfg(not(target_feature = "atomics"))]
-		unreachable!("found instanced `JoinHandle` without threading support")
+		self.0.is_finished()
 	}
 
 	/// See [`std::thread::JoinHandle::join()`].
-	#[allow(
-		clippy::missing_errors_doc,
-		clippy::missing_panics_doc,
-		clippy::unnecessary_wraps
-	)]
-	#[cfg_attr(not(target_feature = "atomics"), allow(clippy::unused_self))]
+	#[allow(clippy::missing_errors_doc)]
 	pub fn join(self) -> Result<T> {
-		#[cfg(target_feature = "atomics")]
-		{
-			let mut value = self
-				.shared
-				.value
-				.lock()
-				.unwrap_or_else(PoisonError::into_inner);
-
-			while value.is_none() {
-				value = self
-					.shared
-					.cvar
-					.wait(value)
-					.unwrap_or_else(PoisonError::into_inner);
-			}
-
-			Ok(value.take().expect("no value found after notification"))
-		}
-		#[cfg(not(target_feature = "atomics"))]
-		unreachable!("found instanced `JoinHandle` without threading support")
+		self.0.join()
 	}
 
 	/// See [`std::thread::JoinHandle::thread()`].
 	#[must_use]
-	#[cfg_attr(target_feature = "atomics", allow(clippy::missing_const_for_fn))]
-	#[cfg_attr(not(target_feature = "atomics"), allow(clippy::unused_self))]
 	pub fn thread(&self) -> &Thread {
-		#[cfg(target_feature = "atomics")]
-		{
-			&self.thread
-		}
-		#[cfg(not(target_feature = "atomics"))]
-		unreachable!("found instanced `JoinHandle` without threading support")
+		self.0.thread()
 	}
 }
 
 /// See [`std::thread::Thread`].
 #[derive(Clone, Debug)]
-pub struct Thread(Arc<ThreadInner>);
-
-/// Inner shared wrapper for [`Thread`].
-#[derive(Debug)]
-struct ThreadInner {
-	/// [`ThreadId`].
-	id: ThreadId,
-	/// Name of the thread.
-	name: Option<String>,
-	/// Parker implementation.
-	#[cfg(target_feature = "atomics")]
-	parker: atomics::Parker,
-}
-
-thread_local! {
-	/// Holds this threads [`Thread`].
-	static THREAD: OnceCell<Thread> = OnceCell::new();
-}
+pub struct Thread(r#impl::Thread);
 
 impl Thread {
-	/// Create a new [`Thread`].
-	fn new() -> Self {
-		let name = GLOBAL.with(|global| match global.as_ref()? {
-			Global::Worker(worker) => Some(worker.name()),
-			Global::Window(_) | Global::Worklet => None,
-		});
-
-		Self(Arc::new(ThreadInner {
-			id: ThreadId::new(),
-			name,
-			#[cfg(target_feature = "atomics")]
-			parker: atomics::Parker::new(),
-		}))
-	}
-
-	/// Gets the current [`Thread`] and instantiates it if not set.
-	fn current() -> Self {
-		THREAD.with(|cell| cell.get_or_init(Self::new).clone())
-	}
-
-	/// Registers the given `thread`.
-	#[cfg(target_feature = "atomics")]
-	fn register(thread: Self) {
-		THREAD.with(|cell| cell.set(thread).expect("`Thread` already registered"));
-	}
-
 	/// See [`std::thread::Thread::id()`].
 	#[must_use]
 	pub fn id(&self) -> ThreadId {
-		self.0.id
+		self.0.id()
 	}
 
 	/// See [`std::thread::Thread::name()`].
 	#[must_use]
 	pub fn name(&self) -> Option<&str> {
-		self.0.name.as_deref()
+		self.0.name()
 	}
 
 	/// See [`std::thread::Thread::unpark()`].
 	#[inline]
-	#[cfg_attr(
-		not(target_feature = "atomics"),
-		allow(clippy::missing_const_for_fn, clippy::unused_self)
-	)]
 	pub fn unpark(&self) {
-		#[cfg(target_feature = "atomics")]
-		self.0.parker.unpark();
+		self.0.unpark();
 	}
 }
 
@@ -324,7 +188,7 @@ pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 /// See [`std::thread::current()`].
 #[must_use]
 pub fn current() -> Thread {
-	Thread::current()
+	Thread(r#impl::Thread::current())
 }
 
 /// See [`std::thread::park()`].
@@ -334,19 +198,8 @@ pub fn current() -> Thread {
 /// Unlike [`std::thread::park()`] this will not panic on the main thread,
 /// worklet or any other unsupported thread type when using `target_feature =
 /// "atomics"`.
-#[cfg_attr(not(target_feature = "atomics"), allow(clippy::missing_const_for_fn))]
 pub fn park() {
-	#[cfg(target_feature = "atomics")]
-	{
-		GLOBAL.with(|global| {
-			if let Some(Global::Worker(_)) = global {
-				// SAFETY: park_timeout is called on the parker owned by this thread.
-				unsafe {
-					current().0.parker.park();
-				}
-			}
-		});
-	}
+	r#impl::park();
 }
 
 /// See [`std::thread::park_timeout()`].
@@ -356,21 +209,8 @@ pub fn park() {
 /// Unlike [`std::thread::park_timeout()`] this will not panic on the main
 /// thread, worklet or any other unsupported thread type when using
 /// `target_feature = "atomics"`.
-#[cfg_attr(not(target_feature = "atomics"), allow(clippy::missing_const_for_fn))]
-pub fn park_timeout(
-	#[cfg_attr(not(target_feature = "atomics"), allow(unused_variables))] dur: Duration,
-) {
-	#[cfg(target_feature = "atomics")]
-	{
-		GLOBAL.with(|global| {
-			if let Some(Global::Worker(_)) = global {
-				// SAFETY: park_timeout is called on the parker owned by this thread.
-				unsafe {
-					current().0.parker.park_timeout(dur);
-				}
-			}
-		});
-	}
+pub fn park_timeout(dur: Duration) {
+	r#impl::park_timeout(dur);
 }
 
 /// See [`std::thread::park_timeout_ms()`].
@@ -381,18 +221,8 @@ pub fn park_timeout(
 /// thread, worklet or any other unsupported thread type when using
 /// `target_feature = "atomics"`.
 #[deprecated(note = "replaced by `web_thread::park_timeout`")]
-#[cfg_attr(not(target_feature = "atomics"), allow(clippy::missing_const_for_fn))]
-pub fn park_timeout_ms(
-	#[cfg_attr(not(target_feature = "atomics"), allow(unused_variables))] ms: u32,
-) {
-	#[cfg(target_feature = "atomics")]
-	{
-		GLOBAL.with(|global| {
-			if let Some(Global::Worker(_)) = global {
-				park_timeout(Duration::from_millis(ms.into()));
-			}
-		});
-	}
+pub fn park_timeout_ms(ms: u32) {
+	r#impl::park_timeout_ms(ms);
 }
 
 /// See [`std::thread::scope()`].
@@ -401,7 +231,7 @@ pub fn scope<'env, F, T>(#[allow(clippy::min_ident_chars)] f: F) -> T
 where
 	F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
 {
-	todo!()
+	r#impl::scope(f)
 }
 
 /// See [`std::thread::sleep()`].
@@ -411,23 +241,7 @@ where
 /// This call will panic unless called from a thread type that allows blocking,
 /// e.g. a Web worker.
 pub fn sleep(dur: Duration) {
-	#[cfg(target_feature = "atomics")]
-	{
-		thread::sleep(dur);
-	}
-	#[cfg(not(target_feature = "atomics"))]
-	{
-		let buffer = SharedArrayBuffer::new(1);
-		let buffer = Int32Array::new(&buffer);
-		#[allow(clippy::as_conversions, clippy::cast_precision_loss)]
-		let timeout = dur.as_millis() as f64;
-		let val = Atomics::wait_with_timeout(&buffer, 0, 0, timeout)
-			.expect("current thread cannot be blocked");
-		debug_assert_eq!(
-			val, "timed-out",
-			"unexpected return value from `Atomics.wait"
-		);
-	}
+	r#impl::sleep(dur);
 }
 
 /// See [`std::thread::sleep_ms()`].
@@ -438,13 +252,7 @@ pub fn sleep(dur: Duration) {
 /// e.g. a Web worker.
 #[deprecated(note = "replaced by `web_thread::sleep`")]
 pub fn sleep_ms(ms: u32) {
-	#[cfg(target_feature = "atomics")]
-	{
-		#[allow(deprecated)]
-		thread::sleep_ms(ms);
-	}
-	#[cfg(not(target_feature = "atomics"))]
-	sleep(Duration::from_millis(ms.into()));
+	r#impl::sleep_ms(ms);
 }
 
 /// See [`std::thread::spawn()`].

@@ -43,7 +43,7 @@ impl<T> Future for JoinHandleFuture<'_, T> {
 		{
 			use std::sync::TryLockError;
 
-			let value = match self.0.shared.value.try_lock() {
+			let value = match self.0 .0.shared.value.try_lock() {
 				Ok(mut value) => value.take(),
 				Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
 				Err(TryLockError::WouldBlock) => None,
@@ -53,9 +53,9 @@ impl<T> Future for JoinHandleFuture<'_, T> {
 				return Poll::Ready(Ok(value));
 			}
 
-			self.0.shared.waker.register(cx.waker());
+			self.0 .0.shared.waker.register(cx.waker());
 
-			let value = match self.0.shared.value.try_lock() {
+			let value = match self.0 .0.shared.value.try_lock() {
 				Ok(mut value) => value.take(),
 				Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
 				Err(TryLockError::WouldBlock) => None,
