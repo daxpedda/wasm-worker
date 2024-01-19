@@ -14,13 +14,14 @@ use std::ops::Deref;
 use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
 
 use atomic_waker::AtomicWaker;
-use js_sys::Array;
+use js_sys::WebAssembly::Global;
+use js_sys::{Array, Number, Object};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
 use self::channel::Sender;
-use self::js::META;
+use self::js::{Exports, GlobalDescriptor, META};
 pub(super) use self::parker::Parker;
 use self::url::ScriptUrl;
 use self::wait_async::Atomics;
@@ -76,7 +77,79 @@ enum Command {
 		id: ThreadId,
 		/// Value to use `Atomics.waitAsync` on.
 		value: Box<i32>,
+		/// TLS base address.
+		tls_base: f64,
+		/// Size of the allocated space.
+		stack_alloc: f64,
 	},
+}
+
+/// Initializes the main thread sender and receiver.
+fn init_main() {
+	SENDER.get_or_init(|| {
+		let (sender, receiver) = channel::channel::<Command>();
+
+		wasm_bindgen_futures::spawn_local(async move {
+			while let Ok(command) = receiver.next().await {
+				match command {
+					Command::Spawn { id, task, name } => {
+						spawn_internal(id, task, name.as_deref());
+					}
+					Command::Terminate {
+						id,
+						value,
+						tls_base,
+						stack_alloc,
+					} => {
+						wasm_bindgen_futures::spawn_local(async move {
+							Atomics::wait_async(&value, 0).await;
+
+							WORKERS
+								.with(|workers| {
+									workers
+										.borrow_mut()
+										.remove(&id)
+										.expect("`Worker` to be destroyed not found")
+								})
+								.terminate();
+
+							thread_local! {
+								/// Caches the [`Exports`] object.
+								static EXPORTS: Exports = wasm_bindgen::exports().unchecked_into();
+								/// Caches the [`GlobalDescriptor`] needed to reconstruct the [`Global`] values.
+								static DESCRIPTOR: GlobalDescriptor = {
+									let descriptor: GlobalDescriptor = Object::new().unchecked_into();
+									descriptor.set_value("i32");
+									descriptor
+								};
+							}
+
+							let (tls_base, stack_alloc) = DESCRIPTOR.with(|descriptor| {
+								(
+									Global::new(descriptor, &tls_base.into())
+										.expect("unexpected invalid `Global` constructor"),
+									Global::new(descriptor, &stack_alloc.into())
+										.expect("unexpected invalid `Global` constructor"),
+								)
+							});
+
+							// SAFETY:
+							// - We don't get here until we are sure the thread is blocked and can't
+							//   be executing Rust code anymore.
+							// - This is only done once per thread.
+							// - The correct values are attained by the thread and sent when
+							//   finished.
+							EXPORTS.with(|exports| unsafe {
+								exports.thread_destroy(&tls_base, &stack_alloc);
+							});
+						});
+					}
+				}
+			}
+		});
+
+		sender
+	});
 }
 
 /// Internal spawn function.
@@ -111,12 +184,18 @@ where
 			#[allow(clippy::as_conversions)]
 			let index = index as u32 / 4;
 
+			let exports: Exports = wasm_bindgen::exports().unchecked_into();
+			let tls_base = Number::unchecked_from_js(exports.tls_base().value()).value_of();
+			let stack_alloc = Number::unchecked_from_js(exports.stack_alloc().value()).value_of();
+
 			SENDER
 				.get()
 				.expect("closing thread without `SENDER` being initialized")
 				.send(Command::Terminate {
 					id: thread::current().id(),
 					value,
+					tls_base,
+					stack_alloc,
 				})
 				.expect("`Receiver` was somehow dropped from the main thread");
 
@@ -125,35 +204,7 @@ where
 	});
 
 	if *MAIN_THREAD.get_or_init(|| thread::current().id()) == thread::current().id() {
-		SENDER.get_or_init(|| {
-			let (sender, receiver) = channel::channel::<Command>();
-
-			wasm_bindgen_futures::spawn_local(async move {
-				while let Ok(command) = receiver.next().await {
-					match command {
-						Command::Spawn { id, task, name } => {
-							spawn_internal(id, task, name.as_deref());
-						}
-						Command::Terminate { id, value } => {
-							wasm_bindgen_futures::spawn_local(async move {
-								Atomics::wait_async(&value, 0).await;
-
-								WORKERS
-									.with(|workers| {
-										workers
-											.borrow_mut()
-											.remove(&id)
-											.expect("`Worker` to be destroyed not found")
-									})
-									.terminate();
-							});
-						}
-					}
-				}
-			});
-
-			sender
-		});
+		init_main();
 
 		spawn_internal(thread.id(), task, name.as_deref());
 	} else {
