@@ -153,7 +153,7 @@ where
 	F: 'static + FnOnce() -> T + Send,
 	T: 'static + Send,
 {
-	let thread = Thread::new();
+	let thread = Thread::new_with_name(name);
 	let shared = Arc::new(Shared {
 		value: Mutex::new(None),
 		cvar: Condvar::new(),
@@ -200,7 +200,7 @@ where
 	if *MAIN_THREAD.get_or_init(|| Thread::current().id()) == Thread::current().id() {
 		init_main();
 
-		spawn_internal(thread.id(), task, name.as_deref());
+		spawn_internal(thread.id(), task, thread.name());
 	} else {
 		SENDER
 			.get()
@@ -208,7 +208,7 @@ where
 			.send(Command::Spawn {
 				id: thread.id(),
 				task,
-				name,
+				name: thread.0.name.clone(),
 			})
 			.expect("`Receiver` was somehow dropped from the main thread");
 	}

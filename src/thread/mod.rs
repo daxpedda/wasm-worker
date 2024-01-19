@@ -138,10 +138,15 @@ impl Thread {
 	/// Create a new [`Thread`].
 	fn new() -> Self {
 		let name = GLOBAL.with(|global| match global.as_ref()? {
-			Global::Worker(worker) => Some(worker.name()),
+			Global::Worker(worker) => Some(worker.name()).filter(|name| !name.is_empty()),
 			Global::Window(_) | Global::Worklet => None,
 		});
 
+		Self::new_with_name(name)
+	}
+
+	/// Create a new [`Thread`].
+	fn new_with_name(name: Option<String>) -> Self {
 		Self(Arc::new(ThreadInner {
 			id: ThreadId::new(),
 			name,
