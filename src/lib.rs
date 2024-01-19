@@ -12,7 +12,7 @@
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 mod thread;
-#[cfg(any(all(target_family = "wasm", target_os = "unknown",), docsrs))]
+#[cfg(any(all(target_family = "wasm", target_os = "unknown"), docsrs))]
 #[cfg_attr(docsrs, doc(cfg(Web)))]
 pub mod web;
 
