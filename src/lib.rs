@@ -1,6 +1,13 @@
 //! TODO
 
-#![cfg_attr(target_feature = "atomics", feature(stdsimd))]
+#![cfg_attr(
+	all(
+		target_family = "wasm",
+		target_os = "unknown",
+		target_feature = "atomics"
+	),
+	feature(stdsimd)
+)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
