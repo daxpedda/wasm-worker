@@ -154,11 +154,6 @@ impl Thread {
 		}))
 	}
 
-	/// Gets the current [`Thread`] and instantiates it if not set.
-	pub(super) fn current() -> Self {
-		THREAD.with(|cell| cell.get_or_init(Self::new).clone())
-	}
-
 	/// See [`std::thread::Thread::id()`].
 	#[must_use]
 	pub fn id(&self) -> ThreadId {
@@ -232,7 +227,7 @@ pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 /// See [`std::thread::current()`].
 #[must_use]
 pub fn current() -> Thread {
-	Thread::current()
+	THREAD.with(|cell| cell.get_or_init(Thread::new).clone())
 }
 
 /// See [`std::thread::park()`].
@@ -247,7 +242,7 @@ pub fn park() {
 		if let Some(Global::Worker(_)) = global {
 			// SAFETY: park_timeout is called on the parker owned by this thread.
 			unsafe {
-				Thread::current().0.parker.park();
+				current().0.parker.park();
 			}
 		}
 	});
@@ -265,7 +260,7 @@ pub fn park_timeout(dur: Duration) {
 		if let Some(Global::Worker(_)) = global {
 			// SAFETY: park_timeout is called on the parker owned by this thread.
 			unsafe {
-				Thread::current().0.parker.park_timeout(dur);
+				current().0.parker.park_timeout(dur);
 			}
 		}
 	});

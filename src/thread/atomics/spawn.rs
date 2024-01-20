@@ -19,8 +19,8 @@ use super::channel::Sender;
 use super::js::{Exports, GlobalDescriptor, META};
 use super::url::ScriptUrl;
 use super::wait_async::Atomics;
-use super::{channel, JoinHandle, Thread};
-use crate::thread::ThreadId;
+use super::{channel, JoinHandle};
+use crate::thread::{Thread, ThreadId, THREAD};
 
 /// Saves the [`ThreadId`] of the main thread.
 static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
@@ -76,6 +76,11 @@ enum Command {
 		/// Size of the allocated space.
 		stack_alloc: f64,
 	},
+}
+
+/// Returns the [`ThreadId`] of the current thread without cloning the [`Arc`].
+fn current_id() -> ThreadId {
+	THREAD.with(|cell| cell.get_or_init(Thread::new).id())
 }
 
 /// Initializes the main thread sender and receiver.
@@ -186,7 +191,7 @@ where
 				.get()
 				.expect("closing thread without `SENDER` being initialized")
 				.send(Command::Terminate {
-					id: Thread::current().id(),
+					id: current_id(),
 					value,
 					tls_base,
 					stack_alloc,
@@ -197,7 +202,7 @@ where
 		}
 	});
 
-	if *MAIN_THREAD.get_or_init(|| Thread::current().id()) == Thread::current().id() {
+	if *MAIN_THREAD.get_or_init(current_id) == current_id() {
 		init_main();
 
 		spawn_internal(thread.id(), task, thread.name());
