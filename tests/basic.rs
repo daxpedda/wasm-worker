@@ -97,7 +97,7 @@ async fn sleep() {
 async fn builder() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = Builder::new()
-		.stack_size(usize::MAX)
+		.stack_size(0)
 		.spawn(|| assert_eq!(web_thread::current().name(), None))
 		.unwrap();
 
@@ -116,7 +116,7 @@ async fn builder() {
 async fn builder_name() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = Builder::new()
-		.stack_size(usize::MAX)
+		.stack_size(0)
 		.name(String::from("test"))
 		.spawn(|| assert_eq!(web_thread::current().name(), Some("test")))
 		.unwrap();
