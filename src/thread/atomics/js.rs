@@ -1,7 +1,7 @@
 //! Bindings to the JS API.
 
 use js_sys::WebAssembly::Global;
-use js_sys::{Int32Array, Object, Promise};
+use js_sys::{Object, Promise};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -15,12 +15,7 @@ extern "C" {
 	#[wasm_bindgen(method, getter)]
 	pub(super) fn url(this: &Meta) -> String;
 
-	pub(super) type Atomics;
-
-	#[wasm_bindgen(static_method_of = Atomics, js_name = waitAsync)]
-	pub(super) fn wait_async(buf: &Int32Array, index: u32, value: i32) -> WaitAsyncResult;
-
-	#[wasm_bindgen(static_method_of = Atomics, js_name = waitAsync, getter)]
+	#[wasm_bindgen(js_namespace = Atomics, js_name = waitAsync, getter)]
 	pub(super) fn has_wait_async() -> JsValue;
 
 	pub(super) type WaitAsyncResult;

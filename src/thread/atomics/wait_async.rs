@@ -5,28 +5,27 @@ use std::future;
 use std::rc::Rc;
 use std::task::{Poll, Waker};
 
-use js_sys::Array;
+use js_sys::{Array, Atomics};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Worker;
 
 use super::super::util::{MEMORY, MEMORY_ARRAY};
-use super::js;
+use super::js::{self, WaitAsyncResult};
 use super::url::ScriptUrl;
 
 /// Arbitrary limited amount of workers to cache.
 const POLYFILL_WORKER_CACHE: usize = 10;
 
-/// Mimics the interface we need from [`Atomics`](js_sys::Atomics).
-pub(super) struct Atomics;
+/// Mimics the interface we need from [`Atomics`].
+pub(super) struct WaitAsync;
 
-impl Atomics {
-	/// Mimics the interface we need from
-	/// [`Atomics::wait_async`](js_sys::Atomics::wait_async).
-	pub(super) async fn wait_async(value: &i32, check: i32) {
+impl WaitAsync {
+	/// Mimics the interface we need from [`Atomics::wait_async`].
+	pub(super) async fn wait(value: &i32, check: i32) {
 		thread_local! {
-			static HAS_WAIT_ASYNC: bool = !js::Atomics::has_wait_async().is_undefined();
+			static HAS_WAIT_ASYNC: bool = !js::has_wait_async().is_undefined();
 		}
 
 		if HAS_WAIT_ASYNC.with(bool::clone) {
@@ -34,7 +33,10 @@ impl Atomics {
 			#[allow(clippy::as_conversions)]
 			let index = index as u32 / 4;
 
-			let result = MEMORY_ARRAY.with(|array| js::Atomics::wait_async(array, index, check));
+			let result: WaitAsyncResult = MEMORY_ARRAY
+				.with(|array| Atomics::wait_async(array, index, check))
+				.expect("`Atomics.waitAsync` is not expected to fail")
+				.unchecked_into();
 
 			if result.async_() {
 				JsFuture::from(result.value())
@@ -42,14 +44,13 @@ impl Atomics {
 					.expect("`Promise` returned by `Atomics.waitAsync` should never throw");
 			}
 		} else {
-			wait_async(value, check).await;
+			wait(value, check).await;
 		}
 	}
 }
 
-/// Polyfills [`Atomics::wait_async`](js_sys::Atomics::wait_async) if not
-/// available.
-async fn wait_async(value: &i32, check: i32) {
+/// Polyfills [`Atomics::wait_async`] if not available.
+async fn wait(value: &i32, check: i32) {
 	thread_local! {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(include_str!("wait_async.js"));

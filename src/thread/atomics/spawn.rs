@@ -18,7 +18,7 @@ use super::super::util::{MEMORY, MODULE};
 use super::channel::Sender;
 use super::js::{Exports, GlobalDescriptor, META};
 use super::url::ScriptUrl;
-use super::wait_async::Atomics;
+use super::wait_async::WaitAsync;
 use super::{channel, JoinHandle};
 use crate::thread::{Thread, ThreadId, THREAD};
 
@@ -101,7 +101,7 @@ fn init_main() {
 						stack_alloc,
 					} => {
 						wasm_bindgen_futures::spawn_local(async move {
-							Atomics::wait_async(&value, 0).await;
+							WaitAsync::wait(&value, 0).await;
 
 							WORKERS
 								.with(|workers| {
