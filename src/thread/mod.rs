@@ -239,8 +239,9 @@ pub fn current() -> Thread {
 ///
 /// # Notes
 ///
-/// Unlike [`std::thread::park()`] this will not panic on the main thread,
-/// worklet or any other unsupported thread type.
+/// Unlike [`std::thread::park()`], when using the atomics target feature, this
+/// will not panic on the main thread, worklet or any other unsupported thread
+/// type.
 pub fn park() {
 	GLOBAL.with(|global| {
 		if let Some(Global::Worker(_)) = global {
@@ -256,8 +257,9 @@ pub fn park() {
 ///
 /// # Notes
 ///
-/// Unlike [`std::thread::park_timeout()`] this will not panic on the main
-/// thread, worklet or any other unsupported thread type.
+/// Unlike [`std::thread::park_timeout()`], when using the atomics target
+/// feature, this will not panic on the main thread, worklet or any other
+/// unsupported thread type.
 pub fn park_timeout(dur: Duration) {
 	GLOBAL.with(|global| {
 		if let Some(Global::Worker(_)) = global {
@@ -273,8 +275,9 @@ pub fn park_timeout(dur: Duration) {
 ///
 /// # Notes
 ///
-/// Unlike [`std::thread::park_timeout_ms()`] this will not panic on the main
-/// thread, worklet or any other unsupported thread type.
+/// Unlike [`std::thread::park_timeout_ms()`], when using the atomics target
+/// feature, this will not panic on the main thread, worklet or any other
+/// unsupported thread type.
 #[deprecated(note = "replaced by `web_thread::park_timeout`")]
 pub fn park_timeout_ms(ms: u32) {
 	GLOBAL.with(|global| {
