@@ -5,7 +5,7 @@ use std::io::{Error, ErrorKind};
 use js_sys::Int32Array;
 use js_sys::WebAssembly::{Memory, Module};
 use wasm_bindgen::JsCast;
-use web_sys::{DedicatedWorkerGlobalScope, Window};
+use web_sys::{DedicatedWorkerGlobalScope, SharedWorkerGlobalScope, Window};
 
 use super::js::GlobalExt;
 
@@ -14,9 +14,21 @@ pub(super) enum Global {
 	/// [`Window`].
 	Window(Window),
 	/// [`DedicatedWorkerGlobalScope`].
-	Worker(DedicatedWorkerGlobalScope),
+	Dedicated(DedicatedWorkerGlobalScope),
+	/// [`SharedWorkerGlobalScope`].
+	Shared(SharedWorkerGlobalScope),
 	/// Worklet.
 	Worklet,
+}
+
+impl Global {
+	/// Returns [`true`] if the thread type is a worker.
+	pub(super) const fn is_worker(&self) -> bool {
+		match self {
+			Self::Window(_) | Self::Worklet => false,
+			Self::Dedicated(_) | Self::Shared(_) => true,
+		}
+	}
 }
 
 thread_local! {
@@ -26,7 +38,9 @@ thread_local! {
 		if !global.window().is_undefined() {
 			Some(Global::Window(global.unchecked_into()))
 		} else if !global.dedicated_worker_global_scope().is_undefined() {
-			Some(Global::Worker(global.unchecked_into()))
+			Some(Global::Dedicated(global.unchecked_into()))
+		} else if !global.shared_worker_global_scope().is_undefined() {
+			Some(Global::Shared(global.unchecked_into()))
 		} else if !global.audio_worklet_global_scope().is_undefined() {
 			Some(Global::Worklet)
 		} else {

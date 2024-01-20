@@ -15,8 +15,8 @@ extern "C" {
 	#[wasm_bindgen(method, getter)]
 	pub(super) fn url(this: &Meta) -> String;
 
-	#[wasm_bindgen(js_namespace = Atomics, js_name = waitAsync, getter)]
-	pub(super) fn has_wait_async() -> JsValue;
+	#[wasm_bindgen(js_namespace = Atomics, js_name = waitAsync)]
+	pub(super) static HAS_WAIT_ASYNC: JsValue;
 
 	pub(super) type WaitAsyncResult;
 

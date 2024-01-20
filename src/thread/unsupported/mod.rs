@@ -3,7 +3,7 @@
 mod parker;
 
 use std::fmt::{self, Debug, Formatter};
-use std::io::{self, Error, ErrorKind};
+use std::io;
 use std::marker::PhantomData;
 use std::thread::Result;
 use std::time::Duration;
@@ -33,10 +33,7 @@ impl Builder {
 	/// Implementation of [`std::thread::Builder::spawn()`].
 	#[allow(clippy::unused_self)]
 	pub(super) fn spawn<F, T>(self, _: F) -> io::Result<JoinHandle<T>> {
-		Err(Error::new(
-			ErrorKind::Unsupported,
-			"operation not supported on this platform without the atomics target feature",
-		))
+		unreachable!("reached `spawn()` without atomics target feature")
 	}
 
 	/// Implementation of [`std::thread::Builder::spawn_scoped()`].
@@ -46,10 +43,7 @@ impl Builder {
 		_: &'scope Scope<'scope, '_>,
 		_: F,
 	) -> io::Result<ScopedJoinHandle<'scope, T>> {
-		Err(Error::new(
-			ErrorKind::Unsupported,
-			"operation not supported on this platform without the atomics target feature",
-		))
+		unreachable!("reached `spawn_scoped()` without atomics target feature")
 	}
 }
 
@@ -102,11 +96,6 @@ pub(super) fn sleep(dur: Duration) {
 		result, "timed-out",
 		"unexpected return value from `Atomics.wait"
 	);
-}
-
-/// Implementation of [`std::thread::sleep_ms()`].
-pub(super) fn sleep_ms(ms: u32) {
-	sleep(Duration::from_millis(ms.into()));
 }
 
 thread_local! {

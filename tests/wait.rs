@@ -1,8 +1,5 @@
 #![cfg(test)]
 
-#[cfg(target_family = "wasm")]
-mod basic;
-
 #[cfg(not(target_family = "wasm"))]
 use std::time;
 
@@ -11,9 +8,6 @@ use time::{Duration, Instant};
 use wasm_bindgen_test::wasm_bindgen_test;
 #[cfg(target_family = "wasm")]
 use web_time as time;
-
-#[cfg(target_family = "wasm")]
-wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_worker);
 
 #[cfg_attr(not(target_family = "wasm"), test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
@@ -41,4 +35,11 @@ fn sleep() {
 	web_thread::sleep_ms(1000);
 
 	assert!(start.elapsed().as_secs() >= 2);
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test::wasm_bindgen_test]
+#[allow(clippy::absolute_paths)]
+fn has_wait_support() {
+	assert!(web_thread::web::has_wait_support());
 }

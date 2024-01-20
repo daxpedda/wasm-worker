@@ -7,6 +7,19 @@ use std::task::{Context, Poll};
 
 use crate::thread::{self, JoinHandle};
 
+/// Returns [`true`] if the current thread supports waiting, e.g. parking and
+/// sleeping.
+#[must_use]
+pub fn has_wait_support() -> bool {
+	thread::has_wait_support()
+}
+
+/// Returns [`true`] if the platform supports spawning threads.
+#[must_use]
+pub fn has_spawn_support() -> bool {
+	thread::has_spawn_support()
+}
+
 /// Web-specific extension to [`web_thread::JoinHandle`](crate::JoinHandle).
 pub trait JoinHandleExt<T> {
 	/// Async version of [`JoinHandle::join()`].

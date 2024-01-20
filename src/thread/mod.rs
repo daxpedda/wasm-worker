@@ -11,6 +11,7 @@ use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Error, ErrorKind};
 use std::num::NonZeroUsize;
+use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -21,6 +22,7 @@ use r#impl::Parker;
 
 #[cfg(target_feature = "atomics")]
 use self::atomics as r#impl;
+use self::js::CROSS_ORIGIN_ISOLATED;
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
 use self::util::{Global, GLOBAL};
@@ -55,7 +57,14 @@ impl Builder {
 		F: Send + 'static,
 		T: Send + 'static,
 	{
-		self.0.spawn(f).map(JoinHandle)
+		if has_spawn_support() {
+			self.0.spawn(f).map(JoinHandle)
+		} else {
+			Err(Error::new(
+				ErrorKind::Unsupported,
+				"operation not supported on this platform without the atomics target feature",
+			))
+		}
 	}
 
 	/// See [`std::thread::Builder::spawn_scoped()`].
@@ -69,7 +78,14 @@ impl Builder {
 		F: FnOnce() -> T + Send + 'scope,
 		T: Send + 'scope,
 	{
-		self.0.spawn_scoped(scope, f)
+		if has_spawn_support() {
+			self.0.spawn_scoped(scope, f)
+		} else {
+			Err(Error::new(
+				ErrorKind::Unsupported,
+				"operation not supported on this platform without the atomics target feature",
+			))
+		}
 	}
 
 	/// See [`std::thread::Builder::stack_size()`].
@@ -137,10 +153,13 @@ thread_local! {
 impl Thread {
 	/// Create a new [`Thread`].
 	fn new() -> Self {
-		let name = GLOBAL.with(|global| match global.as_ref()? {
-			Global::Worker(worker) => Some(worker.name()).filter(|name| !name.is_empty()),
-			Global::Window(_) | Global::Worklet => None,
-		});
+		let name = GLOBAL
+			.with(|global| match global.as_ref()? {
+				Global::Dedicated(worker) => Some(worker.name()),
+				Global::Shared(worker) => Some(worker.name()),
+				Global::Window(_) | Global::Worklet => None,
+			})
+			.filter(|name| !name.is_empty());
 
 		Self::new_with_name(name)
 	}
@@ -204,7 +223,8 @@ pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 
 		match global {
 			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
-			Global::Worker(worker) => Ok(worker.navigator().hardware_concurrency()),
+			Global::Dedicated(worker) => Ok(worker.navigator().hardware_concurrency()),
+			Global::Shared(worker) => Ok(worker.navigator().hardware_concurrency()),
 			Global::Worklet => Err(Error::new(
 				ErrorKind::Unsupported,
 				"operation not supported in worklets",
@@ -238,14 +258,12 @@ pub fn current() -> Thread {
 /// will not panic on the main thread, worklet or any other unsupported thread
 /// type.
 pub fn park() {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			// SAFETY: park_timeout is called on the parker owned by this thread.
-			unsafe {
-				current().0.parker.park();
-			}
+	if has_wait_support() {
+		// SAFETY: park_timeout is called on the parker owned by this thread.
+		unsafe {
+			current().0.parker.park();
 		}
-	});
+	}
 }
 
 /// See [`std::thread::park_timeout()`].
@@ -256,14 +274,12 @@ pub fn park() {
 /// feature, this will not panic on the main thread, worklet or any other
 /// unsupported thread type.
 pub fn park_timeout(dur: Duration) {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			// SAFETY: park_timeout is called on the parker owned by this thread.
-			unsafe {
-				current().0.parker.park_timeout(dur);
-			}
+	if has_wait_support() {
+		// SAFETY: park_timeout is called on the parker owned by this thread.
+		unsafe {
+			current().0.parker.park_timeout(dur);
 		}
-	});
+	}
 }
 
 /// See [`std::thread::park_timeout_ms()`].
@@ -275,11 +291,7 @@ pub fn park_timeout(dur: Duration) {
 /// unsupported thread type.
 #[deprecated(note = "replaced by `web_thread::park_timeout`")]
 pub fn park_timeout_ms(ms: u32) {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			park_timeout(Duration::from_millis(ms.into()));
-		}
-	});
+	park_timeout(Duration::from_millis(ms.into()));
 }
 
 /// See [`std::thread::scope()`].
@@ -298,13 +310,11 @@ where
 /// This call will panic unless called from a thread type that allows blocking,
 /// e.g. a Web worker.
 pub fn sleep(dur: Duration) {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			r#impl::sleep(dur);
-		} else {
-			panic!("current thread type cannot be blocked")
-		}
-	});
+	if has_wait_support() {
+		r#impl::sleep(dur);
+	} else {
+		panic!("current thread type cannot be blocked")
+	}
 }
 
 /// See [`std::thread::sleep_ms()`].
@@ -315,13 +325,7 @@ pub fn sleep(dur: Duration) {
 /// e.g. a Web worker.
 #[deprecated(note = "replaced by `web_thread::sleep`")]
 pub fn sleep_ms(ms: u32) {
-	GLOBAL.with(|global| {
-		if let Some(Global::Worker(_)) = global {
-			r#impl::sleep_ms(ms);
-		} else {
-			panic!("current thread type cannot be blocked")
-		}
-	});
+	sleep(Duration::from_millis(ms.into()));
 }
 
 /// See [`std::thread::spawn()`].
@@ -351,4 +355,25 @@ where
 /// This call is no-op.
 pub fn yield_now() {
 	thread::yield_now();
+}
+
+/// Implementation for
+/// [`web::has_wait_support()`](crate::web::has_wait_support()).
+pub(crate) fn has_wait_support() -> bool {
+	GLOBAL.with(|global| {
+		if global
+			.as_ref()
+			.filter(|global| global.is_worker())
+			.is_some()
+		{
+			cfg!(target_feature = "atomics") || *CROSS_ORIGIN_ISOLATED.deref()
+		} else {
+			false
+		}
+	})
+}
+
+/// Implementation for [`crate::web::has_spawn_support()`].
+pub(crate) fn has_spawn_support() -> bool {
+	cfg!(target_feature = "atomics") && *CROSS_ORIGIN_ISOLATED.deref()
 }

@@ -13,6 +13,12 @@ extern "C" {
 	#[wasm_bindgen(method, getter, js_name = DedicatedWorkerGlobalScope)]
 	pub(super) fn dedicated_worker_global_scope(this: &GlobalExt) -> JsValue;
 
+	#[wasm_bindgen(method, getter, js_name = SharedWorkerGlobalScope)]
+	pub(super) fn shared_worker_global_scope(this: &GlobalExt) -> JsValue;
+
 	#[wasm_bindgen(method, getter, js_name = AudioWorkletGlobalScope)]
 	pub(super) fn audio_worklet_global_scope(this: &GlobalExt) -> JsValue;
+
+	#[wasm_bindgen(js_name = crossOriginIsolated)]
+	pub(super) static CROSS_ORIGIN_ISOLATED: bool;
 }

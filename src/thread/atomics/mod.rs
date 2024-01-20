@@ -131,9 +131,3 @@ pub(super) fn sleep(dur: Duration) {
 	#[allow(clippy::absolute_paths)]
 	std::thread::sleep(dur);
 }
-
-/// Implementation of [`std::thread::sleep_ms()`].
-pub(super) fn sleep_ms(ms: u32) {
-	#[allow(clippy::absolute_paths, deprecated)]
-	std::thread::sleep_ms(ms);
-}

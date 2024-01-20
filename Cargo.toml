@@ -16,6 +16,7 @@ wasm-bindgen = { version = "0.2.70", default-features = false }
 web-sys = { version = "0.3.20", features = [
 	"DedicatedWorkerGlobalScope",
 	"Navigator",
+	"SharedWorkerGlobalScope",
 	"Window",
 	"WorkerNavigator",
 ] }
@@ -43,6 +44,22 @@ web-time = "1"
 
 [[test]]
 name = "basic"
+test = false
+
+[[test]]
+name = "spawn"
+test = false
+
+[[test]]
+name = "unsupported_spawn"
+test = false
+
+[[test]]
+name = "unsupported_wait"
+test = false
+
+[[test]]
+name = "wait"
 test = false
 
 [package.metadata.docs.rs]
