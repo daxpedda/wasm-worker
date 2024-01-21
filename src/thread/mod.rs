@@ -13,11 +13,12 @@ use std::io::{self, Error, ErrorKind};
 use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::thread;
 pub use std::thread::*;
 use std::time::Duration;
 
+use js_sys::Atomics;
 use r#impl::Parker;
 
 #[cfg(target_feature = "atomics")]
@@ -361,12 +362,26 @@ pub fn yield_now() {
 /// Implementation for
 /// [`web::has_wait_support()`](crate::web::has_wait_support()).
 pub(crate) fn has_wait_support() -> bool {
+	/// Firefox doesn't actually support waiting in a shared worker, so we
+	/// actually test it and cache the result here.
+	static SHARED_WORKER_TEST: OnceLock<bool> = OnceLock::new();
+
 	GLOBAL.with(|global| {
 		if global
 			.as_ref()
 			.filter(|global| match global {
 				Global::Window(_) | Global::Worklet | Global::Service(_) => false,
-				Global::Dedicated(_) | Global::Shared(_) => true,
+				Global::Dedicated(_) => true,
+				Global::Shared(_) => *SHARED_WORKER_TEST.get_or_init(|| {
+					let value = 0;
+					let index: *const i32 = &value;
+					#[allow(clippy::as_conversions)]
+					let index = index as u32 / 4;
+
+					util::MEMORY_ARRAY
+						.with(|array| Atomics::wait_with_timeout(array, index, 0, 0.))
+						.is_ok()
+				}),
 			})
 			.is_some()
 		{
