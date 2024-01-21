@@ -14,7 +14,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::super::util::{MEMORY, MODULE};
+use super::super::util::{self, MEMORY, MODULE};
 use super::channel::Sender;
 use super::js::{Exports, GlobalDescriptor, META};
 use super::url::ScriptUrl;
@@ -86,6 +86,8 @@ fn current_id() -> ThreadId {
 /// Initializes the main thread sender and receiver.
 fn init_main() {
 	SENDER.get_or_init(|| {
+		util::has_worker_support();
+
 		let (sender, receiver) = channel::channel::<Command>();
 
 		wasm_bindgen_futures::spawn_local(async move {

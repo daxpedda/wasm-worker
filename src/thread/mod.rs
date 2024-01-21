@@ -157,7 +157,7 @@ impl Thread {
 			.with(|global| match global.as_ref()? {
 				Global::Dedicated(worker) => Some(worker.name()),
 				Global::Shared(worker) => Some(worker.name()),
-				Global::Window(_) | Global::Worklet => None,
+				Global::Window(_) | Global::Service(_) | Global::Worklet => None,
 			})
 			.filter(|name| !name.is_empty());
 
@@ -225,6 +225,7 @@ pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
 			Global::Dedicated(worker) => Ok(worker.navigator().hardware_concurrency()),
 			Global::Shared(worker) => Ok(worker.navigator().hardware_concurrency()),
+			Global::Service(worker) => Ok(worker.navigator().hardware_concurrency()),
 			Global::Worklet => Err(Error::new(
 				ErrorKind::Unsupported,
 				"operation not supported in worklets",
@@ -363,7 +364,10 @@ pub(crate) fn has_wait_support() -> bool {
 	GLOBAL.with(|global| {
 		if global
 			.as_ref()
-			.filter(|global| global.is_worker())
+			.filter(|global| match global {
+				Global::Window(_) | Global::Worklet | Global::Service(_) => false,
+				Global::Dedicated(_) | Global::Shared(_) => true,
+			})
 			.is_some()
 		{
 			cfg!(target_feature = "atomics") || *CROSS_ORIGIN_ISOLATED.deref()
@@ -375,5 +379,5 @@ pub(crate) fn has_wait_support() -> bool {
 
 /// Implementation for [`crate::web::has_spawn_support()`].
 pub(crate) fn has_spawn_support() -> bool {
-	cfg!(target_feature = "atomics") && *CROSS_ORIGIN_ISOLATED.deref()
+	cfg!(target_feature = "atomics") && *CROSS_ORIGIN_ISOLATED.deref() && util::has_worker_support()
 }
