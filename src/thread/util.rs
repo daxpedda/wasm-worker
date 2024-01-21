@@ -52,7 +52,7 @@ pub(super) fn unsupported_global() -> Error {
 	)
 }
 
-/// Returns [`true`] if [`Worker`] is supported in the global context this was
+/// Returns [`true`] if `Worker` is supported in the global context this was
 /// first called in.
 pub(super) fn has_worker_support() -> bool {
 	/// Caches worker support in the first context this is called in.
