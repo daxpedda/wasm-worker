@@ -11,9 +11,9 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::Worker;
 
-use super::super::util::{MEMORY, MEMORY_ARRAY};
 use super::js::{self, WaitAsyncResult};
 use super::url::ScriptUrl;
+use super::{MEMORY, MEMORY_ARRAY};
 
 /// Arbitrary limited amount of workers to cache.
 const POLYFILL_WORKER_CACHE: usize = 10;

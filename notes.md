@@ -1,7 +1,7 @@
 # Test
 cargo test
 CHROMEDRIVER=chromedriver cargo test --target wasm32-unknown-unknown
-GECKODRIVER=geckodriver RUSTFLAGS=--cfg=unsupported_service cargo test --target wasm32-unknown-unknown
+GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_wait" cargo test --target wasm32-unknown-unknown
 CHROMEDRIVER=chromedriver RUSTFLAGS=-Ctarget-feature=+atomics,+bulk-memory cargo +nightly test --target wasm32-unknown-unknown -Zbuild-std=panic_abort,std
 GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_wait -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zbuild-std=panic_abort,std
 

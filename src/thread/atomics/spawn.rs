@@ -14,12 +14,11 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
 
-use super::super::util::{self, MEMORY, MODULE};
 use super::channel::Sender;
 use super::js::{Exports, GlobalDescriptor, META};
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
-use super::{channel, JoinHandle};
+use super::{channel, JoinHandle, MEMORY, MODULE};
 use crate::thread::{Thread, ThreadId, THREAD};
 
 /// Saves the [`ThreadId`] of the main thread.
@@ -86,7 +85,7 @@ fn current_id() -> ThreadId {
 /// Initializes the main thread sender and receiver.
 fn init_main() {
 	SENDER.get_or_init(|| {
-		util::has_worker_support();
+		super::has_spawn_support();
 
 		let (sender, receiver) = channel::channel::<Command>();
 

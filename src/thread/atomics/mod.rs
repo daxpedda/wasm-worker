@@ -9,11 +9,17 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::io;
-use std::sync::{Arc, PoisonError, TryLockError};
+use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
 use std::thread::Result;
 use std::time::Duration;
 
+use js_sys::WebAssembly::{Memory, Module};
+use js_sys::{Atomics, Int32Array};
+use wasm_bindgen::JsCast;
+
 pub(super) use self::parker::Parker;
+use super::global::{Global, GLOBAL};
+use super::js::GlobalExt;
 use super::{Scope, ScopedJoinHandle, Thread, THREAD};
 
 /// Implementation of [`std::thread::Builder`].
@@ -135,4 +141,54 @@ where
 pub(super) fn sleep(dur: Duration) {
 	#[allow(clippy::absolute_paths)]
 	std::thread::sleep(dur);
+}
+
+/// Determines if a shared worker has wait support.
+pub(super) fn has_shared_worker_wait_support() -> bool {
+	thread_local! {
+		/// Caches this test.
+		static HAS_SHARED_WORKER_WAIT_SUPPORT: bool = {
+			let value = 0;
+			let index: *const i32 = &value;
+			#[allow(clippy::as_conversions)]
+			let index = index as u32 / 4;
+
+			MEMORY_ARRAY
+				.with(|array| Atomics::wait_with_timeout(array, index, 0, 0.))
+				.is_ok()
+		};
+	}
+
+	debug_assert!(
+		GLOBAL.with(|global| matches!(global, Some(Global::Shared(_)))),
+		"called `has_shared_worker_wait_support` outside a shared worker"
+	);
+
+	HAS_SHARED_WORKER_WAIT_SUPPORT.with(bool::clone)
+}
+
+/// Implementation for [`crate::web::has_spawn_support()`].
+pub(super) fn has_spawn_support() -> bool {
+	/// We spawn only from the main thread, so we cache the result to be able to
+	/// call it from other threads but get the result of the main thread.
+	static HAS_SPAWN_SUPPORT: OnceLock<bool> = OnceLock::new();
+
+	*HAS_SPAWN_SUPPORT.get_or_init(|| {
+		cfg!(target_feature = "atomics")
+			&& if GLOBAL.with(|global| matches!(global, Some(Global::Shared(_)))) {
+				let global: GlobalExt = js_sys::global().unchecked_into();
+				!global.worker().is_undefined()
+			} else {
+				true
+			}
+	})
+}
+
+thread_local! {
+	/// [`Memory`] of the Wasm module.
+	pub(super) static MEMORY: Memory = wasm_bindgen::memory().unchecked_into();
+	/// [`Memory`] of the Wasm module as a [`Int32Array`].
+	pub(super) static MEMORY_ARRAY: Int32Array = Int32Array::new(&MEMORY.with(Memory::buffer));
+	/// Wasm [`Module`].
+	pub(super) static MODULE: Module = wasm_bindgen::module().unchecked_into();
 }

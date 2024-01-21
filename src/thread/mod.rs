@@ -2,10 +2,10 @@
 
 #[cfg(target_feature = "atomics")]
 mod atomics;
+mod global;
 mod js;
 #[cfg(not(target_feature = "atomics"))]
 mod unsupported;
-mod util;
 
 use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
@@ -13,20 +13,19 @@ use std::io::{self, Error, ErrorKind};
 use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::thread;
 pub use std::thread::*;
 use std::time::Duration;
 
-use js_sys::Atomics;
 use r#impl::Parker;
 
 #[cfg(target_feature = "atomics")]
 use self::atomics as r#impl;
+use self::global::{Global, GLOBAL};
 use self::js::CROSS_ORIGIN_ISOLATED;
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
-use self::util::{Global, GLOBAL};
 
 /// See [`std::thread::Builder`].
 #[derive(Debug)]
@@ -216,11 +215,11 @@ impl ThreadId {
 /// # Errors
 ///
 /// This function will return an error if called from a worklet or any other
-/// unsupported thread type.
+/// unsupported worker type.
 #[allow(clippy::missing_panics_doc)]
 pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 	let value = GLOBAL.with(|global| {
-		let global = global.as_ref().ok_or_else(util::unsupported_global)?;
+		let global = global.as_ref().ok_or_else(global::unsupported_global)?;
 
 		match global {
 			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
@@ -257,7 +256,7 @@ pub fn current() -> Thread {
 /// # Notes
 ///
 /// Unlike [`std::thread::park()`], when using the atomics target feature, this
-/// will not panic on the main thread, worklet or any other unsupported thread
+/// will not panic on the main thread, worklet or any other unsupported worker
 /// type.
 pub fn park() {
 	if has_wait_support() {
@@ -274,7 +273,7 @@ pub fn park() {
 ///
 /// Unlike [`std::thread::park_timeout()`], when using the atomics target
 /// feature, this will not panic on the main thread, worklet or any other
-/// unsupported thread type.
+/// unsupported worker type.
 pub fn park_timeout(dur: Duration) {
 	if has_wait_support() {
 		// SAFETY: park_timeout is called on the parker owned by this thread.
@@ -290,7 +289,7 @@ pub fn park_timeout(dur: Duration) {
 ///
 /// Unlike [`std::thread::park_timeout_ms()`], when using the atomics target
 /// feature, this will not panic on the main thread, worklet or any other
-/// unsupported thread type.
+/// unsupported worker type.
 #[deprecated(note = "replaced by `web_thread::park_timeout`")]
 pub fn park_timeout_ms(ms: u32) {
 	park_timeout(Duration::from_millis(ms.into()));
@@ -309,13 +308,13 @@ where
 ///
 /// # Panics
 ///
-/// This call will panic unless called from a thread type that allows blocking,
+/// This call will panic unless called from a worker type that allows blocking,
 /// e.g. a Web worker.
 pub fn sleep(dur: Duration) {
 	if has_wait_support() {
 		r#impl::sleep(dur);
 	} else {
-		panic!("current thread type cannot be blocked")
+		panic!("current worker type cannot be blocked")
 	}
 }
 
@@ -323,7 +322,7 @@ pub fn sleep(dur: Duration) {
 ///
 /// # Panics
 ///
-/// This call will panic unless called from a thread type that allows blocking,
+/// This call will panic unless called from a worker type that allows blocking,
 /// e.g. a Web worker.
 #[deprecated(note = "replaced by `web_thread::sleep`")]
 pub fn sleep_ms(ms: u32) {
@@ -362,37 +361,21 @@ pub fn yield_now() {
 /// Implementation for
 /// [`web::has_wait_support()`](crate::web::has_wait_support()).
 pub(crate) fn has_wait_support() -> bool {
-	/// Firefox doesn't actually support waiting in a shared worker, so we
-	/// actually test it and cache the result here.
-	static SHARED_WORKER_TEST: OnceLock<bool> = OnceLock::new();
-
 	GLOBAL.with(|global| {
-		if global
+		global
 			.as_ref()
 			.filter(|global| match global {
 				Global::Window(_) | Global::Worklet | Global::Service(_) => false,
-				Global::Dedicated(_) => true,
-				Global::Shared(_) => *SHARED_WORKER_TEST.get_or_init(|| {
-					let value = 0;
-					let index: *const i32 = &value;
-					#[allow(clippy::as_conversions)]
-					let index = index as u32 / 4;
-
-					util::MEMORY_ARRAY
-						.with(|array| Atomics::wait_with_timeout(array, index, 0, 0.))
-						.is_ok()
-				}),
+				Global::Dedicated(_) => *CROSS_ORIGIN_ISOLATED.deref(),
+				// Firefox doesn't support waiting in shared workers, but others do.
+				Global::Shared(_) => r#impl::has_shared_worker_wait_support(),
 			})
 			.is_some()
-		{
-			cfg!(target_feature = "atomics") || *CROSS_ORIGIN_ISOLATED.deref()
-		} else {
-			false
-		}
 	})
 }
 
-/// Implementation for [`crate::web::has_spawn_support()`].
+/// Implementation for [`crate::web::has_spawn_support()`]. Make sure to
+/// instantiate it on the main thread!
 pub(crate) fn has_spawn_support() -> bool {
-	cfg!(target_feature = "atomics") && *CROSS_ORIGIN_ISOLATED.deref() && util::has_worker_support()
+	r#impl::has_spawn_support()
 }
