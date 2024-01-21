@@ -3,25 +3,13 @@
 #[cfg(not(target_family = "wasm"))]
 use std::time;
 
+use time::{Duration, Instant};
+use web_thread::Builder;
 #[cfg(target_family = "wasm")]
-use wasm_bindgen_test::wasm_bindgen_test;
-#[cfg(any(
-	not(target_family = "wasm"),
-	all(target_family = "wasm", target_feature = "atomics")
-))]
-use {
-	time::{Duration, Instant},
-	web_thread::Builder,
-};
-#[cfg(all(target_family = "wasm", target_feature = "atomics"))]
-use {web_thread::web::JoinHandleExt, web_time as time};
+use {wasm_bindgen_test::wasm_bindgen_test, web_thread::web::JoinHandleExt, web_time as time};
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
-#[cfg(any(
-	not(target_family = "wasm"),
-	all(target_family = "wasm", target_feature = "atomics")
-))]
 async fn park() {
 	let start = Instant::now();
 
@@ -45,10 +33,6 @@ async fn park() {
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
-#[cfg(any(
-	not(target_family = "wasm"),
-	all(target_family = "wasm", target_feature = "atomics")
-))]
 async fn sleep() {
 	let start = Instant::now();
 
@@ -69,10 +53,6 @@ async fn sleep() {
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
-#[cfg(any(
-	not(target_family = "wasm"),
-	all(target_family = "wasm", target_feature = "atomics")
-))]
 async fn builder() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = Builder::new()
@@ -88,10 +68,6 @@ async fn builder() {
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
-#[cfg(any(
-	not(target_family = "wasm"),
-	all(target_family = "wasm", target_feature = "atomics")
-))]
 async fn builder_name() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = Builder::new()
@@ -108,10 +84,6 @@ async fn builder_name() {
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
-#[cfg(any(
-	not(target_family = "wasm"),
-	all(target_family = "wasm", target_feature = "atomics")
-))]
 async fn is_finished() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = web_thread::spawn(|| {

@@ -3,7 +3,7 @@
 mod unsupported_spawn;
 #[cfg(any(
 	not(target_feature = "atomics"),
-	all(target_feature = "atomics", shared_unsupported_wait)
+	all(target_feature = "atomics", unsupported_shared_wait)
 ))]
 mod unsupported_wait;
 

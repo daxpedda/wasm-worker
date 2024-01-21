@@ -1,4 +1,3 @@
-#![cfg(test)]
 #![cfg(target_family = "wasm")]
 
 #[cfg(not(target_feature = "atomics"))]

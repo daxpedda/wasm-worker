@@ -1,8 +1,8 @@
 #[cfg(target_family = "wasm")]
-mod basic;
+mod supported_basic;
 #[cfg(all(target_family = "wasm", target_feature = "atomics"))]
-mod spawn;
-mod wait;
+mod supported_spawn;
+mod supported_wait;
 
 #[cfg(target_family = "wasm")]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_dedicated_worker);

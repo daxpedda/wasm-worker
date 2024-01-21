@@ -1,5 +1,5 @@
 #![cfg(target_family = "wasm")]
-#![cfg(not(service_unsupported))]
+#![cfg(not(unsupported_service))]
 
 mod unsupported_spawn;
 mod unsupported_wait;
