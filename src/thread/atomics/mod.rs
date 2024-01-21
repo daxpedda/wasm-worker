@@ -9,7 +9,7 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::io;
-use std::sync::{Arc, PoisonError};
+use std::sync::{Arc, PoisonError, TryLockError};
 use std::thread::Result;
 use std::time::Duration;
 
@@ -80,7 +80,12 @@ impl<T> Debug for JoinHandle<T> {
 impl<T> JoinHandle<T> {
 	/// Implementation of [`std::thread::JoinHandle::is_finished()`].
 	pub(super) fn is_finished(&self) -> bool {
-		Arc::strong_count(&self.shared) == 1
+		#[allow(clippy::significant_drop_in_scrutinee)]
+		match self.shared.value.try_lock().as_deref() {
+			Ok(Some(_)) => true,
+			Err(TryLockError::Poisoned(error)) => error.get_ref().is_some(),
+			Err(TryLockError::WouldBlock) | Ok(None) => false,
+		}
 	}
 
 	/// Implementation of [`std::thread::JoinHandle::join()`].

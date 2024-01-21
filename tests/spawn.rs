@@ -106,6 +106,28 @@ async fn builder_name() {
 	handle.join_async().await.unwrap();
 }
 
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
+#[cfg(any(
+	not(target_family = "wasm"),
+	all(target_family = "wasm", target_feature = "atomics")
+))]
+async fn is_finished() {
+	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
+	let mut handle = web_thread::spawn(|| {
+		web_thread::park();
+	});
+
+	assert!(!handle.is_finished());
+
+	handle.thread().unpark();
+
+	#[cfg(not(target_family = "wasm"))]
+	handle.join().unwrap();
+	#[cfg(target_family = "wasm")]
+	handle.join_async().await.unwrap();
+}
+
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen_test]
 #[allow(clippy::absolute_paths)]
