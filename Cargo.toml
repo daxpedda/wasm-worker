@@ -42,12 +42,19 @@ wasm-bindgen-test = "0.3"
 web-sys = { version = "0.3.20", features = ["console"] }
 web-time = "1"
 
+[patch.crates-io]
+js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen-test = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+
 [[test]]
-name = "basic"
+name = "supported_basic"
 test = false
 
 [[test]]
-name = "spawn"
+name = "supported_spawn"
 test = false
 
 [[test]]
@@ -59,7 +66,7 @@ name = "unsupported_wait"
 test = false
 
 [[test]]
-name = "wait"
+name = "supported_wait"
 test = false
 
 [package.metadata.docs.rs]
