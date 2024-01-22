@@ -9,6 +9,7 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::io;
+use std::ops::Deref;
 use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
 use std::thread::Result;
 use std::time::Duration;
@@ -19,7 +20,7 @@ use wasm_bindgen::JsCast;
 
 pub(super) use self::parker::Parker;
 use super::global::{Global, GLOBAL};
-use super::js::GlobalExt;
+use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
 use super::{Scope, ScopedJoinHandle, Thread, THREAD};
 
 /// Implementation of [`std::thread::Builder`].
@@ -174,13 +175,10 @@ pub(super) fn has_spawn_support() -> bool {
 	static HAS_SPAWN_SUPPORT: OnceLock<bool> = OnceLock::new();
 
 	*HAS_SPAWN_SUPPORT.get_or_init(|| {
-		cfg!(target_feature = "atomics")
-			&& if GLOBAL.with(|global| matches!(global, Some(Global::Shared(_)))) {
-				let global: GlobalExt = js_sys::global().unchecked_into();
-				!global.worker().is_undefined()
-			} else {
-				true
-			}
+		*CROSS_ORIGIN_ISOLATED.deref() && {
+			let global: GlobalExt = js_sys::global().unchecked_into();
+			!global.worker().is_undefined()
+		}
 	})
 }
 
