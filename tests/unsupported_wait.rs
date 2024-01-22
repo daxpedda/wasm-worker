@@ -1,6 +1,10 @@
 #![cfg(test)]
 #![cfg(target_family = "wasm")]
 
+use js_sys::WebAssembly::Memory;
+use js_sys::{Atomics, Int32Array, Object, Reflect, SharedArrayBuffer};
+use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::wasm_bindgen_test;
 use web_thread::web;
 use web_time::Duration;
@@ -29,4 +33,33 @@ fn sleep_ms() {
 #[wasm_bindgen_test]
 fn has_wait_support() {
 	assert!(!web::has_wait_support());
+}
+
+#[wasm_bindgen_test]
+fn check_failing_wait() {
+	#[wasm_bindgen]
+	extern "C" {
+		pub(super) type HasSharedArrayBuffer;
+
+		#[wasm_bindgen(method, getter, js_name = SharedArrayBuffer)]
+		pub(super) fn shared_array_buffer(this: &HasSharedArrayBuffer) -> JsValue;
+	}
+
+	let global: HasSharedArrayBuffer = js_sys::global().unchecked_into();
+
+	// Shared workers on Chrome support waiting through Wasm shared memory but don't
+	// allow instantiating `SharedArrayBuffer` directly.
+	let array = if global.shared_array_buffer().is_undefined() {
+		let descriptor = Object::new();
+		Reflect::set(&descriptor, &"initial".into(), &1.into()).unwrap();
+		Reflect::set(&descriptor, &"maximum".into(), &1.into()).unwrap();
+		Reflect::set(&descriptor, &"shared".into(), &true.into()).unwrap();
+		Memory::new(&descriptor).map(|memory| Int32Array::new(&memory.buffer()))
+	} else {
+		Ok(Int32Array::new(&SharedArrayBuffer::new(4)))
+	};
+
+	array
+		.and_then(|array| Atomics::wait_with_timeout(&array, 0, 0, 0.))
+		.unwrap_err();
 }

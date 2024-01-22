@@ -367,7 +367,7 @@ pub(crate) fn has_wait_support() -> bool {
 			.filter(|global| match global {
 				Global::Window(_) | Global::Worklet | Global::Service(_) => false,
 				Global::Dedicated(_) => *CROSS_ORIGIN_ISOLATED.deref(),
-				// Firefox doesn't support waiting in shared workers, but others do.
+				// Chrome supports waiting in shared workers, which we test for specifically.
 				Global::Shared(_) => r#impl::has_shared_worker_wait_support(),
 			})
 			.is_some()

@@ -24,3 +24,32 @@ fn builder() {
 fn has_thread_support() {
 	assert!(!web::has_spawn_support());
 }
+
+#[wasm_bindgen_test]
+#[cfg(target_feature = "atomics")]
+fn check_failing_spawn() {
+	use js_sys::Array;
+	use wasm_bindgen::prelude::wasm_bindgen;
+	use wasm_bindgen::{JsCast, JsValue};
+	use web_sys::Worker;
+
+	#[wasm_bindgen]
+	extern "C" {
+		pub(super) type HasWorker;
+
+		#[wasm_bindgen(method, getter, js_name = Worker)]
+		pub(super) fn worker(this: &HasWorker) -> JsValue;
+	}
+
+	let global: HasWorker = js_sys::global().unchecked_into();
+
+	if !global.worker().is_undefined() {
+		let worker = Worker::new("data:,").unwrap();
+		worker
+			.post_message_with_transfer(
+				&wasm_bindgen::memory(),
+				&Array::of1(&wasm_bindgen::memory()),
+			)
+			.unwrap_err();
+	}
+}
