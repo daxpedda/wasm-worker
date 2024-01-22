@@ -5,8 +5,13 @@ use js_sys::{Object, Promise};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
+use super::super::js::GlobalExt;
+
 #[wasm_bindgen]
 extern "C" {
+	#[wasm_bindgen(method, getter, js_name = Worker)]
+	pub(super) fn worker(this: &GlobalExt) -> JsValue;
+
 	pub(super) type Meta;
 
 	#[wasm_bindgen(js_namespace = import, js_name = meta)]
