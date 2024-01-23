@@ -1,5 +1,7 @@
 #![cfg(target_family = "wasm")]
 
+#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+mod supported_spawn_fail;
 #[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
 mod unsupported_spawn;
 

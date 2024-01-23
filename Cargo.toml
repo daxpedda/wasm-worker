@@ -58,15 +58,19 @@ name = "supported_spawn"
 test = false
 
 [[test]]
+name = "supported_spawn_fail"
+test = false
+
+[[test]]
+name = "supported_wait"
+test = false
+
+[[test]]
 name = "unsupported_spawn"
 test = false
 
 [[test]]
 name = "unsupported_wait"
-test = false
-
-[[test]]
-name = "supported_wait"
 test = false
 
 [package.metadata.docs.rs]

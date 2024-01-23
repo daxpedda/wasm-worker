@@ -14,7 +14,7 @@ WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg
 
 ## Multi-Threaded
 
-CHROMEDRIVER=chromedriver RUSTFLAGS=-Ctarget-feature=+atomics,+bulk-memory cargo +nightly test --target wasm32-unknown-unknown -Zbuild-std=panic_abort,std
+CHROMEDRIVER=chromedriver RUSTFLAGS="--cfg=unsupported_spawn_then_wait -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zbuild-std=panic_abort,std
 GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_wait -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zbuild-std=panic_abort,std
 
 ## Multi-Threaded without Origin Isolation

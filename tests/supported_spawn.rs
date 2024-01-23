@@ -6,7 +6,11 @@ use std::time;
 use time::{Duration, Instant};
 use web_thread::Builder;
 #[cfg(target_family = "wasm")]
-use {wasm_bindgen_test::wasm_bindgen_test, web_thread::web::JoinHandleExt, web_time as time};
+use {
+	wasm_bindgen_test::wasm_bindgen_test,
+	web_thread::web::{self, JoinHandleExt},
+	web_time as time,
+};
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
@@ -26,7 +30,11 @@ async fn park() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	handle.join_async().await.unwrap();
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
 
 	assert!(start.elapsed().as_secs() >= 2);
 }
@@ -46,9 +54,29 @@ async fn sleep() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	handle.join_async().await.unwrap();
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
 
 	assert!(start.elapsed().as_secs() >= 2);
+}
+
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
+async fn spawn() {
+	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
+	let mut handle = web_thread::spawn(|| ());
+
+	#[cfg(not(target_family = "wasm"))]
+	handle.join().unwrap();
+	#[cfg(target_family = "wasm")]
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
 }
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
@@ -63,7 +91,11 @@ async fn builder() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	handle.join_async().await.unwrap();
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
 }
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
@@ -79,7 +111,11 @@ async fn builder_name() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	handle.join_async().await.unwrap();
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
 }
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
@@ -105,7 +141,12 @@ async fn is_finished() {
 
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen_test]
-#[allow(clippy::absolute_paths)]
+async fn join_async() {
+	web_thread::spawn(|| ()).join_async().await.unwrap();
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
 fn has_thread_support() {
-	assert!(web_thread::web::has_spawn_support());
+	assert!(web::has_spawn_support());
 }
