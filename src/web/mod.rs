@@ -3,7 +3,6 @@
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
 
 use crate::thread::{self, JoinHandle};
@@ -55,6 +54,7 @@ impl<T> Future for JoinHandleFuture<'_, T> {
 	) -> Poll<Self::Output> {
 		#[cfg(target_feature = "atomics")]
 		{
+			use std::sync::atomic::Ordering;
 			use std::sync::TryLockError;
 
 			assert!(
