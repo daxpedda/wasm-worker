@@ -56,12 +56,12 @@ fn check_failing_wait() {
 		Reflect::set(&descriptor, &"initial".into(), &1.into()).unwrap();
 		Reflect::set(&descriptor, &"maximum".into(), &1.into()).unwrap();
 		Reflect::set(&descriptor, &"shared".into(), &true.into()).unwrap();
-		Memory::new(&descriptor).map(|memory| Int32Array::new(&memory.buffer()))
+		Memory::new(&descriptor)
+			.map(|memory| Int32Array::new(&memory.buffer()))
+			.unwrap()
 	} else {
-		Ok(Int32Array::new(&SharedArrayBuffer::new(4)))
+		Int32Array::new(&SharedArrayBuffer::new(4))
 	};
 
-	array
-		.and_then(|array| Atomics::wait_with_timeout(&array, 0, 0, 0.))
-		.unwrap_err();
+	Atomics::wait_with_timeout(&array, 0, 0, 0.).unwrap_err();
 }
