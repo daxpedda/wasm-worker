@@ -119,9 +119,10 @@ thread_local! {
 		if *CROSS_ORIGIN_ISOLATED {
 			Int32Array::new(&SharedArrayBuffer::new(4))
 		} else {
-			// Without origin isolation `new SharedArrayBuffer` is unsupported, but Wasm's
-			// shared memory, which is a `SharedArrayBuffer` underneath, can still be used
-			// for waiting.
+			// Without cross-origin isolation `SharedArrayBuffer` is unsupported, but we
+			// can still use `Atomics.wait` by using a shared Wasm memory, which is a
+			// `SharedArrayBuffer` underneath.
+			// See <https://github.com/w3c/ServiceWorker/pull/1545>.
 			let descriptor: MemoryDescriptor = Object::new().unchecked_into();
 			descriptor.set_initial(1);
 			descriptor.set_maximum(1);

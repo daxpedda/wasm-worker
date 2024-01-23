@@ -365,7 +365,9 @@ pub(crate) fn has_wait_support() -> bool {
 				global.as_ref().map(|global| match global {
 					Global::Window(_) | Global::Worklet | Global::Service(_) => false,
 					Global::Dedicated(_) => true,
-					// Chrome supports waiting in shared workers, which we test for specifically.
+					// Firefox doesn't support waiting in shared workers, so for cross-browser
+					// support we have to test manually.
+					// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
 					Global::Shared(_) => {
 						/// Cache if waiting on shared workers is supported.
 						static HAS_SHARED_WORKER_WAIT_SUPPORT: OnceLock<bool> = OnceLock::new();

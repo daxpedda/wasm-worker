@@ -47,8 +47,10 @@ fn check_failing_wait() {
 
 	let global: HasSharedArrayBuffer = js_sys::global().unchecked_into();
 
-	// Shared workers on Chrome support waiting through Wasm shared memory but don't
-	// allow instantiating `SharedArrayBuffer` directly.
+	// Without cross-origin isolation `SharedArrayBuffer` is unsupported, but we
+	// can still use `Atomics.wait` by using a shared Wasm memory, which is a
+	// `SharedArrayBuffer` underneath.
+	// See <https://github.com/w3c/ServiceWorker/pull/1545>.
 	let array = if global.shared_array_buffer().is_undefined() {
 		let descriptor = Object::new();
 		Reflect::set(&descriptor, &"initial".into(), &1.into()).unwrap();

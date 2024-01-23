@@ -1,6 +1,8 @@
 #![cfg(target_family = "wasm")]
 
 mod supported_basic;
+// Firefox doesn't support waiting in shared workers.
+// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
 #[cfg(not(unsupported_shared_wait))]
 mod supported_wait;
 
