@@ -97,7 +97,10 @@ async fn is_finished() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	handle.join_async().await.unwrap();
+	{
+		handle.join_async().await.unwrap();
+		assert!(handle.is_finished());
+	}
 }
 
 #[cfg(target_family = "wasm")]

@@ -9,6 +9,7 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::io;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
 use std::thread::Result;
 use std::time::Duration;
@@ -70,6 +71,9 @@ pub(crate) struct JoinHandle<T> {
 	pub(crate) shared: Arc<spawn::Shared<T>>,
 	/// Corresponding [`Thread`].
 	pub(crate) thread: Thread,
+	/// Marker to know if the return value was already taken by
+	/// [`JoinHandle::join_async()`](crate::web::JoinHandleExt::join_async).
+	pub(crate) taken: AtomicBool,
 }
 
 impl<T> Debug for JoinHandle<T> {
@@ -78,6 +82,7 @@ impl<T> Debug for JoinHandle<T> {
 			.debug_struct("JoinHandle")
 			.field("shared", &self.shared)
 			.field("thread", &self.thread)
+			.field("taken", &self.taken)
 			.finish()
 	}
 }
@@ -85,6 +90,10 @@ impl<T> Debug for JoinHandle<T> {
 impl<T> JoinHandle<T> {
 	/// Implementation of [`std::thread::JoinHandle::is_finished()`].
 	pub(super) fn is_finished(&self) -> bool {
+		if self.taken.load(Ordering::Relaxed) {
+			return true;
+		}
+
 		#[allow(clippy::significant_drop_in_scrutinee)]
 		match self.shared.value.try_lock().as_deref() {
 			Ok(Some(_)) => true,

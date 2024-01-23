@@ -3,6 +3,7 @@
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::Ordering;
 use std::task::{Context, Poll};
 
 use crate::thread::{self, JoinHandle};
@@ -56,25 +57,29 @@ impl<T> Future for JoinHandleFuture<'_, T> {
 		{
 			use std::sync::TryLockError;
 
-			let value = match self.0 .0.shared.value.try_lock() {
+			assert!(
+				!self.0 .0.taken.load(Ordering::Relaxed),
+				"`JoinHandleFuture` polled or created after completion"
+			);
+
+			let mut value = match self.0 .0.shared.value.try_lock() {
 				Ok(mut value) => value.take(),
 				Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
 				Err(TryLockError::WouldBlock) => None,
 			};
 
-			if let Some(value) = value {
-				return Poll::Ready(Ok(value));
+			if value.is_none() {
+				self.0 .0.shared.waker.register(cx.waker());
+
+				value = match self.0 .0.shared.value.try_lock() {
+					Ok(mut value) => value.take(),
+					Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
+					Err(TryLockError::WouldBlock) => None,
+				};
 			}
 
-			self.0 .0.shared.waker.register(cx.waker());
-
-			let value = match self.0 .0.shared.value.try_lock() {
-				Ok(mut value) => value.take(),
-				Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
-				Err(TryLockError::WouldBlock) => None,
-			};
-
 			if let Some(value) = value {
+				self.0 .0.taken.store(true, Ordering::Relaxed);
 				Poll::Ready(Ok(value))
 			} else {
 				Poll::Pending

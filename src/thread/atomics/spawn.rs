@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
 use std::{fmt, io};
 
@@ -219,7 +220,11 @@ where
 			.expect("`Receiver` was somehow dropped from the main thread");
 	}
 
-	Ok(JoinHandle { shared, thread })
+	Ok(JoinHandle {
+		shared,
+		thread,
+		taken: AtomicBool::new(false),
+	})
 }
 
 /// Spawning thread regardless of being nested.
