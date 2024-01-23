@@ -9,7 +9,6 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::io;
-use std::ops::Deref;
 use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
 use std::thread::Result;
 use std::time::Duration;
@@ -19,7 +18,6 @@ use js_sys::{Atomics, Int32Array};
 use wasm_bindgen::JsCast;
 
 pub(super) use self::parker::Parker;
-use super::global::{Global, GLOBAL};
 use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
 use super::{Scope, ScopedJoinHandle, Thread, THREAD};
 
@@ -144,38 +142,27 @@ pub(super) fn sleep(dur: Duration) {
 	std::thread::sleep(dur);
 }
 
-/// Determines if a shared worker has wait support.
-pub(super) fn has_shared_worker_wait_support() -> bool {
-	thread_local! {
-		/// Caches this test.
-		static HAS_SHARED_WORKER_WAIT_SUPPORT: bool = {
-			let value = 0;
-			let index: *const i32 = &value;
-			#[allow(clippy::as_conversions)]
-			let index = index as u32 / 4;
+/// Tests is waiting is supported.
+pub(super) fn test_wait_support() -> bool {
+	let value = 0;
+	let index: *const i32 = &value;
+	#[allow(clippy::as_conversions)]
+	let index = index as u32 / 4;
 
-			MEMORY_ARRAY
-				.with(|array| Atomics::wait_with_timeout(array, index, 0, 0.))
-				.is_ok()
-		};
-	}
-
-	debug_assert!(
-		GLOBAL.with(|global| matches!(global, Some(Global::Shared(_)))),
-		"called `has_shared_worker_wait_support` outside a shared worker"
-	);
-
-	HAS_SHARED_WORKER_WAIT_SUPPORT.with(bool::clone)
+	MEMORY_ARRAY
+		.with(|array| Atomics::wait_with_timeout(array, index, 0, 0.))
+		.is_ok()
 }
 
-/// Implementation for [`crate::web::has_spawn_support()`].
+/// Implementation for [`crate::web::has_spawn_support()`]. Make sure to
+/// instantiate it on the main thread!
 pub(super) fn has_spawn_support() -> bool {
 	/// We spawn only from the main thread, so we cache the result to be able to
 	/// call it from other threads but get the result of the main thread.
 	static HAS_SPAWN_SUPPORT: OnceLock<bool> = OnceLock::new();
 
 	*HAS_SPAWN_SUPPORT.get_or_init(|| {
-		*CROSS_ORIGIN_ISOLATED.deref() && {
+		*CROSS_ORIGIN_ISOLATED && {
 			let global: GlobalExt = js_sys::global().unchecked_into();
 			!global.worker().is_undefined()
 		}

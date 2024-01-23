@@ -1,7 +1,11 @@
 mod supported_basic;
 #[cfg(any(
 	not(target_family = "wasm"),
-	all(target_family = "wasm", target_feature = "atomics")
+	all(
+		target_family = "wasm",
+		target_feature = "atomics",
+		not(unsupported_spawn)
+	)
 ))]
 mod supported_spawn;
 

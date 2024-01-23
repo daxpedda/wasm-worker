@@ -11,9 +11,8 @@ use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Error, ErrorKind};
 use std::num::NonZeroUsize;
-use std::ops::Deref;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::thread;
 pub use std::thread::*;
 use std::time::Duration;
@@ -23,7 +22,6 @@ use r#impl::Parker;
 #[cfg(target_feature = "atomics")]
 use self::atomics as r#impl;
 use self::global::{Global, GLOBAL};
-use self::js::CROSS_ORIGIN_ISOLATED;
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
 
@@ -361,21 +359,29 @@ pub fn yield_now() {
 /// Implementation for
 /// [`web::has_wait_support()`](crate::web::has_wait_support()).
 pub(crate) fn has_wait_support() -> bool {
-	GLOBAL.with(|global| {
-		global
-			.as_ref()
-			.filter(|global| match global {
-				Global::Window(_) | Global::Worklet | Global::Service(_) => false,
-				Global::Dedicated(_) => *CROSS_ORIGIN_ISOLATED.deref(),
-				// Chrome supports waiting in shared workers, which we test for specifically.
-				Global::Shared(_) => r#impl::has_shared_worker_wait_support(),
+	thread_local! {
+		static HAS_WAIT_SUPPORT: bool = GLOBAL
+			.with(|global| {
+				global.as_ref().map(|global| match global {
+					Global::Window(_) | Global::Worklet | Global::Service(_) => false,
+					Global::Dedicated(_) => true,
+					// Chrome supports waiting in shared workers, which we test for specifically.
+					Global::Shared(_) => {
+						/// Cache if waiting on shared workers is supported.
+						static HAS_SHARED_WORKER_WAIT_SUPPORT: OnceLock<bool> = OnceLock::new();
+
+						*HAS_SHARED_WORKER_WAIT_SUPPORT.get_or_init(r#impl::test_wait_support)
+					}
+				})
 			})
-			.is_some()
-	})
+			// For unknown worker types we test manually.
+			.unwrap_or_else(r#impl::test_wait_support);
+	}
+
+	HAS_WAIT_SUPPORT.with(bool::clone)
 }
 
-/// Implementation for [`crate::web::has_spawn_support()`]. Make sure to
-/// instantiate it on the main thread!
+/// Implementation for [`crate::web::has_spawn_support()`].
 pub(crate) fn has_spawn_support() -> bool {
 	r#impl::has_spawn_support()
 }

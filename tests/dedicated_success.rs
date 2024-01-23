@@ -1,6 +1,10 @@
 #[cfg(target_family = "wasm")]
 mod supported_basic;
-#[cfg(all(target_family = "wasm", target_feature = "atomics"))]
+#[cfg(all(
+	target_family = "wasm",
+	target_feature = "atomics",
+	not(unsupported_spawn)
+))]
 mod supported_spawn;
 mod supported_wait;
 

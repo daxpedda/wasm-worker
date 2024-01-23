@@ -50,12 +50,7 @@ fn wait(timeout: Option<Duration>) {
 	let timeout = timeout.map_or(f64::INFINITY, |timeout| timeout.as_millis() as f64);
 
 	let result = ZERO_ARRAY
-		.with(|array| {
-			let Some(array) = array else {
-				unreachable!("forgot to check wait support first");
-			};
-			Atomics::wait_with_timeout(array, 0, 0, timeout)
-		})
+		.with(|array| Atomics::wait_with_timeout(array, 0, 0, timeout))
 		.expect("`Atomic.wait` is not expected to fail");
 	debug_assert_eq!(
 		result, "timed-out",
