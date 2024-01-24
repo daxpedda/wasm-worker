@@ -31,6 +31,9 @@ jobs:
         rust:
           - { version: stable }
         include:
+          - os: macos-latest
+            rust: { version: stable }
+            target: { target: wasm32-unknown-unknown, web: true }
           - os: ubuntu-latest
             rust: {
               version: nightly,
