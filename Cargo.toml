@@ -11,9 +11,9 @@ rust-version = "1.70"
 version = "0.0.0"
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-js-sys = "0.3.64"
-wasm-bindgen = { version = "0.2.87", default-features = false }
-web-sys = { version = "0.3.64", features = [
+js-sys = "0.3.65"
+wasm-bindgen = { version = "0.2.88", default-features = false }
+web-sys = { version = "0.3.65", features = [
 	"DedicatedWorkerGlobalScope",
 	"Navigator",
 	"SharedWorkerGlobalScope",
@@ -23,8 +23,8 @@ web-sys = { version = "0.3.64", features = [
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown", target_feature = "atomics"))'.dependencies]
 atomic-waker = "1"
-wasm-bindgen-futures = "0.4.37"
-web-sys = { version = "0.3.64", features = [
+wasm-bindgen-futures = "0.4.38"
+web-sys = { version = "0.3.65", features = [
 	"Blob",
 	"BlobPropertyBag",
 	"Url",
