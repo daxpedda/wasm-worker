@@ -11,9 +11,9 @@ rust-version = "1.60"
 version = "0.0.0"
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-js-sys = "0.3.20"
-wasm-bindgen = { version = "0.2.70", default-features = false }
-web-sys = { version = "0.3.20", features = [
+js-sys = "0.3.64"
+wasm-bindgen = { version = "0.2.87", default-features = false }
+web-sys = { version = "0.3.64", features = [
 	"DedicatedWorkerGlobalScope",
 	"Navigator",
 	"SharedWorkerGlobalScope",
@@ -23,8 +23,8 @@ web-sys = { version = "0.3.20", features = [
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown", target_feature = "atomics"))'.dependencies]
 atomic-waker = "1"
-wasm-bindgen-futures = "0.4.20"
-web-sys = { version = "0.3.20", features = [
+wasm-bindgen-futures = "0.4.37"
+web-sys = { version = "0.3.64", features = [
 	"Blob",
 	"BlobPropertyBag",
 	"Url",
@@ -39,7 +39,7 @@ pollster = { version = "0.3", features = ["macro"] }
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dev-dependencies]
 console_error_panic_hook = "0.1"
 wasm-bindgen-test = "0.3"
-web-sys = { version = "0.3.20", features = ["console"] }
+web-sys = { version = "0.3", features = ["console"] }
 web-time = "1"
 
 [patch.crates-io]
