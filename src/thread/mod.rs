@@ -10,7 +10,7 @@ mod unsupported;
 use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
 use std::io::{self, Error, ErrorKind};
-use std::num::NonZeroUsize;
+use std::num::{NonZeroU64, NonZeroUsize};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::thread;
@@ -192,15 +192,33 @@ impl Thread {
 
 /// See [`std::thread::ThreadId`].
 #[derive(Eq, PartialEq, Clone, Copy, Hash, Debug)]
-pub struct ThreadId(u64);
+pub struct ThreadId(NonZeroU64);
 
 impl ThreadId {
 	/// Create a new [`ThreadId`].
 	fn new() -> Self {
-		/// Global counter for [`ThreadId`].
-		static COUNTER: AtomicU64 = AtomicU64::new(1);
+		// See <https://github.com/rust-lang/rust/blob/1.75.0/library/std/src/thread/mod.rs#L1177-L1218>.
 
-		Self(COUNTER.fetch_add(1, Ordering::Relaxed))
+		/// Separate failed [`ThreadId`] to apply `#[cold]` to it.
+		#[cold]
+		fn exhausted() -> ! {
+			panic!("failed to generate unique thread ID: bitspace exhausted")
+		}
+
+		/// Global counter for [`ThreadId`].
+		static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+		let mut last = COUNTER.load(Ordering::Relaxed);
+		loop {
+			let Some(id) = last.checked_add(1) else {
+				exhausted();
+			};
+
+			match COUNTER.compare_exchange_weak(last, id, Ordering::Relaxed, Ordering::Relaxed) {
+				Ok(_) => return Self(NonZeroU64::new(id).expect("unexpected `0` `ThreadId`")),
+				Err(id) => last = id,
+			}
+		}
 	}
 }
 
