@@ -24,6 +24,7 @@ jobs:
       - name: Install Rust nightly
         run: |
           rustup toolchain install nightly --profile minimal --component rustfmt --allow-downgrade
+          rustup default nightly
       - name: Run Rustfmt
         run: cargo fmt --check
 

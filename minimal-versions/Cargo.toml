@@ -4,10 +4,5 @@ name = "minimal-versions"
 publish = false
 version = "0.0.0"
 
-[features]
-futures = ["web-thread/futures"]
-message = ["web-thread/message"]
-worklet = ["web-thread/worklet"]
-
 [dependencies]
 web-thread = { path = ".." }

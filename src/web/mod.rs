@@ -5,7 +5,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::thread::{self, JoinHandle};
+use crate::{self as thread, JoinHandle};
 
 /// Returns [`true`] if the current thread supports waiting, e.g. parking and
 /// sleeping.

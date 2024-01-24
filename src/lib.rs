@@ -1,10 +1,14 @@
 //! TODO
 //!
 //! - Firefox doesn't support module service workers: <https://bugzilla.mozilla.org/show_bug.cgi?id=1360870>.
-//! - Firefox doesn't support blocking in shared workers: <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
+//! - Browser don't support blocking in shared workers:
+//!   - Firefox: <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>
+//!   - Safari: ?
 //! - Spec doesn't allow cross-origin isolation in shared and service workers: <https://github.com/w3c/ServiceWorker/pull/1545>.
 //! - Chrome doesn't support spawning workers when blocking afterwards (e.g. `spawn(..).join()`): <https://bugs.chromium.org/p/chromium/issues/detail?id=977924>.
 //! - Chrome doesn't support sending messages when blocking afterwards: <https://bugs.chromium.org/p/chromium/issues/detail?id=1075645>.
+//! - Safari doesn't support spawning or sending message when blocking
+//!   afterwars: needs research.
 
 #![cfg_attr(
 	all(

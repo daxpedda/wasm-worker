@@ -51,26 +51,32 @@ web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thre
 
 [[test]]
 name = "supported_basic"
+path = "tests/supported_basic.rs"
 test = false
 
 [[test]]
 name = "supported_spawn"
+path = "tests/supported_spawn.rs"
 test = false
 
 [[test]]
 name = "supported_spawn_fail"
+path = "tests/supported_spawn_fail.rs"
 test = false
 
 [[test]]
 name = "supported_wait"
+path = "tests/supported_wait.rs"
 test = false
 
 [[test]]
 name = "unsupported_spawn"
+path = "tests/unsupported_spawn.rs"
 test = false
 
 [[test]]
 name = "unsupported_wait"
+path = "tests/unsupported_wait.rs"
 test = false
 
 [package.metadata.docs.rs]
