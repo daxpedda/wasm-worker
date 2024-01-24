@@ -97,6 +97,27 @@ jobs:
           SAFARIDRIVER: safaridriver
           RUSTFLAGS: --cfg=unsupported_spawn_then_wait --cfg=unsupported_shared_wait ${{ matrix.rust.flags }}
         run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+      - name: Test on Chrome without cross-origin isolation
+        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
+        env:
+          WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION: 1 
+          CHROMEDRIVER: chromedriver
+          RUSTFLAGS: --cfg=unsupported_spawn ${{ matrix.rust.flags }}
+        run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+      - name: Test on Firefox without cross-origin isolation
+        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
+        env:
+          WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION: 1 
+          GECKODRIVER: geckodriver
+          RUSTFLAGS: --cfg=unsupported_spawn --cfg=unsupported_service --cfg=unsupported_shared_wait ${{ matrix.rust.flags }}
+        run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+      - name: Test on Safari without cross-origin isolation
+        if: matrix.target.web == true && matrix.os == 'macos-latest'
+        env:
+          WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION: 1 
+          SAFARIDRIVER: safaridriver
+          RUSTFLAGS: --cfg=unsupported_spawn --cfg=unsupported_shared_wait ${{ matrix.rust.flags }}
+        run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Documentation Test
         if: matrix.target.web == false
         env:
