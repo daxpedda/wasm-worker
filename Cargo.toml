@@ -7,7 +7,7 @@ keywords = ["worker", "worklet", "wasm", "web", "thread"]
 license = "MIT OR Apache-2.0"
 name = "web-thread"
 repository = "https://github.com/daxpedda/web-thread"
-rust-version = "1.60"
+rust-version = "1.70"
 version = "0.0.0"
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
