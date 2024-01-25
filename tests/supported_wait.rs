@@ -22,7 +22,8 @@ fn park() {
 	#[allow(deprecated)]
 	web_thread::park_timeout_ms(1000);
 
-	assert!(start.elapsed().as_secs() >= 2);
+	let elapsed = start.elapsed();
+	assert!(elapsed.as_secs() >= 2, "time: {}", elapsed.as_secs());
 }
 
 #[cfg_attr(not(target_family = "wasm"), test)]
@@ -34,7 +35,8 @@ fn sleep() {
 	#[allow(deprecated)]
 	web_thread::sleep_ms(1000);
 
-	assert!(start.elapsed().as_secs() >= 2);
+	let elapsed = start.elapsed();
+	assert!(elapsed.as_secs() >= 2, "time: {}", elapsed.as_secs());
 }
 
 #[cfg(target_family = "wasm")]
