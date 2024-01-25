@@ -3,6 +3,7 @@
 // See <https://bugzilla.mozilla.org/show_bug.cgi?id=1360870>.
 #![cfg(not(unsupported_service))]
 
+mod basic_fail;
 mod unsupported_spawn;
 mod unsupported_wait;
 

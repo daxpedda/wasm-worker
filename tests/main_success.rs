@@ -1,4 +1,4 @@
-mod supported_basic;
+mod basic_success;
 #[cfg(any(
 	not(target_family = "wasm"),
 	all(
@@ -7,7 +7,7 @@ mod supported_basic;
 		not(unsupported_spawn)
 	)
 ))]
-mod supported_spawn;
+mod supported_spawn_success;
 
 #[cfg(target_family = "wasm")]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);

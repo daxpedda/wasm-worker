@@ -51,13 +51,18 @@ wasm-bindgen-test = { git = "https://github.com/daxpedda/wasm-bindgen", branch =
 web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
 
 [[test]]
-name = "supported_basic"
-path = "tests/supported_basic.rs"
+name = "basic_fail"
+path = "tests/basic_fail.rs"
 test = false
 
 [[test]]
-name = "supported_spawn"
-path = "tests/supported_spawn.rs"
+name = "basic_success"
+path = "tests/basic_success.rs"
+test = false
+
+[[test]]
+name = "supported_spawn_success"
+path = "tests/supported_spawn_success.rs"
 test = false
 
 [[test]]
