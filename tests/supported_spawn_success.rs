@@ -37,7 +37,7 @@ async fn park() {
 	}
 
 	let elapsed = start.elapsed();
-	assert!(elapsed.as_secs() >= 2, "time: {}", elapsed.as_secs());
+	assert!(elapsed.as_secs() >= 2, "time: {elapsed:?}");
 }
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
@@ -62,7 +62,7 @@ async fn sleep() {
 	}
 
 	let elapsed = start.elapsed();
-	assert!(elapsed.as_secs() >= 2, "time: {}", elapsed.as_secs());
+	assert!(elapsed.as_secs() >= 2, "time: {elapsed:?}");
 }
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
