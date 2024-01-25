@@ -62,7 +62,9 @@ impl Builder {
 }
 
 /// Implementation of [`std::thread::JoinHandle`].
-pub(super) struct JoinHandle<T>(PhantomData<T>);
+pub(super) struct JoinHandle<T>(
+	#[allow(clippy::absolute_paths)] PhantomData<std::thread::JoinHandle<T>>,
+);
 
 impl<T> Unpin for JoinHandle<T> {}
 

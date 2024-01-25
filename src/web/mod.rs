@@ -74,17 +74,17 @@ where
 /// finished executing.
 #[must_use = "does nothing if not polled"]
 #[pin_project]
-pub struct ScopeFuture<'scope, 'env, F2, T>(#[pin] thread::ScopeFuture<'scope, 'env, F2, T>);
+pub struct ScopeFuture<'scope, 'env, F, T>(#[pin] thread::ScopeFuture<'scope, 'env, F, T>);
 
-impl<F2, T> Debug for ScopeFuture<'_, '_, F2, T> {
+impl<F, T> Debug for ScopeFuture<'_, '_, F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		formatter.debug_tuple("ScopeFuture").field(&self.0).finish()
 	}
 }
 
-impl<F2, T> Future for ScopeFuture<'_, '_, F2, T>
+impl<F, T> Future for ScopeFuture<'_, '_, F, T>
 where
-	F2: Future<Output = T>,
+	F: Future<Output = T>,
 {
 	type Output = T;
 

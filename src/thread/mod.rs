@@ -13,6 +13,7 @@ use std::future::Future;
 use std::io::{self, Error, ErrorKind};
 use std::marker::PhantomData;
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -276,6 +277,8 @@ pub struct Scope<'scope, 'env: 'scope> {
 	_env: PhantomData<&'env mut &'env ()>,
 }
 
+impl RefUnwindSafe for Scope<'_, '_> {}
+
 impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
 	/// See [`std::thread::Scope`].
 	#[allow(clippy::missing_panics_doc)]
@@ -468,10 +471,10 @@ where
 
 /// Waits for the associated scope to finish.
 #[pin_project(PinnedDrop)]
-pub(crate) struct ScopeFuture<'scope, 'env, F2, T> {
+pub(crate) struct ScopeFuture<'scope, 'env, F, T> {
 	/// [`ScopeFuture`] state.
 	#[pin]
-	inner: ScopeFutureInner<F2, T>,
+	inner: ScopeFutureInner<F, T>,
 	/// Make sure same invariances over [`Scope`] are hold over its [`Future`].
 	///
 	/// ```compile_fail,E0373
@@ -488,16 +491,16 @@ pub(crate) struct ScopeFuture<'scope, 'env, F2, T> {
 
 /// State for [`ScopeFuture`].
 #[pin_project(project = ScopeFutureProj, project_replace = ScopeFutureReplace)]
-enum ScopeFutureInner<F2, T> {
+enum ScopeFutureInner<F, T> {
 	/// Executing the task given to [`scope_async()`].
-	Task(#[pin] F2),
+	Task(#[pin] F),
 	/// Wait for all threads to finish.
 	Wait(T),
 	/// [`Future`] was polled to conclusion.
 	None,
 }
 
-impl<F2, T> Debug for ScopeFuture<'_, '_, F2, T> {
+impl<F, T> Debug for ScopeFuture<'_, '_, F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		formatter
 			.debug_struct("ScopeFuture")
@@ -507,7 +510,7 @@ impl<F2, T> Debug for ScopeFuture<'_, '_, F2, T> {
 	}
 }
 
-impl<F2, T> Debug for ScopeFutureInner<F2, T> {
+impl<F, T> Debug for ScopeFutureInner<F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Task(_) => formatter.debug_struct("Task").finish_non_exhaustive(),
@@ -518,7 +521,7 @@ impl<F2, T> Debug for ScopeFutureInner<F2, T> {
 }
 
 #[pinned_drop]
-impl<F2, T> PinnedDrop for ScopeFuture<'_, '_, F2, T> {
+impl<F, T> PinnedDrop for ScopeFuture<'_, '_, F, T> {
 	fn drop(self: Pin<&mut Self>) {
 		let this = self.project();
 
@@ -531,9 +534,9 @@ impl<F2, T> PinnedDrop for ScopeFuture<'_, '_, F2, T> {
 	}
 }
 
-impl<F2, T> Future for ScopeFuture<'_, '_, F2, T>
+impl<F, T> Future for ScopeFuture<'_, '_, F, T>
 where
-	F2: Future<Output = T>,
+	F: Future<Output = T>,
 {
 	type Output = T;
 
