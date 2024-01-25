@@ -3,7 +3,9 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
+use std::future::Future;
 use std::ops::Deref;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
 use std::{fmt, io, mem};
@@ -13,7 +15,7 @@ use js_sys::WebAssembly::Global;
 use js_sys::{Array, Number, Object};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
-use web_sys::{DedicatedWorkerGlobalScope, Worker, WorkerOptions, WorkerType};
+use web_sys::{Worker, WorkerOptions, WorkerType};
 
 use super::channel::Sender;
 use super::js::{Exports, GlobalDescriptor, META};
@@ -31,6 +33,12 @@ thread_local! {
 	/// Containing all spawned workers.
 	static WORKERS: RefCell<HashMap<ThreadId, Worker>> = RefCell::new(HashMap::new());
 }
+
+/// Type of the task being sent to the worker.
+type Task = Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = u32>>> + Send>;
+/// Type of the task being sent to the worker with `'static` lifetime.
+type TaskStatic =
+	Box<dyn 'static + FnOnce() -> Pin<Box<dyn 'static + Future<Output = u32>>> + Send>;
 
 /// Shared state between thread and [`JoinHandle`].
 pub(super) struct Shared<T> {
@@ -61,7 +69,7 @@ enum Command {
 		/// [`ThreadId`] of the thread to be spawned.
 		id: ThreadId,
 		/// Task.
-		task: Box<dyn FnOnce() -> u32 + Send>,
+		task: Task,
 		/// Name of the thread.
 		name: Option<String>,
 	},
@@ -155,13 +163,14 @@ fn init_main() {
 
 /// Internal spawn function.
 #[allow(clippy::unnecessary_wraps)]
-pub(super) unsafe fn spawn<F, T>(
-	task: F,
+pub(super) unsafe fn spawn<F1, F2, T>(
+	task: F1,
 	name: Option<String>,
 	scope: Option<Arc<ScopeData>>,
 ) -> io::Result<JoinHandle<T>>
 where
-	F: FnOnce() -> T + Send,
+	F1: FnOnce() -> F2 + Send,
+	F2: Future<Output = T>,
 	T: Send,
 {
 	let thread = Thread::new_with_name(name);
@@ -176,54 +185,59 @@ where
 		scope.threads.fetch_add(1, Ordering::Relaxed);
 	}
 
-	let task: Box<dyn FnOnce() -> u32 + Send> = Box::new({
+	let task: Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = u32>>> + Send> = Box::new({
 		let thread = thread.clone();
 		let shared = Arc::downgrade(&shared);
 		move || {
 			Thread::register(thread);
-			let value = task();
+			let task = task();
 
-			if let Some(shared) = shared.upgrade() {
-				*shared.value.lock().unwrap_or_else(PoisonError::into_inner) = Some(value);
-				shared.cvar.notify_one();
-				shared.waker.wake();
-			} else {
-				drop(value);
-			}
+			Box::pin(async move {
+				let result = task.await;
 
-			if let Some(scope) = scope {
-				if scope.threads.fetch_sub(1, Ordering::Release) == 1 {
-					scope.thread.unpark();
-					scope.waker.wake();
+				if let Some(shared) = shared.upgrade() {
+					*shared.value.lock().unwrap_or_else(PoisonError::into_inner) = Some(result);
+					shared.cvar.notify_one();
+					shared.waker.wake();
+				} else {
+					drop(result);
 				}
-			}
 
-			let value = Box::new(0);
-			let index: *const i32 = value.deref();
-			#[allow(clippy::as_conversions)]
-			let index = index as u32 / 4;
+				if let Some(scope) = scope {
+					if scope.threads.fetch_sub(1, Ordering::Release) == 1 {
+						scope.thread.unpark();
+						scope.waker.wake();
+					}
+				}
 
-			let exports: Exports = wasm_bindgen::exports().unchecked_into();
-			let tls_base = Number::unchecked_from_js(exports.tls_base().value()).value_of();
-			let stack_alloc = Number::unchecked_from_js(exports.stack_alloc().value()).value_of();
+				let value = Box::new(0);
+				let index: *const i32 = value.deref();
+				#[allow(clippy::as_conversions)]
+				let index = index as u32 / 4;
 
-			SENDER
-				.get()
-				.expect("closing thread without `SENDER` being initialized")
-				.send(Command::Terminate {
-					id: current_id(),
-					value,
-					tls_base,
-					stack_alloc,
-				})
-				.expect("`Receiver` was somehow dropped from the main thread");
+				let exports: Exports = wasm_bindgen::exports().unchecked_into();
+				let tls_base = Number::unchecked_from_js(exports.tls_base().value()).value_of();
+				let stack_alloc =
+					Number::unchecked_from_js(exports.stack_alloc().value()).value_of();
 
-			index
+				SENDER
+					.get()
+					.expect("closing thread without `SENDER` being initialized")
+					.send(Command::Terminate {
+						id: current_id(),
+						value,
+						tls_base,
+						stack_alloc,
+					})
+					.expect("`Receiver` was somehow dropped from the main thread");
+
+				index
+			})
 		}
 	});
 	// SAFETY: `scope` has to be `Some`, which prevents this thread from outliving
 	// its lifetime.
-	let task: Box<dyn 'static + FnOnce() -> u32 + Send> = unsafe { mem::transmute(task) };
+	let task: TaskStatic = unsafe { mem::transmute(task) };
 
 	if *MAIN_THREAD.get_or_init(current_id) == current_id() {
 		init_main();
@@ -249,7 +263,7 @@ where
 }
 
 /// Spawning thread regardless of being nested.
-fn spawn_internal(id: ThreadId, task: Box<dyn FnOnce() -> u32>, name: Option<&str>) {
+fn spawn_internal(id: ThreadId, task: TaskStatic, name: Option<&str>) {
 	thread_local! {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(&{
@@ -290,14 +304,10 @@ fn spawn_internal(id: ThreadId, task: Box<dyn FnOnce() -> u32>, name: Option<&st
 #[doc(hidden)]
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
-pub unsafe fn __web_thread_entry(task: *mut Box<dyn FnOnce() -> u32>) -> u32 {
-	js_sys::global()
-		.unchecked_into::<DedicatedWorkerGlobalScope>()
-		.set_onmessage(None);
-
+pub async unsafe fn __web_thread_entry(task: *mut Task) -> u32 {
 	// SAFETY: Has to be a valid pointer to a `Box<dyn FnOnce() -> u32>`. We only
 	// call `__web_thread_entry` from `worker.js`. The data sent to it should
 	// only come from `self::spawn_internal()`.
 	let task = *unsafe { Box::from_raw(task) };
-	task()
+	task().await
 }

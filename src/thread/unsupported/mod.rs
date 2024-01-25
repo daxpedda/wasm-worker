@@ -4,6 +4,7 @@ mod js;
 mod parker;
 
 use std::fmt::{self, Debug, Formatter};
+use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
@@ -39,6 +40,17 @@ impl Builder {
 	/// Implementation of [`std::thread::Builder::spawn()`].
 	#[allow(clippy::unused_self)]
 	pub(super) fn spawn<F, T>(self, _: F) -> io::Result<JoinHandle<T>> {
+		unreachable!("reached `spawn()` without atomics target feature")
+	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_async()`](crate::web::BuilderExt::spawn_async).
+	#[allow(clippy::unused_self)]
+	pub(super) fn spawn_async_internal<F1, F2, T>(self, _: F1) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce() -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+	{
 		unreachable!("reached `spawn()` without atomics target feature")
 	}
 

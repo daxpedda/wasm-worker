@@ -8,6 +8,7 @@ mod url;
 mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
+use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -53,6 +54,18 @@ impl Builder {
 		T: Send + 'static,
 	{
 		// SAFETY: `F` and `T` are `'static`.
+		unsafe { spawn::spawn(|| async { task() }, self.name, None) }
+	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_async()`](crate::web::BuilderExt::spawn_async).
+	pub(super) fn spawn_async_internal<F1, F2, T>(self, task: F1) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce() -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: Send + 'static,
+	{
+		// SAFETY: `F` and `T` are `'static`.
 		unsafe { spawn::spawn(task, self.name, None) }
 	}
 
@@ -66,8 +79,9 @@ impl Builder {
 		F: FnOnce() -> T + Send + 'scope,
 		T: Send + 'scope,
 	{
-		// SAFETY: `Scope` will prevent this thread to outliving its lifetime.
-		let result = unsafe { spawn::spawn(task, self.name, Some(Arc::clone(&scope.0))) };
+		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
+		let result =
+			unsafe { spawn::spawn(|| async { task() }, self.name, Some(Arc::clone(&scope.0))) };
 
 		result.map(|handle| ScopedJoinHandle {
 			handle,

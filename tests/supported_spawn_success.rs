@@ -8,7 +8,7 @@ use web_thread::{Builder, Scope};
 #[cfg(target_family = "wasm")]
 use {
 	wasm_bindgen_test::wasm_bindgen_test,
-	web_thread::web::{self, JoinHandleExt, ScopedJoinHandleExt},
+	web_thread::web::{self, BuilderExt, JoinHandleExt, ScopedJoinHandleExt},
 	web_time as time,
 };
 
@@ -199,6 +199,33 @@ async fn join_async() {
 #[wasm_bindgen_test]
 fn has_thread_support() {
 	assert!(web::has_spawn_support());
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn spawn_async() {
+	let mut handle = web::spawn_async(|| async { assert_eq!(web_thread::current().name(), None) });
+
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn builder_async() {
+	let mut handle = Builder::new()
+		.stack_size(0)
+		.spawn_async(|| async { assert_eq!(web_thread::current().name(), None) })
+		.unwrap();
+
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
 }
 
 #[cfg(target_family = "wasm")]

@@ -70,6 +70,25 @@ impl Builder {
 		}
 	}
 
+	/// Implementation for
+	/// [`BuilderExt::spawn_async()`](crate::web::BuilderExt::spawn_async).
+	#[allow(clippy::same_name_method)]
+	pub(crate) fn spawn_async_internal<F1, F2, T>(self, task: F1) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce() -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: Send + 'static,
+	{
+		if has_spawn_support() {
+			self.0.spawn_async_internal(task).map(JoinHandle)
+		} else {
+			Err(Error::new(
+				ErrorKind::Unsupported,
+				"operation not supported on this platform without the atomics target feature",
+			))
+		}
+	}
+
 	/// See [`std::thread::Builder::spawn_scoped()`].
 	#[allow(clippy::missing_errors_doc, single_use_lifetimes)]
 	pub fn spawn_scoped<'scope, 'env, F, T>(
@@ -425,8 +444,7 @@ where
 	result
 }
 
-/// Implementation for
-/// [`web::scope_async()`](crate::web::scope_async()).
+/// Implementation for [`crate::web::scope_async()`].
 pub(crate) fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
 	task: F1,
 ) -> ScopeFuture<'scope, 'env, F2, T>
@@ -590,6 +608,18 @@ where
 	Builder::new().spawn(f).expect("failed to spawn thread")
 }
 
+/// Implementation for [`crate::web::spawn_async()`].
+pub(crate) fn spawn_async<F1, F2, T>(task: F1) -> JoinHandle<T>
+where
+	F1: 'static + FnOnce() -> F2 + Send,
+	F2: 'static + Future<Output = T>,
+	T: Send + 'static,
+{
+	Builder::new()
+		.spawn_async_internal(task)
+		.expect("failed to spawn thread")
+}
+
 /// See [`std::thread::yield_now()`].
 ///
 /// # Notes
@@ -599,8 +629,7 @@ pub fn yield_now() {
 	thread::yield_now();
 }
 
-/// Implementation for
-/// [`web::has_wait_support()`](crate::web::has_wait_support()).
+/// Implementation for [`crate::web::has_wait_support()`].
 pub(crate) fn has_wait_support() -> bool {
 	thread_local! {
 		static HAS_WAIT_SUPPORT: bool = GLOBAL

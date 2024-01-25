@@ -2,12 +2,13 @@
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
+use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use crate::{thread, JoinHandle, Scope, ScopedJoinHandle};
+use crate::{thread, Builder, JoinHandle, Scope, ScopedJoinHandle};
 
 /// Returns [`true`] if the current thread supports waiting, e.g. parking and
 /// sleeping.
@@ -124,4 +125,42 @@ impl<T> Future for ScopedJoinHandleFuture<'_, '_, T> {
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		ScopedJoinHandle::poll(self.0, cx)
 	}
+}
+
+/// Web-specific extension to [`web_thread::Builder`](crate::Builder).
+pub trait BuilderExt<T> {
+	/// Async version of [`Builder::spawn()`].
+	#[allow(clippy::missing_errors_doc)]
+	fn spawn_async<F1, F2>(
+		self,
+		#[allow(clippy::min_ident_chars)] f: F1,
+	) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce() -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: Send + 'static;
+}
+
+impl<T> BuilderExt<T> for Builder {
+	fn spawn_async<F1, F2>(
+		self,
+		#[allow(clippy::min_ident_chars)] f: F1,
+	) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce() -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: Send + 'static,
+	{
+		self.spawn_async_internal(f)
+	}
+}
+
+/// Async version of [`spawn()`](std::thread::spawn).
+pub fn spawn_async<F1, F2, T>(#[allow(clippy::min_ident_chars)] f: F1) -> JoinHandle<T>
+where
+	F1: 'static + FnOnce() -> F2 + Send,
+	F2: 'static + Future<Output = T>,
+	T: Send + 'static,
+{
+	thread::spawn_async(f)
 }
