@@ -9,14 +9,19 @@ mod unsupported;
 
 use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
+use std::future::Future;
 use std::io::{self, Error, ErrorKind};
+use std::marker::PhantomData;
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
-use std::thread;
+use std::task::{ready, Context, Poll};
 pub use std::thread::*;
 use std::time::Duration;
+use std::{mem, thread};
 
+use pin_project::{pin_project, pinned_drop};
 use r#impl::Parker;
 
 #[cfg(target_feature = "atomics")]
@@ -77,7 +82,7 @@ impl Builder {
 		T: Send + 'scope,
 	{
 		if has_spawn_support() {
-			self.0.spawn_scoped(scope, f)
+			self.0.spawn_scoped(&scope.this, f)
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,
@@ -100,7 +105,7 @@ impl Builder {
 }
 
 /// See [`std::thread::JoinHandle`].
-pub struct JoinHandle<T>(pub(crate) r#impl::JoinHandle<T>);
+pub struct JoinHandle<T>(r#impl::JoinHandle<T>);
 
 impl<T> Debug for JoinHandle<T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
@@ -126,6 +131,12 @@ impl<T> JoinHandle<T> {
 	pub fn thread(&self) -> &Thread {
 		self.0.thread()
 	}
+
+	/// Implementation for
+	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
+	pub(crate) fn poll(&self, cx: &Context<'_>) -> Poll<Result<T>> {
+		Pin::new(&self.0).poll(cx)
+	}
 }
 
 /// See [`std::thread::Thread`].
@@ -145,7 +156,7 @@ struct ThreadInner {
 
 thread_local! {
 	/// Holds this threads [`Thread`].
-	static THREAD: OnceCell<Thread> = OnceCell::new();
+	static THREAD: OnceCell<Thread> = const { OnceCell::new() };
 }
 
 impl Thread {
@@ -219,6 +230,91 @@ impl ThreadId {
 				Err(id) => last = id,
 			}
 		}
+	}
+}
+
+/// See [`std::thread::Scope`].
+#[derive(Debug)]
+pub struct Scope<'scope, 'env: 'scope> {
+	/// Implementation of [`Scope`].
+	this: r#impl::Scope,
+	/// Invariance over 'scope, to make sure 'scope cannot shrink,
+	/// which is necessary for soundness.
+	///
+	/// Without invariance, this would compile fine but be unsound:
+	///
+	/// ```compile_fail,E0373
+	/// web_thread::scope(|s| {
+	///     s.spawn(|| {
+	///         let a = String::from("abcd");
+	///         s.spawn(|| println!("{a:?}")); // might run after `a` is dropped
+	///     });
+	/// });
+	/// ```
+	#[allow(clippy::struct_field_names, rustdoc::private_doc_tests)]
+	_scope: PhantomData<&'scope mut &'scope ()>,
+	/// See [`Self::_env`].
+	_env: PhantomData<&'env mut &'env ()>,
+}
+
+impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
+	/// See [`std::thread::Scope`].
+	#[allow(clippy::missing_panics_doc)]
+	pub fn spawn<F, T>(
+		&'scope self,
+		#[allow(clippy::min_ident_chars)] f: F,
+	) -> ScopedJoinHandle<'scope, T>
+	where
+		F: FnOnce() -> T + Send + 'scope,
+		T: Send + 'scope,
+	{
+		Builder::new()
+			.spawn_scoped(self, f)
+			.expect("failed to spawn thread")
+	}
+}
+
+/// See [`std::thread::ScopedJoinHandle`].
+pub struct ScopedJoinHandle<'scope, T> {
+	/// The underlying [`JoinHandle`].
+	handle: r#impl::JoinHandle<T>,
+	/// Hold the `'scope` lifetime.
+	_scope: PhantomData<&'scope ()>,
+}
+
+impl<T> Debug for ScopedJoinHandle<'_, T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_struct("ScopedJoinHandle")
+			.field("handle", &self.handle)
+			.field("_scope", &self._scope)
+			.finish()
+	}
+}
+
+impl<#[allow(single_use_lifetimes)] 'scope, T> ScopedJoinHandle<'scope, T> {
+	/// See [`std::thread::ScopedJoinHandle::thread()`].
+	#[must_use]
+	pub fn thread(&self) -> &Thread {
+		self.handle.thread()
+	}
+
+	/// See [`std::thread::ScopedJoinHandle::join()`].
+	#[allow(clippy::missing_errors_doc)]
+	pub fn join(self) -> Result<T> {
+		self.handle.join()
+	}
+
+	/// See [`std::thread::ScopedJoinHandle::is_finished()`].
+	#[allow(clippy::must_use_candidate)]
+	pub fn is_finished(&self) -> bool {
+		self.handle.is_finished()
+	}
+
+	/// Implementation for
+	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
+	pub(crate) fn poll(&self, cx: &Context<'_>) -> Poll<Result<T>> {
+		Pin::new(&self.handle).poll(cx)
 	}
 }
 
@@ -317,7 +413,136 @@ pub fn scope<'env, F, T>(#[allow(clippy::min_ident_chars)] f: F) -> T
 where
 	F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
 {
-	r#impl::scope(f)
+	let scope = Scope {
+		this: r#impl::Scope::new(),
+		_scope: PhantomData,
+		_env: PhantomData,
+	};
+	let result = f(&scope);
+
+	scope.this.finish();
+
+	result
+}
+
+/// Implementation for
+/// [`web::scope_async()`](crate::web::scope_async()).
+pub(crate) fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
+	task: F1,
+) -> ScopeFuture<'scope, 'env, F2, T>
+where
+	F1: FnOnce(&'scope Scope<'scope, 'env>) -> F2,
+	F2: Future<Output = T>,
+{
+	let scope = Scope {
+		this: r#impl::Scope::new(),
+		_scope: PhantomData,
+		_env: PhantomData,
+	};
+	// SAFETY: We have to make sure that `task` is dropped before `scope`.
+	let task = task(unsafe { mem::transmute(&scope) });
+
+	ScopeFuture {
+		inner: ScopeFutureInner::Task(task),
+		scope,
+	}
+}
+
+/// Waits for the associated scope to finish.
+#[pin_project(PinnedDrop)]
+pub(crate) struct ScopeFuture<'scope, 'env, F2, T> {
+	/// [`ScopeFuture`] state.
+	#[pin]
+	inner: ScopeFutureInner<F2, T>,
+	/// Make sure same invariances over [`Scope`] are hold over its [`Future`].
+	///
+	/// ```compile_fail,E0373
+	/// web_thread::web::scope_async(|s| async move {
+	///     s.spawn(|| {
+	///         let a = String::from("abcd");
+	///         s.spawn(|| println!("{a:?}")); // might run after `a` is dropped
+	///     });
+	/// });
+	/// ```
+	#[allow(rustdoc::private_doc_tests)]
+	scope: Scope<'scope, 'env>,
+}
+
+/// State for [`ScopeFuture`].
+#[pin_project(project = ScopeFutureProj, project_replace = ScopeFutureReplace)]
+enum ScopeFutureInner<F2, T> {
+	/// Executing the task given to [`scope_async()`].
+	Task(#[pin] F2),
+	/// Wait for all threads to finish.
+	Wait(T),
+	/// [`Future`] was polled to conclusion.
+	None,
+}
+
+impl<F2, T> Debug for ScopeFuture<'_, '_, F2, T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_struct("ScopeFuture")
+			.field("inner", &self.inner)
+			.field("scope", &self.scope)
+			.finish()
+	}
+}
+
+impl<F2, T> Debug for ScopeFutureInner<F2, T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		match self {
+			Self::Task(_) => formatter.debug_struct("Task").finish_non_exhaustive(),
+			Self::Wait(_) => formatter.debug_struct("Wait").finish_non_exhaustive(),
+			Self::None => formatter.write_str("None"),
+		}
+	}
+}
+
+#[pinned_drop]
+impl<F2, T> PinnedDrop for ScopeFuture<'_, '_, F2, T> {
+	fn drop(self: Pin<&mut Self>) {
+		let this = self.project();
+
+		// SAFETY: Make sure to drop `task` before `scope`.
+		if let ScopeFutureReplace::Task(_) | ScopeFutureReplace::Wait(_) =
+			this.inner.project_replace(ScopeFutureInner::None)
+		{
+			this.scope.this.finish();
+		}
+	}
+}
+
+impl<F2, T> Future for ScopeFuture<'_, '_, F2, T>
+where
+	F2: Future<Output = T>,
+{
+	type Output = T;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		let mut this = self.project();
+
+		loop {
+			match this.inner.as_mut().project() {
+				ScopeFutureProj::Task(task) => {
+					let result = ready!(task.poll(cx));
+					this.inner
+						.as_mut()
+						.project_replace(ScopeFutureInner::Wait(result));
+				}
+				ScopeFutureProj::Wait(_) => {
+					ready!(this.scope.this.finish_async(cx));
+					let ScopeFutureReplace::Wait(result) =
+						this.inner.project_replace(ScopeFutureInner::None)
+					else {
+						unreachable!("found wrong state")
+					};
+					return Poll::Ready(result);
+				}
+				ScopeFutureProj::None => panic!("`ScopeFuture` polled after completion"),
+			}
+		}
+	}
 }
 
 /// See [`std::thread::sleep()`].

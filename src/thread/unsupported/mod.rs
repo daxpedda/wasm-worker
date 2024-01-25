@@ -6,6 +6,7 @@ mod parker;
 use std::fmt::{self, Debug, Formatter};
 use std::io;
 use std::marker::PhantomData;
+use std::task::{Context, Poll};
 use std::thread::Result;
 use std::time::Duration;
 
@@ -16,7 +17,7 @@ use wasm_bindgen::JsCast;
 
 pub(super) use self::parker::Parker;
 use super::js::CROSS_ORIGIN_ISOLATED;
-use super::{Scope, ScopedJoinHandle};
+use super::ScopedJoinHandle;
 use crate::thread;
 
 /// Implementation of [`std::thread::Builder`].
@@ -43,17 +44,15 @@ impl Builder {
 
 	/// Implementation of [`std::thread::Builder::spawn_scoped()`].
 	#[allow(clippy::unused_self)]
-	pub(super) fn spawn_scoped<'scope, F, T>(
-		self,
-		_: &'scope Scope<'scope, '_>,
-		_: F,
-	) -> io::Result<ScopedJoinHandle<'scope, T>> {
+	pub(super) fn spawn_scoped<F, T>(self, _: &Scope, _: F) -> io::Result<ScopedJoinHandle<'_, T>> {
 		unreachable!("reached `spawn_scoped()` without atomics target feature")
 	}
 }
 
 /// Implementation of [`std::thread::JoinHandle`].
-pub(crate) struct JoinHandle<T>(PhantomData<T>);
+pub(super) struct JoinHandle<T>(PhantomData<T>);
+
+impl<T> Unpin for JoinHandle<T> {}
 
 impl<T> Debug for JoinHandle<T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
@@ -79,15 +78,35 @@ impl<T> JoinHandle<T> {
 	pub(super) fn thread(&self) -> &thread::Thread {
 		unreachable!("found instanced `JoinHandle` without threading support")
 	}
+
+	/// Implementation for
+	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
+	#[allow(clippy::unused_self)]
+	pub(super) fn poll(&self, _: &Context<'_>) -> Poll<Result<T>> {
+		unreachable!("found instanced `JoinHandle` without threading support")
+	}
 }
 
-/// Implementation of [`std::thread::scope()`].
-#[track_caller]
-pub(super) fn scope<'env, F, T>(_: F) -> T
-where
-	F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
-{
-	todo!()
+/// Implementation of [`std::thread::Scope`].
+#[derive(Debug)]
+pub(super) struct Scope;
+
+impl Scope {
+	/// Create a [`Scope`].
+	#[allow(clippy::missing_const_for_fn)]
+	pub(super) fn new() -> Self {
+		Self
+	}
+
+	/// End the scope after calling the user function.
+	#[allow(clippy::missing_const_for_fn, clippy::unused_self)]
+	pub(super) fn finish(&self) {}
+
+	/// End the scope after calling the user function.
+	#[allow(clippy::missing_const_for_fn, clippy::unused_self)]
+	pub(super) fn finish_async(&self, _: &Context<'_>) -> Poll<()> {
+		Poll::Ready(())
+	}
 }
 
 /// Implementation of [`std::thread::sleep()`].
@@ -110,7 +129,7 @@ pub(super) fn test_wait_support() -> bool {
 
 /// Implementation for [`crate::web::has_spawn_support()`].
 #[allow(clippy::missing_const_for_fn)]
-pub(crate) fn has_spawn_support() -> bool {
+pub(super) fn has_spawn_support() -> bool {
 	false
 }
 

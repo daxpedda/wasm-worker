@@ -40,7 +40,7 @@ jobs:
               component: --component rust-src,
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
-              docargs: "-Zdoctest-xcompile",
+              doctestargs: "-Zdoctest-xcompile",
             }
             target: { target: wasm32-unknown-unknown, web: true }
           - os: macos-latest
@@ -49,7 +49,7 @@ jobs:
               component: --component rust-src,
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
-              docargs: "-Zdoctest-xcompile",
+              doctestargs: "-Zdoctest-xcompile",
             }
             target: { target: wasm32-unknown-unknown, web: true }
 
@@ -75,10 +75,14 @@ jobs:
         env:
           RUSTDOCFLAGS: ${{ matrix.rust.flags }}
           RUSTFLAGS: ${{ matrix.rust.flags }}
-        run: cargo doc --no-deps --target ${{ matrix.target.target }} ${{ matrix.rust.args }} ${{ matrix.rust.docargs }}
+        run: cargo doc --no-deps --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test
         if: matrix.target.web == false
         run: cargo test --all-targets --no-fail-fast
+      - name: Documentation tests
+        env:
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo test --doc --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }} ${{ matrix.rust.doctestargs }}
       - name: Test on Chrome
         if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
         env:

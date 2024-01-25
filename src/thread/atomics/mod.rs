@@ -9,18 +9,22 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::io;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::marker::PhantomData;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
+use std::task::{Context, Poll};
 use std::thread::Result;
 use std::time::Duration;
 
+use atomic_waker::AtomicWaker;
 use js_sys::WebAssembly::{Memory, Module};
 use js_sys::{Atomics, Int32Array};
 use wasm_bindgen::JsCast;
 
 pub(super) use self::parker::Parker;
 use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
-use super::{Scope, ScopedJoinHandle, Thread, THREAD};
+use super::{ScopedJoinHandle, Thread, THREAD};
+use crate::thread;
 
 /// Implementation of [`std::thread::Builder`].
 #[derive(Debug)]
@@ -48,32 +52,39 @@ impl Builder {
 		F: 'static + FnOnce() -> T + Send,
 		T: Send + 'static,
 	{
-		spawn::spawn(task, self.name)
+		// SAFETY: `F` and `T` are `'static`.
+		unsafe { spawn::spawn(task, self.name, None) }
 	}
 
 	/// Implementation of [`std::thread::Builder::spawn_scoped()`].
 	pub(super) fn spawn_scoped<'scope, F, T>(
 		self,
-		_scope: &'scope Scope<'scope, '_>,
-		_task: F,
+		scope: &'scope Scope,
+		task: F,
 	) -> io::Result<ScopedJoinHandle<'scope, T>>
 	where
 		F: FnOnce() -> T + Send + 'scope,
 		T: Send + 'scope,
 	{
-		todo!()
+		// SAFETY: `Scope` will prevent this thread to outliving its lifetime.
+		let result = unsafe { spawn::spawn(task, self.name, Some(Arc::clone(&scope.0))) };
+
+		result.map(|handle| ScopedJoinHandle {
+			handle,
+			_scope: PhantomData,
+		})
 	}
 }
 
 /// Implementation of [`std::thread::JoinHandle`].
-pub(crate) struct JoinHandle<T> {
+pub(super) struct JoinHandle<T> {
 	/// Shared state between [`JoinHandle`] and thread.
-	pub(crate) shared: Arc<spawn::Shared<T>>,
+	shared: Arc<spawn::Shared<T>>,
 	/// Corresponding [`Thread`].
-	pub(crate) thread: Thread,
+	thread: Thread,
 	/// Marker to know if the return value was already taken by
 	/// [`JoinHandle::join_async()`](crate::web::JoinHandleExt::join_async).
-	pub(crate) taken: AtomicBool,
+	taken: AtomicBool,
 }
 
 impl<T> Debug for JoinHandle<T> {
@@ -127,6 +138,39 @@ impl<T> JoinHandle<T> {
 	pub(super) fn thread(&self) -> &Thread {
 		&self.thread
 	}
+
+	/// Implementation for
+	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
+	#[allow(clippy::needless_pass_by_ref_mut)]
+	pub(super) fn poll(&self, cx: &Context<'_>) -> Poll<Result<T>> {
+		assert!(
+			!self.taken.load(Ordering::Relaxed),
+			"`JoinHandleFuture` polled or created after completion"
+		);
+
+		let mut value = match self.shared.value.try_lock() {
+			Ok(mut value) => value.take(),
+			Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
+			Err(TryLockError::WouldBlock) => None,
+		};
+
+		if value.is_none() {
+			self.shared.waker.register(cx.waker());
+
+			value = match self.shared.value.try_lock() {
+				Ok(mut value) => value.take(),
+				Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
+				Err(TryLockError::WouldBlock) => None,
+			};
+		}
+
+		if let Some(value) = value {
+			self.taken.store(true, Ordering::Relaxed);
+			Poll::Ready(Ok(value))
+		} else {
+			Poll::Pending
+		}
+	}
 }
 
 impl Thread {
@@ -136,13 +180,52 @@ impl Thread {
 	}
 }
 
-/// Implementation of [`std::thread::scope()`].
-#[track_caller]
-pub(super) fn scope<'env, F, T>(_task: F) -> T
-where
-	F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
-{
-	todo!()
+/// Implementation of [`std::thread::Scope`].
+#[derive(Debug)]
+pub(super) struct Scope(Arc<ScopeData>);
+
+/// Shared data between [`Scope`] and scoped threads.
+#[derive(Debug)]
+pub(super) struct ScopeData {
+	/// Number of running threads.
+	threads: AtomicUsize,
+	/// Handle to the spawning thread.
+	thread: Thread,
+	/// [`Waker`](std::task::Waker) to wake up a waiting [`Scope`].
+	waker: AtomicWaker,
+}
+
+impl Scope {
+	/// Creates a new [`Scope`].
+	pub(super) fn new() -> Self {
+		Self(Arc::new(ScopeData {
+			threads: AtomicUsize::new(0),
+			thread: thread::current(),
+			waker: AtomicWaker::new(),
+		}))
+	}
+
+	/// End the scope after calling the user function.
+	pub(super) fn finish(&self) {
+		while self.0.threads.load(Ordering::Acquire) != 0 {
+			thread::park();
+		}
+	}
+
+	/// End the scope after calling the user function.
+	pub(super) fn finish_async(&self, cx: &Context<'_>) -> Poll<()> {
+		if self.0.threads.load(Ordering::Acquire) == 0 {
+			return Poll::Ready(());
+		}
+
+		self.0.waker.register(cx.waker());
+
+		if self.0.threads.load(Ordering::Acquire) == 0 {
+			Poll::Ready(())
+		} else {
+			Poll::Pending
+		}
+	}
 }
 
 /// Implementation of [`std::thread::sleep()`].

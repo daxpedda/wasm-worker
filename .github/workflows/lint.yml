@@ -32,6 +32,7 @@ jobs:
               version: nightly,
               component: ",rust-src",
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              docflags: "--cfg=docsrs",
               args: "-Zbuild-std=panic_abort,std",
               docargs: "-Zdoctest-xcompile",
             }
@@ -49,7 +50,7 @@ jobs:
         run: cargo clippy --all-targets --target ${{ matrix.target }} ${{ matrix.rust.args }} -- -D warnings
       - name: Run Rustdoc
         env:
-          RUSTDOCFLAGS: -D warnings --cfg=docsrs ${{ matrix.rust.flags }}
+          RUSTDOCFLAGS: -D warnings ${{ matrix.rust.flags }} ${{ matrix.rust.docflags }}
           RUSTFLAGS: ${{ matrix.rust.flags }}
         run: |
           cargo doc --no-deps --document-private-items --lib --examples --target ${{ matrix.target }} ${{ matrix.rust.args }} ${{ matrix.rust.docargs }}

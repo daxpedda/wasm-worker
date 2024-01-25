@@ -4,9 +4,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
-use std::{fmt, io};
+use std::{fmt, io, mem};
 
 use atomic_waker::AtomicWaker;
 use js_sys::WebAssembly::Global;
@@ -19,7 +19,7 @@ use super::channel::Sender;
 use super::js::{Exports, GlobalDescriptor, META};
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
-use super::{channel, JoinHandle, MEMORY, MODULE};
+use super::{channel, JoinHandle, ScopeData, MEMORY, MODULE};
 use crate::thread::{Thread, ThreadId, THREAD};
 
 /// Saves the [`ThreadId`] of the main thread.
@@ -33,14 +33,14 @@ thread_local! {
 }
 
 /// Shared state between thread and [`JoinHandle`].
-pub(crate) struct Shared<T> {
+pub(super) struct Shared<T> {
 	/// [`Mutex`] holding the returned value.
-	pub(crate) value: Mutex<Option<T>>,
+	pub(super) value: Mutex<Option<T>>,
 	/// [`Condvar`] to wake up any thread waiting on the return value.
 	pub(super) cvar: Condvar,
 	/// Registered [`Waker`](std::task::Waker) to be notified when the thread is
 	/// finished.
-	pub(crate) waker: AtomicWaker,
+	pub(super) waker: AtomicWaker,
 }
 
 impl<T> Debug for Shared<T> {
@@ -155,10 +155,14 @@ fn init_main() {
 
 /// Internal spawn function.
 #[allow(clippy::unnecessary_wraps)]
-pub(super) fn spawn<F, T>(task: F, name: Option<String>) -> io::Result<JoinHandle<T>>
+pub(super) unsafe fn spawn<F, T>(
+	task: F,
+	name: Option<String>,
+	scope: Option<Arc<ScopeData>>,
+) -> io::Result<JoinHandle<T>>
 where
-	F: 'static + FnOnce() -> T + Send,
-	T: 'static + Send,
+	F: FnOnce() -> T + Send,
+	T: Send,
 {
 	let thread = Thread::new_with_name(name);
 	let shared = Arc::new(Shared {
@@ -166,6 +170,11 @@ where
 		cvar: Condvar::new(),
 		waker: AtomicWaker::new(),
 	});
+
+	if let Some(scope) = &scope {
+		// This can't overflow because creating a `ThreadId` would fail beforehand.
+		scope.threads.fetch_add(1, Ordering::Relaxed);
+	}
 
 	let task: Box<dyn FnOnce() -> u32 + Send> = Box::new({
 		let thread = thread.clone();
@@ -178,6 +187,15 @@ where
 				*shared.value.lock().unwrap_or_else(PoisonError::into_inner) = Some(value);
 				shared.cvar.notify_one();
 				shared.waker.wake();
+			} else {
+				drop(value);
+			}
+
+			if let Some(scope) = scope {
+				if scope.threads.fetch_sub(1, Ordering::Release) == 1 {
+					scope.thread.unpark();
+					scope.waker.wake();
+				}
 			}
 
 			let value = Box::new(0);
@@ -203,6 +221,9 @@ where
 			index
 		}
 	});
+	// SAFETY: `scope` has to be `Some`, which prevents this thread from outliving
+	// its lifetime.
+	let task: Box<dyn 'static + FnOnce() -> u32 + Send> = unsafe { mem::transmute(task) };
 
 	if *MAIN_THREAD.get_or_init(current_id) == current_id() {
 		init_main();

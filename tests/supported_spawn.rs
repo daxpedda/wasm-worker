@@ -4,11 +4,11 @@
 use std::time;
 
 use time::{Duration, Instant};
-use web_thread::Builder;
+use web_thread::{Builder, Scope};
 #[cfg(target_family = "wasm")]
 use {
 	wasm_bindgen_test::wasm_bindgen_test,
-	web_thread::web::{self, JoinHandleExt},
+	web_thread::web::{self, JoinHandleExt, ScopedJoinHandleExt},
 	web_time as time,
 };
 
@@ -81,6 +81,54 @@ async fn spawn() {
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
+async fn scope() {
+	let mut test = 0;
+
+	let task = scope_task(|scope| {
+		scope.spawn(|| test = 1);
+	});
+
+	#[cfg(not(target_family = "wasm"))]
+	web_thread::scope(task);
+	#[cfg(target_family = "wasm")]
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		web_thread::scope(task);
+	} else {
+		web::scope_async(move |scope| async move {
+			task(scope);
+		})
+		.await;
+	}
+
+	assert_eq!(test, 1);
+}
+
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
+async fn scope_builder() {
+	let mut test = 0;
+
+	let task = scope_task(|scope| {
+		Builder::new().spawn_scoped(scope, || test = 1).unwrap();
+	});
+
+	#[cfg(not(target_family = "wasm"))]
+	web_thread::scope(task);
+	#[cfg(target_family = "wasm")]
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		web_thread::scope(task);
+	} else {
+		web::scope_async(move |scope| async move {
+			task(scope);
+		})
+		.await;
+	}
+
+	assert_eq!(test, 1);
+}
+
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
 async fn builder() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = Builder::new()
@@ -149,4 +197,53 @@ async fn join_async() {
 #[wasm_bindgen_test]
 fn has_thread_support() {
 	assert!(web::has_spawn_support());
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_async() {
+	let mut test = 0;
+
+	web::scope_async(|scope| async {
+		scope.spawn(|| test = 1);
+	})
+	.await;
+
+	assert_eq!(test, 1);
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_async_drop() {
+	if !web::has_wait_support() {
+		return;
+	}
+
+	let borrow = String::new();
+
+	drop(web::scope_async(|scope| async {
+		scope.spawn(|| &borrow);
+	}));
+
+	drop(borrow);
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_join_async() {
+	let mut test = 0;
+
+	web::scope_async(|scope| async {
+		scope.spawn(|| test = 1).join_async().await.unwrap();
+	})
+	.await;
+
+	assert_eq!(test, 1);
+}
+
+const fn scope_task<'env, F, T>(task: F) -> F
+where
+	F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
+{
+	task
 }

@@ -5,19 +5,21 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use crate::{self as thread, JoinHandle};
+use pin_project::pin_project;
+
+use crate::{JoinHandle, Scope, ScopedJoinHandle};
 
 /// Returns [`true`] if the current thread supports waiting, e.g. parking and
 /// sleeping.
 #[must_use]
 pub fn has_wait_support() -> bool {
-	thread::has_wait_support()
+	crate::has_wait_support()
 }
 
 /// Returns [`true`] if the platform supports spawning threads.
 #[must_use]
 pub fn has_spawn_support() -> bool {
-	thread::has_spawn_support()
+	crate::has_spawn_support()
 }
 
 /// Web-specific extension to [`web_thread::JoinHandle`](crate::JoinHandle).
@@ -46,46 +48,80 @@ impl<T> Debug for JoinHandleFuture<'_, T> {
 }
 
 impl<T> Future for JoinHandleFuture<'_, T> {
-	type Output = thread::Result<T>;
+	type Output = crate::Result<T>;
 
-	fn poll(
-		self: Pin<&mut Self>,
-		#[cfg_attr(not(target_feature = "atomics"), allow(unused_variables))] cx: &mut Context<'_>,
-	) -> Poll<Self::Output> {
-		#[cfg(target_feature = "atomics")]
-		{
-			use std::sync::atomic::Ordering;
-			use std::sync::TryLockError;
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		JoinHandle::poll(self.0, cx)
+	}
+}
 
-			assert!(
-				!self.0 .0.taken.load(Ordering::Relaxed),
-				"`JoinHandleFuture` polled or created after completion"
-			);
+/// Async version of [`scope()`](std::thread::scope).
+pub fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
+	#[allow(clippy::min_ident_chars)] f: F1,
+) -> ScopeFuture<'scope, 'env, F2, T>
+where
+	F1: FnOnce(&'scope Scope<'scope, 'env>) -> F2,
+	F2: Future<Output = T>,
+{
+	ScopeFuture(crate::scope_async(f))
+}
 
-			let mut value = match self.0 .0.shared.value.try_lock() {
-				Ok(mut value) => value.take(),
-				Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
-				Err(TryLockError::WouldBlock) => None,
-			};
+/// Waits for the associated scope to finish.
+///
+/// If dropped but not polled to completion, will block until all spawned
+/// threads are finished but does not guarantee that the passed [`Future`] has
+/// finished executing.
+#[must_use = "does nothing if not polled"]
+#[pin_project]
+pub struct ScopeFuture<'scope, 'env, F2, T>(#[pin] crate::ScopeFuture<'scope, 'env, F2, T>);
 
-			if value.is_none() {
-				self.0 .0.shared.waker.register(cx.waker());
+impl<F2, T> Debug for ScopeFuture<'_, '_, F2, T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter.debug_tuple("ScopeFuture").field(&self.0).finish()
+	}
+}
 
-				value = match self.0 .0.shared.value.try_lock() {
-					Ok(mut value) => value.take(),
-					Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
-					Err(TryLockError::WouldBlock) => None,
-				};
-			}
+impl<F2, T> Future for ScopeFuture<'_, '_, F2, T>
+where
+	F2: Future<Output = T>,
+{
+	type Output = T;
 
-			if let Some(value) = value {
-				self.0 .0.taken.store(true, Ordering::Relaxed);
-				Poll::Ready(Ok(value))
-			} else {
-				Poll::Pending
-			}
-		}
-		#[cfg(not(target_feature = "atomics"))]
-		unreachable!("found instanced `JoinHandle` without threading support")
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		self.project().0.poll(cx)
+	}
+}
+
+/// Web-specific extension to
+/// [`web_thread::ScopedJoinHandle`](crate::ScopedJoinHandle).
+pub trait ScopedJoinHandleExt<'scope, T> {
+	/// Async version of [`ScopedJoinHandle::join()`].
+	fn join_async<'handle>(&'handle mut self) -> ScopedJoinHandleFuture<'handle, 'scope, T>;
+}
+
+impl<'scope, T> ScopedJoinHandleExt<'scope, T> for ScopedJoinHandle<'scope, T> {
+	fn join_async<'handle>(&'handle mut self) -> ScopedJoinHandleFuture<'handle, 'scope, T> {
+		ScopedJoinHandleFuture(self)
+	}
+}
+
+/// Waits for the associated thread to finish.
+#[must_use = "does nothing if not polled"]
+pub struct ScopedJoinHandleFuture<'handle, 'scope, T>(&'handle mut ScopedJoinHandle<'scope, T>);
+
+impl<T> Debug for ScopedJoinHandleFuture<'_, '_, T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_tuple("JoinHandleFuture")
+			.field(&self.0)
+			.finish()
+	}
+}
+
+impl<T> Future for ScopedJoinHandleFuture<'_, '_, T> {
+	type Output = crate::Result<T>;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		ScopedJoinHandle::poll(self.0, cx)
 	}
 }

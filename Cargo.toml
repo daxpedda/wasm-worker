@@ -12,6 +12,7 @@ version = "0.0.0"
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 js-sys = "0.3.65"
+pin-project = "1"
 wasm-bindgen = { version = "0.2.88", default-features = false }
 web-sys = { version = "0.3.65", features = [
 	"DedicatedWorkerGlobalScope",
