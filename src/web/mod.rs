@@ -7,19 +7,19 @@ use std::task::{Context, Poll};
 
 use pin_project::pin_project;
 
-use crate::{JoinHandle, Scope, ScopedJoinHandle};
+use crate::{thread, JoinHandle, Scope, ScopedJoinHandle};
 
 /// Returns [`true`] if the current thread supports waiting, e.g. parking and
 /// sleeping.
 #[must_use]
 pub fn has_wait_support() -> bool {
-	crate::has_wait_support()
+	thread::has_wait_support()
 }
 
 /// Returns [`true`] if the platform supports spawning threads.
 #[must_use]
 pub fn has_spawn_support() -> bool {
-	crate::has_spawn_support()
+	thread::has_spawn_support()
 }
 
 /// Web-specific extension to [`web_thread::JoinHandle`](crate::JoinHandle).
@@ -63,7 +63,7 @@ where
 	F1: FnOnce(&'scope Scope<'scope, 'env>) -> F2,
 	F2: Future<Output = T>,
 {
-	ScopeFuture(crate::scope_async(f))
+	ScopeFuture(thread::scope_async(f))
 }
 
 /// Waits for the associated scope to finish.
@@ -73,7 +73,7 @@ where
 /// finished executing.
 #[must_use = "does nothing if not polled"]
 #[pin_project]
-pub struct ScopeFuture<'scope, 'env, F2, T>(#[pin] crate::ScopeFuture<'scope, 'env, F2, T>);
+pub struct ScopeFuture<'scope, 'env, F2, T>(#[pin] thread::ScopeFuture<'scope, 'env, F2, T>);
 
 impl<F2, T> Debug for ScopeFuture<'_, '_, F2, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {

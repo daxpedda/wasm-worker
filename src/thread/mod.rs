@@ -17,7 +17,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::task::{ready, Context, Poll};
-pub use std::thread::*;
+use std::thread::Result;
 use std::time::Duration;
 use std::{mem, thread};
 

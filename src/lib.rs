@@ -26,11 +26,14 @@ mod thread;
 #[cfg_attr(docsrs, doc(cfg(Web)))]
 pub mod web;
 
-#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 pub use std::thread::*;
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
-pub use self::thread::*;
+#[allow(deprecated)]
+pub use self::thread::{
+	available_parallelism, current, park, park_timeout, park_timeout_ms, scope, sleep, sleep_ms,
+	spawn, yield_now, Builder, JoinHandle, Scope, ScopedJoinHandle, Thread, ThreadId,
+};
 
 #[cfg(all(
 	target_family = "wasm",
