@@ -241,7 +241,7 @@ async fn scope_async() {
 	assert_eq!(test, 1);
 }
 
-#[cfg(target_family = "wasm")]
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
 #[wasm_bindgen_test]
 async fn scope_async_drop() {
 	if !web::has_wait_support() {
@@ -266,6 +266,79 @@ async fn scope_join_async() {
 		scope.spawn(|| test = 1).join_async().await.unwrap();
 	})
 	.await;
+
+	assert_eq!(test, 1);
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_async_wait() {
+	let mut test = 0;
+
+	web::scope_async(|scope| async {
+		scope.spawn(|| test = 1);
+	})
+	.into_wait()
+	.await
+	.await;
+
+	assert_eq!(test, 1);
+}
+
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
+#[wasm_bindgen_test]
+async fn scope_async_into_wait_drop() {
+	if !web::has_wait_support() {
+		return;
+	}
+
+	let borrow = String::new();
+
+	drop(
+		web::scope_async(|scope| async {
+			scope.spawn(|| &borrow);
+		})
+		.into_wait(),
+	);
+
+	drop(borrow);
+}
+
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
+#[wasm_bindgen_test]
+async fn scope_async_wait_drop() {
+	if !web::has_wait_support() {
+		return;
+	}
+
+	let mut test = 0;
+
+	drop(
+		web::scope_async(|scope| async {
+			scope.spawn(|| test = 1);
+		})
+		.into_wait()
+		.await,
+	);
+
+	assert_eq!(test, 1);
+}
+
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
+#[wasm_bindgen_test]
+async fn scope_async_join() {
+	if !web::has_wait_support() {
+		return;
+	}
+
+	let mut test = 0;
+
+	web::scope_async(|scope| async {
+		scope.spawn(|| test = 1);
+	})
+	.into_wait()
+	.await
+	.join();
 
 	assert_eq!(test, 1);
 }

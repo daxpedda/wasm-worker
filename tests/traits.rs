@@ -42,7 +42,9 @@ const fn basic() {
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen_test]
 const fn web() {
-	use web_thread::web::{JoinHandleFuture, ScopeFuture, ScopedJoinHandleFuture};
+	use web_thread::web::{
+		JoinHandleFuture, ScopeFuture, ScopeIntoWaitFuture, ScopeWaitFuture, ScopedJoinHandleFuture,
+	};
 
 	assert_impl_all!(JoinHandleFuture<'_, PhantomPinned>: Debug, Send, Sync, Unpin);
 	assert_not_impl_any!(JoinHandleFuture<'_, PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, RefUnwindSafe, UnwindSafe);
@@ -53,4 +55,11 @@ const fn web() {
 	assert_impl_all!(ScopeFuture<'_, '_, PhantomPinned, PhantomPinned>: Debug, Send, Sync, RefUnwindSafe);
 	assert_impl_all!(ScopeFuture<'_, '_, (), PhantomPinned>: Unpin);
 	assert_not_impl_any!(ScopeFuture<'_, '_, PhantomPinned, PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, UnwindSafe);
+
+	assert_impl_all!(ScopeIntoWaitFuture<'_, '_, PhantomPinned, PhantomPinned>: Debug, Send, Sync, RefUnwindSafe);
+	assert_impl_all!(ScopeIntoWaitFuture<'_, '_, (), PhantomPinned>: Unpin);
+	assert_not_impl_any!(ScopeIntoWaitFuture<'_, '_, PhantomPinned, PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, UnwindSafe);
+
+	assert_impl_all!(ScopeWaitFuture<'_, '_, PhantomPinned>: Debug, Send, Sync, Unpin, RefUnwindSafe);
+	assert_not_impl_any!(ScopeWaitFuture<'_, '_, PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, UnwindSafe);
 }

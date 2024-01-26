@@ -1,7 +1,7 @@
 //! Platform-specific extensions to `web-thread` for the Web platform.
 
 use std::fmt::{self, Debug, Formatter};
-use std::future::Future;
+use std::future::{Future, Ready};
 use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -35,7 +35,8 @@ impl<T> JoinHandleExt<T> for JoinHandle<T> {
 	}
 }
 
-/// Waits for the associated thread to finish.
+/// Waits for the associated thread to finish. See
+/// [`JoinHandleExt::join_async()`].
 #[must_use = "does nothing if not polled"]
 pub struct JoinHandleFuture<'handle, T>(&'handle mut JoinHandle<T>);
 
@@ -67,12 +68,12 @@ where
 	ScopeFuture(thread::scope_async(f))
 }
 
-/// Waits for the associated scope to finish.
+/// Waits for the associated scope to finish. See [`scope_async()`].
 ///
 /// If dropped but not polled to completion, will block until all spawned
 /// threads are finished but does not guarantee that the passed [`Future`] has
 /// finished executing.
-#[must_use = "does nothing if not polled"]
+#[must_use = "will block until all spawned threads are finished if not polled to completion"]
 #[pin_project]
 pub struct ScopeFuture<'scope, 'env, F, T>(#[pin] thread::ScopeFuture<'scope, 'env, F, T>);
 
@@ -93,6 +94,17 @@ where
 	}
 }
 
+impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T> {
+	/// Converts this [`ScopeFuture`] to a [`ScopeWaitFuture`] by waiting until
+	/// the given [`Future`] to [`scope_async()`] is finished.
+	///
+	/// This is useful to get rid of `F` which often prevents [`ScopeFuture`] to
+	/// implement [`Unpin`].
+	pub const fn into_wait(self) -> ScopeIntoWaitFuture<'scope, 'env, F, T> {
+		ScopeIntoWaitFuture(self)
+	}
+}
+
 /// Web-specific extension to
 /// [`web_thread::ScopedJoinHandle`](crate::ScopedJoinHandle).
 pub trait ScopedJoinHandleExt<'scope, T> {
@@ -106,7 +118,8 @@ impl<'scope, T> ScopedJoinHandleExt<'scope, T> for ScopedJoinHandle<'scope, T> {
 	}
 }
 
-/// Waits for the associated thread to finish.
+/// Waits for the associated thread to finish. See
+/// [`ScopedJoinHandleExt::join_async()`].
 #[must_use = "does nothing if not polled"]
 pub struct ScopedJoinHandleFuture<'handle, 'scope, T>(&'handle mut ScopedJoinHandle<'scope, T>);
 
@@ -124,6 +137,83 @@ impl<T> Future for ScopedJoinHandleFuture<'_, '_, T> {
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		ScopedJoinHandle::poll(self.0, cx)
+	}
+}
+
+/// Poll to completion to get a [`ScopeWaitFuture`]. See
+/// [`ScopeFuture::into_wait()`].
+///
+/// If dropped but not polled to completion, will block until all spawned
+/// threads are finished but does not guarantee that the passed [`Future`] has
+/// finished executing.
+#[must_use = "will block until all spawned threads are finished if not polled to completion"]
+#[pin_project]
+pub struct ScopeIntoWaitFuture<'scope, 'env, F, T>(#[pin] ScopeFuture<'scope, 'env, F, T>);
+
+impl<F, T> Debug for ScopeIntoWaitFuture<'_, '_, F, T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_tuple("ScopeIntoWaitFuture")
+			.field(&self.0)
+			.finish()
+	}
+}
+
+impl<'scope, 'env, F, T> Future for ScopeIntoWaitFuture<'scope, 'env, F, T>
+where
+	F: Future<Output = T>,
+{
+	type Output = ScopeWaitFuture<'scope, 'env, T>;
+
+	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		self.project()
+			.0
+			.project()
+			.0
+			.poll_into_wait(cx)
+			.map(ScopeFuture)
+			.map(ScopeWaitFuture)
+	}
+}
+
+impl<'scope, 'env, F, T> ScopeIntoWaitFuture<'scope, 'env, F, T> {
+	/// Reverts back to [`ScopeFuture`]. See [`ScopeFuture::into_wait()`].
+	pub fn revert(self) -> ScopeFuture<'scope, 'env, F, T> {
+		self.0
+	}
+}
+
+/// Waits for the associated scope to finish. See [`ScopeFuture::into_wait()`].
+///
+/// If dropped but not polled to completion, will block until all spawned
+/// threads are finished.
+#[must_use = "will block until all spawned threads are finished if not polled to completion"]
+pub struct ScopeWaitFuture<'scope, 'env, T>(ScopeFuture<'scope, 'env, Ready<T>, T>);
+
+impl<T> Debug for ScopeWaitFuture<'_, '_, T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_tuple("ScopeWaitFuture")
+			.field(&self.0)
+			.finish()
+	}
+}
+
+impl<T> Future for ScopeWaitFuture<'_, '_, T> {
+	type Output = T;
+
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		Pin::new(&mut self.0).poll(cx)
+	}
+}
+
+impl<T> ScopeWaitFuture<'_, '_, T> {
+	/// This will block until all associated threads are finished.
+	///
+	/// # Panics
+	/// If called after being polled to completion.
+	pub fn join(self) -> T {
+		self.0 .0.join()
 	}
 }
 

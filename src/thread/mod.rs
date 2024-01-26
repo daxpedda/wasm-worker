@@ -9,7 +9,7 @@ mod unsupported;
 
 use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
-use std::future::Future;
+use std::future::{Future, Ready};
 use std::io::{self, Error, ErrorKind};
 use std::marker::PhantomData;
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -455,26 +455,22 @@ where
 	F1: FnOnce(&'scope Scope<'scope, 'env>) -> F2,
 	F2: Future<Output = T>,
 {
-	let scope = Scope {
+	let scope = Box::new(Scope {
 		this: r#impl::Scope::new(),
 		_scope: PhantomData,
 		_env: PhantomData,
-	};
+	});
 	// SAFETY: We have to make sure that `task` is dropped before `scope`.
-	let task = task(unsafe { mem::transmute(&scope) });
+	let task = task(unsafe { mem::transmute(scope.as_ref()) });
 
-	ScopeFuture {
-		inner: ScopeFutureInner::Task(task),
-		scope,
-	}
+	ScopeFuture(ScopeFutureInner::Task { task, scope })
 }
 
 /// Waits for the associated scope to finish.
 #[pin_project(PinnedDrop)]
-pub(crate) struct ScopeFuture<'scope, 'env, F, T> {
+pub(crate) struct ScopeFuture<'scope, 'env, F, T>(
 	/// [`ScopeFuture`] state.
-	#[pin]
-	inner: ScopeFutureInner<F, T>,
+	///
 	/// Make sure same invariances over [`Scope`] are hold over its [`Future`].
 	///
 	/// ```compile_fail,E0373
@@ -485,36 +481,50 @@ pub(crate) struct ScopeFuture<'scope, 'env, F, T> {
 	///     });
 	/// });
 	/// ```
+	#[pin]
 	#[allow(rustdoc::private_doc_tests)]
-	scope: Scope<'scope, 'env>,
-}
+	ScopeFutureInner<'scope, 'env, F, T>,
+);
 
 /// State for [`ScopeFuture`].
 #[pin_project(project = ScopeFutureProj, project_replace = ScopeFutureReplace)]
-enum ScopeFutureInner<F, T> {
+enum ScopeFutureInner<'scope, 'env, F, T> {
 	/// Executing the task given to [`scope_async()`].
-	Task(#[pin] F),
+	Task {
+		/// [`Future`] given by the user.
+		#[pin]
+		task: F,
+		/// Corresponding [`Scope`].
+		scope: Box<Scope<'scope, 'env>>,
+	},
 	/// Wait for all threads to finish.
-	Wait(T),
+	Wait {
+		/// Result of the [`Future`] given by the user.
+		result: T,
+		/// Corresponding [`Scope`].
+		scope: Box<Scope<'scope, 'env>>,
+	},
 	/// [`Future`] was polled to conclusion.
 	None,
 }
 
 impl<F, T> Debug for ScopeFuture<'_, '_, F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-		formatter
-			.debug_struct("ScopeFuture")
-			.field("inner", &self.inner)
-			.field("scope", &self.scope)
-			.finish()
+		formatter.debug_tuple("ScopeFuture").field(&self.0).finish()
 	}
 }
 
-impl<F, T> Debug for ScopeFutureInner<F, T> {
+impl<F, T> Debug for ScopeFutureInner<'_, '_, F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::Task(_) => formatter.debug_struct("Task").finish_non_exhaustive(),
-			Self::Wait(_) => formatter.debug_struct("Wait").finish_non_exhaustive(),
+			Self::Task { scope, .. } => formatter
+				.debug_struct("Task")
+				.field("scope", &scope)
+				.finish_non_exhaustive(),
+			Self::Wait { scope, .. } => formatter
+				.debug_struct("Wait")
+				.field("scope", &scope)
+				.finish_non_exhaustive(),
 			Self::None => formatter.write_str("None"),
 		}
 	}
@@ -525,11 +535,12 @@ impl<F, T> PinnedDrop for ScopeFuture<'_, '_, F, T> {
 	fn drop(self: Pin<&mut Self>) {
 		let this = self.project();
 
-		// SAFETY: Make sure to drop `task` before `scope`.
-		if let ScopeFutureReplace::Task(_) | ScopeFutureReplace::Wait(_) =
-			this.inner.project_replace(ScopeFutureInner::None)
+		// SAFETY: Make sure `task` is dropped and all threads have finished before
+		// dropping `Scope`.
+		if let ScopeFutureReplace::Task { scope, .. } | ScopeFutureReplace::Wait { scope, .. } =
+			this.0.project_replace(ScopeFutureInner::None)
 		{
-			this.scope.this.finish();
+			scope.this.finish();
 		}
 	}
 }
@@ -544,23 +555,82 @@ where
 		let mut this = self.project();
 
 		loop {
-			match this.inner.as_mut().project() {
-				ScopeFutureProj::Task(task) => {
+			match this.0.as_mut().project() {
+				ScopeFutureProj::Task { task, .. } => {
 					let result = ready!(task.poll(cx));
-					this.inner
+					let ScopeFutureReplace::Task { scope, .. } =
+						this.0.as_mut().project_replace(ScopeFutureInner::None)
+					else {
+						unreachable!("found wrong state")
+					};
+					this.0
 						.as_mut()
-						.project_replace(ScopeFutureInner::Wait(result));
+						.project_replace(ScopeFutureInner::Wait { result, scope });
 				}
-				ScopeFutureProj::Wait(_) => {
-					ready!(this.scope.this.finish_async(cx));
-					let ScopeFutureReplace::Wait(result) =
-						this.inner.project_replace(ScopeFutureInner::None)
+				ScopeFutureProj::Wait { scope, .. } => {
+					ready!(scope.this.finish_async(cx));
+					// SAFETY: Make sure `task` is dropped and all threads have finished before
+					// dropping `Scope`.
+					let ScopeFutureReplace::Wait { result, .. } =
+						this.0.project_replace(ScopeFutureInner::None)
 					else {
 						unreachable!("found wrong state")
 					};
 					return Poll::Ready(result);
 				}
 				ScopeFutureProj::None => panic!("`ScopeFuture` polled after completion"),
+			}
+		}
+	}
+}
+
+impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T>
+where
+	F: Future<Output = T>,
+{
+	/// Implementation for
+	/// [`ScopeFuture::into_wait()`](crate::web::ScopeFuture::into_wait).
+	pub(crate) fn poll_into_wait(
+		self: Pin<&mut Self>,
+		cx: &mut Context<'_>,
+	) -> Poll<ScopeFuture<'scope, 'env, Ready<T>, T>> {
+		let mut this = self.project();
+
+		match this.0.as_mut().project() {
+			ScopeFutureProj::Task { task, .. } => {
+				let result = ready!(task.poll(cx));
+				let ScopeFutureReplace::Task { scope, .. } =
+					this.0.project_replace(ScopeFutureInner::None)
+				else {
+					unreachable!("found wrong state")
+				};
+				Poll::Ready(ScopeFuture(ScopeFutureInner::Wait { result, scope }))
+			}
+			ScopeFutureProj::Wait { .. } => {
+				let ScopeFutureReplace::Wait { result, scope } =
+					this.0.project_replace(ScopeFutureInner::None)
+				else {
+					unreachable!("found wrong state")
+				};
+				return Poll::Ready(ScopeFuture(ScopeFutureInner::Wait { result, scope }));
+			}
+			ScopeFutureProj::None => panic!("`ScopeFuture` polled after completion"),
+		}
+	}
+
+	/// Implementation for
+	/// [`ScopeWaitFuture::join()`](crate::web::ScopeWaitFuture::join).
+	pub(crate) fn join(mut self) -> T {
+		match mem::replace(&mut self.0, ScopeFutureInner::None) {
+			ScopeFutureInner::Wait { result, scope } => {
+				scope.this.finish();
+				result
+			}
+			ScopeFutureInner::None => {
+				panic!("called after `ScopeWaitFuture` was polled to completion")
+			}
+			ScopeFutureInner::Task { .. } => {
+				unreachable!("should only be called from `ScopeWaitFuture`")
 			}
 		}
 	}

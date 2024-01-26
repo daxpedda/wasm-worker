@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 #[cfg(target_family = "wasm")]
-use wasm_bindgen_test::wasm_bindgen_test;
+use {wasm_bindgen_test::wasm_bindgen_test, web_thread::web};
 
 #[cfg_attr(not(target_family = "wasm"), test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
@@ -38,8 +38,30 @@ fn scope() {
 async fn scope_async() {
 	let mut test = 0;
 
-	#[allow(clippy::absolute_paths)]
-	web_thread::web::scope_async(|_| async { test = 1 }).await;
+	web::scope_async(|_| async { test = 1 }).await;
+
+	assert_eq!(test, 1);
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_async_wait() {
+	let mut test = 0;
+
+	let _future = web::scope_async(|_| async { test = 1 }).into_wait().await;
+
+	assert_eq!(test, 1);
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_async_join() {
+	let mut test = 0;
+
+	web::scope_async(|_| async { test = 1 })
+		.into_wait()
+		.await
+		.join();
 
 	assert_eq!(test, 1);
 }
