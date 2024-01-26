@@ -40,7 +40,6 @@ jobs:
               component: --component rust-src,
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
-              doctestargs: "-Zdoctest-xcompile",
             }
             target: { target: wasm32-unknown-unknown, web: true }
           - os: macos-latest
@@ -49,7 +48,6 @@ jobs:
               component: --component rust-src,
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
-              doctestargs: "-Zdoctest-xcompile",
             }
             target: { target: wasm32-unknown-unknown, web: true }
 
@@ -79,10 +77,6 @@ jobs:
       - name: Test
         if: matrix.target.web == false
         run: cargo test --all-targets --no-fail-fast
-      - name: Documentation tests
-        env:
-          RUSTFLAGS: ${{ matrix.rust.flags }}
-        run: cargo test --doc --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }} ${{ matrix.rust.doctestargs }}
       - name: Test on Chrome
         if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
         env:
@@ -122,11 +116,19 @@ jobs:
           SAFARIDRIVER: safaridriver
           RUSTFLAGS: --cfg=unsupported_spawn --cfg=unsupported_shared_wait ${{ matrix.rust.flags }}
         run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
-      - name: Documentation Test
+      - name: Documentation tests
         if: matrix.target.web == false
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }}
         run: cargo test --doc --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+      - name: Install nightly Rust
+        if: matrix.target.web && matrix.rust.version != 'nightly' && matrix.os == 'ubuntu-latest'
+        run: rustup toolchain install nightly --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
+      - name: Documentation tests with cross-compilation
+        if: matrix.target.web && matrix.os == 'ubuntu-latest'
+        env:
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run: cargo +nightly test --doc --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }} -Zdoctest-xcompile
 
   minimal-versions:
     name: Minimal Versions

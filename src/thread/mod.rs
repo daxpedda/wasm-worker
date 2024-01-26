@@ -258,22 +258,10 @@ impl ThreadId {
 pub struct Scope<'scope, 'env: 'scope> {
 	/// Implementation of [`Scope`].
 	this: r#impl::Scope,
-	/// Invariance over 'scope, to make sure 'scope cannot shrink,
-	/// which is necessary for soundness.
-	///
-	/// Without invariance, this would compile fine but be unsound:
-	///
-	/// ```compile_fail,E0373
-	/// web_thread::scope(|s| {
-	///     s.spawn(|| {
-	///         let a = String::from("abcd");
-	///         s.spawn(|| println!("{a:?}")); // might run after `a` is dropped
-	///     });
-	/// });
-	/// ```
-	#[allow(clippy::struct_field_names, rustdoc::private_doc_tests)]
+	/// Invariance over the lifetime `'scope`.
+	#[allow(clippy::struct_field_names)]
 	_scope: PhantomData<&'scope mut &'scope ()>,
-	/// See [`Self::_env`].
+	/// Invariance over the lifetime `'env`.
 	_env: PhantomData<&'env mut &'env ()>,
 }
 
@@ -468,23 +456,7 @@ where
 
 /// Waits for the associated scope to finish.
 #[pin_project(PinnedDrop)]
-pub(crate) struct ScopeFuture<'scope, 'env, F, T>(
-	/// [`ScopeFuture`] state.
-	///
-	/// Make sure same invariances over [`Scope`] are hold over its [`Future`].
-	///
-	/// ```compile_fail,E0373
-	/// web_thread::web::scope_async(|s| async move {
-	///     s.spawn(|| {
-	///         let a = String::from("abcd");
-	///         s.spawn(|| println!("{a:?}")); // might run after `a` is dropped
-	///     });
-	/// });
-	/// ```
-	#[pin]
-	#[allow(rustdoc::private_doc_tests)]
-	ScopeFutureInner<'scope, 'env, F, T>,
-);
+pub(crate) struct ScopeFuture<'scope, 'env, F, T>(#[pin] ScopeFutureInner<'scope, 'env, F, T>);
 
 /// State for [`ScopeFuture`].
 #[pin_project(project = ScopeFutureProj, project_replace = ScopeFutureReplace)]

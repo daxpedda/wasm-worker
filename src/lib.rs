@@ -20,6 +20,8 @@
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+#[cfg(doc)]
+mod compile_fail;
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 mod thread;
 #[cfg(any(all(target_family = "wasm", target_os = "unknown"), docsrs))]
