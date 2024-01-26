@@ -55,6 +55,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - uses: taiki-e/cache-cargo-install-action@v1
+        if: matrix.target.web
         with:
           tool: wasm-bindgen-cli
           git: https://github.com/daxpedda/wasm-bindgen
@@ -78,39 +79,39 @@ jobs:
         if: matrix.target.web == false
         run: cargo test --all-targets --no-fail-fast
       - name: Test on Chrome
-        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
+        if: matrix.target.web && matrix.os == 'ubuntu-latest'
         env:
           CHROMEDRIVER: chromedriver
           RUSTFLAGS: --cfg=unsupported_spawn_then_wait ${{ matrix.rust.flags }}
         run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test on Firefox
-        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
+        if: matrix.target.web && matrix.os == 'ubuntu-latest'
         env:
           GECKODRIVER: geckodriver
           RUSTFLAGS: --cfg=unsupported_service --cfg=unsupported_shared_wait ${{ matrix.rust.flags }}
         run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test on Safari
-        if: matrix.target.web == true && matrix.os == 'macos-latest'
+        if: matrix.target.web && matrix.os == 'macos-latest'
         env:
           SAFARIDRIVER: safaridriver
           RUSTFLAGS: --cfg=unsupported_spawn_then_wait --cfg=unsupported_shared_wait ${{ matrix.rust.flags }}
         run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test on Chrome without cross-origin isolation
-        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
+        if: matrix.target.web && matrix.os == 'ubuntu-latest'
         env:
           WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION: 1 
           CHROMEDRIVER: chromedriver
           RUSTFLAGS: --cfg=unsupported_spawn ${{ matrix.rust.flags }}
         run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test on Firefox without cross-origin isolation
-        if: matrix.target.web == true && matrix.os == 'ubuntu-latest'
+        if: matrix.target.web && matrix.os == 'ubuntu-latest'
         env:
           WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION: 1 
           GECKODRIVER: geckodriver
           RUSTFLAGS: --cfg=unsupported_spawn --cfg=unsupported_service --cfg=unsupported_shared_wait ${{ matrix.rust.flags }}
         run: cargo test --all-targets --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test on Safari without cross-origin isolation
-        if: matrix.target.web == true && matrix.os == 'macos-latest'
+        if: matrix.target.web && matrix.os == 'macos-latest'
         env:
           WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION: 1 
           SAFARIDRIVER: safaridriver
@@ -123,12 +124,46 @@ jobs:
         run: cargo test --doc --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Install nightly Rust
         if: matrix.target.web && matrix.rust.version != 'nightly' && matrix.os == 'ubuntu-latest'
-        run: rustup toolchain install nightly --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
+        run: rustup toolchain install nightly --profile minimal --target ${{ matrix.target.target }}
       - name: Documentation tests with cross-compilation
         if: matrix.target.web && matrix.os == 'ubuntu-latest'
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }}
         run: cargo +nightly test --doc --no-fail-fast --target ${{ matrix.target.target }} ${{ matrix.rust.args }} -Zdoctest-xcompile
+
+  wasm-compile-test:
+    name: Wasm Compile Test
+
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - { version: stable }
+        include:
+          - rust: {
+              version: nightly,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
+          rustup default ${{ matrix.rust.version }}
+      - name: Test
+        env:
+          UI_TEST_TARGET: wasm32-unknown-unknown
+          UI_TEST_RUSTFLAGS: ${{ matrix.rust.flags }}
+          UI_TEST_ARGS: ${{ matrix.rust.args }}
+        run: cargo test --test compile_test
 
   minimal-versions:
     name: Minimal Versions

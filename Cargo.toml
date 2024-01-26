@@ -39,6 +39,7 @@ static_assertions = "1"
 
 [target.'cfg(not(all(target_family = "wasm", target_os = "unknown")))'.dev-dependencies]
 pollster = { version = "0.3", features = ["macro"] }
+ui_test = { git = "https://github.com/daxpedda/ui_test", branch = "web-thread" }
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dev-dependencies]
 console_error_panic_hook = "0.1"
