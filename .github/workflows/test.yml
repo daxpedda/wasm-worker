@@ -157,8 +157,8 @@ jobs:
           RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
         run: cargo +nightly test --doc --no-fail-fast --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile
 
-  wasm-compile-test:
-    name: Wasm Compile Tests ${{ matrix.rust.description }}
+  compile-test-web:
+    name: Compile Tests on Web ${{ matrix.rust.description }}
 
     runs-on: ubuntu-latest
 
