@@ -6,9 +6,17 @@ use std::io;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+mod thread {
+	pub(super) struct ScopeFuture<'scope, 'env, F, T>(&'scope &'env (F, T));
+}
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
 use pin_project::pin_project;
 
-use crate::{thread, Builder, JoinHandle, Scope, ScopedJoinHandle};
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use crate::thread;
+use crate::{Builder, JoinHandle, Scope, ScopedJoinHandle};
 
 /// Returns [`true`] if the current thread supports waiting, e.g. parking and
 /// sleeping.
@@ -74,8 +82,11 @@ where
 /// threads are finished but does not guarantee that the passed [`Future`] has
 /// finished executing.
 #[must_use = "will block until all spawned threads are finished if not polled to completion"]
-#[pin_project]
-pub struct ScopeFuture<'scope, 'env, F, T>(#[pin] thread::ScopeFuture<'scope, 'env, F, T>);
+#[cfg_attr(all(target_family = "wasm", target_os = "unknown"), pin_project)]
+pub struct ScopeFuture<'scope, 'env, F, T>(
+	#[cfg_attr(all(target_family = "wasm", target_os = "unknown"), pin)]
+	thread::ScopeFuture<'scope, 'env, F, T>,
+);
 
 impl<F, T> Debug for ScopeFuture<'_, '_, F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
@@ -147,8 +158,11 @@ impl<T> Future for ScopedJoinHandleFuture<'_, '_, T> {
 /// threads are finished but does not guarantee that the passed [`Future`] has
 /// finished executing.
 #[must_use = "will block until all spawned threads are finished if not polled to completion"]
-#[pin_project]
-pub struct ScopeIntoWaitFuture<'scope, 'env, F, T>(#[pin] ScopeFuture<'scope, 'env, F, T>);
+#[cfg_attr(all(target_family = "wasm", target_os = "unknown"), pin_project)]
+pub struct ScopeIntoWaitFuture<'scope, 'env, F, T>(
+	#[cfg_attr(all(target_family = "wasm", target_os = "unknown"), pin)]
+	ScopeFuture<'scope, 'env, F, T>,
+);
 
 impl<F, T> Debug for ScopeIntoWaitFuture<'_, '_, F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {

@@ -90,7 +90,7 @@ path = "tests/unsupported_wait.rs"
 test = false
 
 [package.metadata.docs.rs]
-rustdoc-args = ["--cfg=docsrs", "-Ctarget-feature=+atomics,+bulk-memory"]
+rustdoc-args = ["--cfg=docsrs"]
 targets = ["wasm32-unknown-unknown"]
 
 [lints.rust]

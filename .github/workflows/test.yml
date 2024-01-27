@@ -80,7 +80,7 @@ jobs:
         run: cargo test --doc --no-fail-fast
 
   test-browsers:
-    name: Test ${{ matrix.driver.description }} ${{ matrix.rust.description }} ${{ matrix.cross-origin-isolation.description }}
+    name: ${{ matrix.rust.pre_description }} ${{ matrix.driver.description }} ${{ matrix.rust.post_description }} ${{ matrix.cross-origin-isolation.description }}
 
     runs-on: ${{ matrix.driver.os }}
 
@@ -90,10 +90,13 @@ jobs:
       fail-fast: false
       matrix:
         rust:
-          - { version: stable }
+          - { version: stable, pre_description: Test }
+          - { version: nightly, pre_description: Doctest }
           - {
               version: nightly,
-              description: with Atomics,
+              pre_description: Test & Doctest,
+              post_description: with Atomics,
+              atomics: true,
               component: --component rust-src,
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
@@ -140,19 +143,18 @@ jobs:
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
           rustup default ${{ matrix.rust.version }}
-      - name: Install nightly Rust
-        if: matrix.rust.version != 'nightly'
-        run: rustup toolchain install nightly --profile minimal --target wasm32-unknown-unknown
       - name: Set Driver
         run: echo "${{ matrix.driver.name }}=${{ matrix.driver.value }}" >> $GITHUB_ENV
       - name: Disable Cross-Origin-Isolation
         if: matrix.cross-origin-isolation.state == false
         run: echo "WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1" >> $GITHUB_ENV
       - name: Test
+        if: matrix.rust.version != 'nightly' || matrix.rust.atomics
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
         run: cargo test --all-targets --no-fail-fast --target wasm32-unknown-unknown ${{ matrix.rust.args }}
       - name: Documentation tests
+        if: matrix.rust.version == 'nightly'
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
         run: cargo +nightly test --doc --no-fail-fast --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile
@@ -228,7 +230,7 @@ jobs:
       - name: Install Rust nightly
         run: rustup toolchain install nightly --profile minimal
       - name: Update to minimal versions
-        run: cargo +nightly update -Z minimal-versions
+        run: cargo +nightly update -Zminimal-versions
       - name: Fix nightly
         if: matrix.rust.version == 'nightly'
         run: cargo update -p proc-macro2 --precise 1.0.60
