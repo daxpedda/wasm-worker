@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::marker::PhantomPinned;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
-use static_assertions::{assert_impl_all, assert_not_impl_any, assert_obj_safe};
+use static_assertions::{assert_impl_all, assert_not_impl_any};
 #[cfg(target_family = "wasm")]
 use wasm_bindgen_test::wasm_bindgen_test;
 use web_thread::{Builder, JoinHandle, Scope, ScopedJoinHandle, Thread, ThreadId};
@@ -16,34 +16,30 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 const fn basic() {
 	assert_impl_all!(Builder: Debug, Send, Sync, Unpin, RefUnwindSafe, UnwindSafe);
 	assert_not_impl_any!(Builder: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd);
-	assert_obj_safe!(Builder);
 
 	assert_impl_all!(JoinHandle<PhantomPinned>: Debug, Send, Sync, Unpin);
 	assert_not_impl_any!(JoinHandle<PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, RefUnwindSafe, UnwindSafe);
-	assert_obj_safe!(JoinHandle<PhantomPinned>);
 
 	assert_impl_all!(Scope<'_, '_>: Debug, Send, Sync, Unpin, RefUnwindSafe);
 	assert_not_impl_any!(Scope<'_, '_>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, UnwindSafe);
-	assert_obj_safe!(Scope<'_, '_>);
 
 	assert_impl_all!(ScopedJoinHandle<'_, PhantomPinned>: Debug, Send, Sync, Unpin);
 	assert_not_impl_any!(ScopedJoinHandle<'_, PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, RefUnwindSafe, UnwindSafe);
-	assert_obj_safe!(ScopedJoinHandle<'_, PhantomPinned>);
 
 	assert_impl_all!(Thread: Clone, Debug, Send, Sync, Unpin, RefUnwindSafe, UnwindSafe);
 	assert_not_impl_any!(Thread: Copy, Hash, Eq, PartialEq, Ord, PartialOrd);
-	assert_obj_safe!(Thread);
 
 	assert_impl_all!(ThreadId: Clone, Copy, Debug, Hash, Eq, PartialEq, Send, Sync, Unpin, RefUnwindSafe, UnwindSafe);
 	assert_not_impl_any!(ThreadId: Ord, PartialOrd);
-	assert_obj_safe!(ThreadId);
 }
 
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen_test]
 const fn web() {
+	use static_assertions::assert_obj_safe;
 	use web_thread::web::{
-		JoinHandleFuture, ScopeFuture, ScopeIntoWaitFuture, ScopeWaitFuture, ScopedJoinHandleFuture,
+		JoinHandleExt, JoinHandleFuture, ScopeFuture, ScopeIntoWaitFuture, ScopeWaitFuture,
+		ScopedJoinHandleExt, ScopedJoinHandleFuture,
 	};
 
 	assert_impl_all!(JoinHandleFuture<'_, PhantomPinned>: Debug, Send, Sync, Unpin);
@@ -62,4 +58,6 @@ const fn web() {
 
 	assert_impl_all!(ScopeWaitFuture<'_, '_, PhantomPinned>: Debug, Send, Sync, Unpin, RefUnwindSafe);
 	assert_not_impl_any!(ScopeWaitFuture<'_, '_, PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, UnwindSafe);
+
+	assert_obj_safe!(JoinHandleExt<()>, ScopedJoinHandleExt<'_, ()>);
 }
