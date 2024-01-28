@@ -13,7 +13,6 @@ use std::future::{Future, Ready};
 use std::io::{self, Error, ErrorKind};
 use std::marker::PhantomData;
 use std::num::{NonZeroU64, NonZeroUsize};
-use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -294,8 +293,6 @@ pub struct Scope<'scope, 'env: 'scope> {
 	_env: PhantomData<&'env mut &'env ()>,
 }
 
-impl RefUnwindSafe for Scope<'_, '_> {}
-
 impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
 	/// See [`std::thread::Scope`].
 	#[allow(clippy::missing_panics_doc)]
@@ -488,12 +485,13 @@ where
 	F1: FnOnce(&'scope Scope<'scope, 'env>) -> F2,
 	F2: Future<Output = T>,
 {
-	let scope = Box::new(Scope {
+	let scope = Box::pin(Scope {
 		this: r#impl::Scope::new(),
 		_scope: PhantomData,
 		_env: PhantomData,
 	});
-	// SAFETY: We have to make sure that `task` is dropped before `scope`.
+	// SAFETY: We have to make sure that `task` is dropped and all threads have
+	// finished before `scope` is dropped.
 	let task = task(unsafe { mem::transmute(scope.as_ref()) });
 
 	ScopeFuture(ScopeFutureInner::Task { task, scope })
@@ -512,14 +510,14 @@ enum ScopeFutureInner<'scope, 'env, F, T> {
 		#[pin]
 		task: F,
 		/// Corresponding [`Scope`].
-		scope: Box<Scope<'scope, 'env>>,
+		scope: Pin<Box<Scope<'scope, 'env>>>,
 	},
 	/// Wait for all threads to finish.
 	Wait {
 		/// Result of the [`Future`] given by the user.
 		result: T,
 		/// Corresponding [`Scope`].
-		scope: Box<Scope<'scope, 'env>>,
+		scope: Pin<Box<Scope<'scope, 'env>>>,
 	},
 	/// [`Future`] was polled to conclusion.
 	None,
@@ -552,8 +550,8 @@ impl<F, T> PinnedDrop for ScopeFuture<'_, '_, F, T> {
 	fn drop(self: Pin<&mut Self>) {
 		let this = self.project();
 
-		// SAFETY: Make sure `task` is dropped and all threads have finished before
-		// dropping `Scope`.
+		// SAFETY: We have to make sure that `task` is dropped and all threads have
+		// finished before `scope` is dropped.
 		if let ScopeFutureReplace::Task { scope, .. } | ScopeFutureReplace::Wait { scope, .. } =
 			this.0.project_replace(ScopeFutureInner::None)
 		{
@@ -586,8 +584,8 @@ where
 				}
 				ScopeFutureProj::Wait { scope, .. } => {
 					ready!(scope.this.finish_async(cx));
-					// SAFETY: Make sure `task` is dropped and all threads have finished before
-					// dropping `Scope`.
+					// SAFETY: We have to make sure that `task` is dropped and all threads have
+					// finished before `scope` is dropped.
 					let ScopeFutureReplace::Wait { result, .. } =
 						this.0.project_replace(ScopeFutureInner::None)
 					else {

@@ -3,7 +3,7 @@
 async fn scope_nested_async_await() {
 	let mut test = String::new();
 
-	let future = web_thread::web::scope_async(|scope| async {
+	let _future = web_thread::web::scope_async(|scope| async {
 		scope.spawn(|| test.push_str("test"));
 	})
 	.into_wait()

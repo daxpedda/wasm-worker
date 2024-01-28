@@ -11,6 +11,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
+use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
 use std::task::{Context, Poll};
@@ -229,6 +230,8 @@ impl Thread {
 /// Implementation of [`std::thread::Scope`].
 #[derive(Debug)]
 pub(super) struct Scope(Arc<ScopeData>);
+
+impl RefUnwindSafe for Scope {}
 
 /// Shared data between [`Scope`] and scoped threads.
 #[derive(Debug)]

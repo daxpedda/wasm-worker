@@ -3,7 +3,7 @@
 fn test() {
 	let mut test = String::new();
 
-	let future = web_thread::web::scope_async(|scope| async {
+	let _future = web_thread::web::scope_async(|scope| async {
 		test.push_str("test");
 	});
 
