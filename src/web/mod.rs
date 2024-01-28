@@ -232,10 +232,10 @@ impl<T> ScopeWaitFuture<'_, '_, T> {
 }
 
 /// Web-specific extension to [`web_thread::Builder`](crate::Builder).
-pub trait BuilderExt<T> {
+pub trait BuilderExt {
 	/// Async version of [`Builder::spawn()`].
 	#[allow(clippy::missing_errors_doc)]
-	fn spawn_async<F1, F2>(
+	fn spawn_async<F1, F2, T>(
 		self,
 		#[allow(clippy::min_ident_chars)] f: F1,
 	) -> io::Result<JoinHandle<T>>
@@ -245,8 +245,8 @@ pub trait BuilderExt<T> {
 		T: Send + 'static;
 }
 
-impl<T> BuilderExt<T> for Builder {
-	fn spawn_async<F1, F2>(
+impl BuilderExt for Builder {
+	fn spawn_async<F1, F2, T>(
 		self,
 		#[allow(clippy::min_ident_chars)] f: F1,
 	) -> io::Result<JoinHandle<T>>
