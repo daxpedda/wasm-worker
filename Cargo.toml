@@ -75,8 +75,8 @@ path = "tests/supported_spawn_fail.rs"
 test = false
 
 [[test]]
-name = "supported_wait"
-path = "tests/supported_wait.rs"
+name = "supported_block"
+path = "tests/supported_block.rs"
 test = false
 
 [[test]]
@@ -85,8 +85,8 @@ path = "tests/unsupported_spawn.rs"
 test = false
 
 [[test]]
-name = "unsupported_wait"
-path = "tests/unsupported_wait.rs"
+name = "unsupported_block"
+path = "tests/unsupported_block.rs"
 test = false
 
 [package.metadata.docs.rs]

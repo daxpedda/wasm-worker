@@ -420,7 +420,7 @@ pub fn current() -> Thread {
 /// will not panic on the main thread, worklet or any other unsupported worker
 /// type.
 pub fn park() {
-	if has_wait_support() {
+	if has_block_support() {
 		// SAFETY: park_timeout is called on the parker owned by this thread.
 		unsafe {
 			current().0.parker.park();
@@ -436,7 +436,7 @@ pub fn park() {
 /// feature, this will not panic on the main thread, worklet or any other
 /// unsupported worker type.
 pub fn park_timeout(dur: Duration) {
-	if has_wait_support() {
+	if has_block_support() {
 		// SAFETY: park_timeout is called on the parker owned by this thread.
 		unsafe {
 			current().0.parker.park_timeout(dur);
@@ -654,7 +654,7 @@ where
 /// This call will panic unless called from a worker type that allows blocking,
 /// e.g. a Web worker.
 pub fn sleep(dur: Duration) {
-	if has_wait_support() {
+	if has_block_support() {
 		r#impl::sleep(dur);
 	} else {
 		panic!("current worker type cannot be blocked")
@@ -713,30 +713,30 @@ pub fn yield_now() {
 	thread::yield_now();
 }
 
-/// Implementation for [`crate::web::has_wait_support()`].
-pub(crate) fn has_wait_support() -> bool {
+/// Implementation for [`crate::web::has_block_support()`].
+pub(crate) fn has_block_support() -> bool {
 	thread_local! {
-		static HAS_WAIT_SUPPORT: bool = GLOBAL
+		static HAS_BLOCK_SUPPORT: bool = GLOBAL
 			.with(|global| {
 				global.as_ref().map(|global| match global {
 					Global::Window(_) | Global::Worklet | Global::Service(_) => false,
 					Global::Dedicated(_) => true,
-					// Firefox doesn't support waiting in shared workers, so for cross-browser
+					// Firefox doesn't support blocking in shared workers, so for cross-browser
 					// support we have to test manually.
 					// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
 					Global::Shared(_) => {
-						/// Cache if waiting on shared workers is supported.
-						static HAS_SHARED_WORKER_WAIT_SUPPORT: OnceLock<bool> = OnceLock::new();
+						/// Cache if blocking on shared workers is supported.
+						static HAS_SHARED_WORKER_BLOCK_SUPPORT: OnceLock<bool> = OnceLock::new();
 
-						*HAS_SHARED_WORKER_WAIT_SUPPORT.get_or_init(r#impl::test_wait_support)
+						*HAS_SHARED_WORKER_BLOCK_SUPPORT.get_or_init(r#impl::test_block_support)
 					}
 				})
 			})
 			// For unknown worker types we test manually.
-			.unwrap_or_else(r#impl::test_wait_support);
+			.unwrap_or_else(r#impl::test_block_support);
 	}
 
-	HAS_WAIT_SUPPORT.with(bool::clone)
+	HAS_BLOCK_SUPPORT.with(bool::clone)
 }
 
 /// Implementation for [`crate::web::has_spawn_support()`].

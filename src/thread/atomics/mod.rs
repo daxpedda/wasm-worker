@@ -269,8 +269,8 @@ pub(super) fn sleep(dur: Duration) {
 	std::thread::sleep(dur);
 }
 
-/// Tests is waiting is supported.
-pub(super) fn test_wait_support() -> bool {
+/// Tests is blocking is supported.
+pub(super) fn test_block_support() -> bool {
 	let value = 0;
 	let index: *const i32 = &value;
 	#[allow(clippy::as_conversions)]

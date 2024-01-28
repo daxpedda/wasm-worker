@@ -35,7 +35,7 @@ async fn park() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		handle.join().unwrap();
 	} else {
 		handle.join_async().await.unwrap();
@@ -60,7 +60,7 @@ async fn sleep() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		handle.join().unwrap();
 	} else {
 		handle.join_async().await.unwrap();
@@ -79,7 +79,7 @@ async fn spawn() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		handle.join().unwrap();
 	} else {
 		handle.join_async().await.unwrap();
@@ -98,7 +98,7 @@ async fn scope() {
 	#[cfg(not(target_family = "wasm"))]
 	web_thread::scope(task);
 	#[cfg(target_family = "wasm")]
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		web_thread::scope(task);
 	} else {
 		web::scope_async(move |scope| async move {
@@ -122,7 +122,7 @@ async fn scope_builder() {
 	#[cfg(not(target_family = "wasm"))]
 	web_thread::scope(task);
 	#[cfg(target_family = "wasm")]
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		web_thread::scope(task);
 	} else {
 		web::scope_async(move |scope| async move {
@@ -146,7 +146,7 @@ async fn builder() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		handle.join().unwrap();
 	} else {
 		handle.join_async().await.unwrap();
@@ -166,7 +166,7 @@ async fn builder_name() {
 	#[cfg(not(target_family = "wasm"))]
 	handle.join().unwrap();
 	#[cfg(target_family = "wasm")]
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		handle.join().unwrap();
 	} else {
 		handle.join_async().await.unwrap();
@@ -211,7 +211,7 @@ fn has_thread_support() {
 async fn spawn_async() {
 	let mut handle = web::spawn_async(|| async { assert_eq!(web_thread::current().name(), None) });
 
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		handle.join().unwrap();
 	} else {
 		handle.join_async().await.unwrap();
@@ -226,7 +226,7 @@ async fn builder_async() {
 		.spawn_async(|| async { assert_eq!(web_thread::current().name(), None) })
 		.unwrap();
 
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		handle.join().unwrap();
 	} else {
 		handle.join_async().await.unwrap();
@@ -242,7 +242,7 @@ async fn scope_spawn_async() {
 		scope.spawn_async(|| async { test = 1 });
 	});
 
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		web_thread::scope(task);
 	} else {
 		web::scope_async(move |scope| async move {
@@ -265,7 +265,7 @@ async fn scope_builder_async() {
 			.unwrap();
 	});
 
-	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
 		web_thread::scope(task);
 	} else {
 		web::scope_async(move |scope| async move {
@@ -290,10 +290,10 @@ async fn scope_async() {
 	assert_eq!(test, 1);
 }
 
-#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_block)))]
 #[wasm_bindgen_test]
 async fn scope_async_drop() {
-	if !web::has_wait_support() {
+	if !web::has_block_support() {
 		return;
 	}
 
@@ -334,10 +334,10 @@ async fn scope_async_wait() {
 	assert_eq!(test, 1);
 }
 
-#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_block)))]
 #[wasm_bindgen_test]
 async fn scope_async_into_wait_drop() {
-	if !web::has_wait_support() {
+	if !web::has_block_support() {
 		return;
 	}
 
@@ -353,10 +353,10 @@ async fn scope_async_into_wait_drop() {
 	drop(borrow);
 }
 
-#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_block)))]
 #[wasm_bindgen_test]
 async fn scope_async_wait_drop() {
-	if !web::has_wait_support() {
+	if !web::has_block_support() {
 		return;
 	}
 
@@ -373,10 +373,10 @@ async fn scope_async_wait_drop() {
 	assert_eq!(test, 1);
 }
 
-#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_wait)))]
+#[cfg(all(target_family = "wasm", not(unsupported_spawn_then_block)))]
 #[wasm_bindgen_test]
 async fn scope_async_join() {
-	if !web::has_wait_support() {
+	if !web::has_block_support() {
 		return;
 	}
 

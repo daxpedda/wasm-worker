@@ -114,21 +114,21 @@ jobs:
               description: Chrome,
               name: CHROMEDRIVER,
               value: chromedriver,
-              flags: --cfg=unsupported_spawn_then_wait
+              flags: --cfg=unsupported_spawn_then_block
             }
           - {
               os: ubuntu-latest,
               description: Firefox,
               name: GECKODRIVER,
               value: geckodriver,
-              flags: --cfg=unsupported_service --cfg=unsupported_shared_wait
+              flags: --cfg=unsupported_service --cfg=unsupported_shared_block
             }
           - {
               os: macos-latest,
               description: Safari,
               name: SAFARIDRIVER,
               value: safaridriver,
-              flags: --cfg=unsupported_spawn_then_wait --cfg=unsupported_shared_wait
+              flags: --cfg=unsupported_spawn_then_block --cfg=unsupported_shared_block
             }
 
     steps:

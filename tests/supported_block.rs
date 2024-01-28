@@ -42,6 +42,6 @@ fn sleep() {
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen_test::wasm_bindgen_test]
 #[allow(clippy::absolute_paths)]
-fn has_wait_support() {
-	assert!(web_thread::web::has_wait_support());
+fn has_block_support() {
+	assert!(web_thread::web::has_block_support());
 }

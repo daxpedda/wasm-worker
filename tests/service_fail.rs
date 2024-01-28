@@ -4,7 +4,7 @@
 #![cfg(not(unsupported_service))]
 
 mod basic_fail;
+mod unsupported_block;
 mod unsupported_spawn;
-mod unsupported_wait;
 
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_service_worker);

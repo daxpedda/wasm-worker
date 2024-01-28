@@ -18,11 +18,11 @@ use pin_project::pin_project;
 use crate::thread;
 use crate::{Builder, JoinHandle, Scope, ScopedJoinHandle};
 
-/// Returns [`true`] if the current thread supports waiting, e.g. parking and
+/// Returns [`true`] if the current thread supports blocking, e.g. parking and
 /// sleeping.
 #[must_use]
-pub fn has_wait_support() -> bool {
-	thread::has_wait_support()
+pub fn has_block_support() -> bool {
+	thread::has_block_support()
 }
 
 /// Returns [`true`] if the platform supports spawning threads.
@@ -245,8 +245,8 @@ pub trait BuilderExt {
 		T: 'static + Send;
 
 	/// Async version of [`Builder::spawn_scoped()`].
-	#[allow(clippy::missing_errors_doc, single_use_lifetimes)]
-	fn spawn_scoped_async<'scope, 'env, F1, F2, T>(
+	#[allow(clippy::missing_errors_doc)]
+	fn spawn_scoped_async<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T>(
 		self,
 		scope: &'scope Scope<'scope, 'env>,
 		#[allow(clippy::min_ident_chars)] f: F1,
@@ -270,8 +270,7 @@ impl BuilderExt for Builder {
 		self.spawn_async_internal(f)
 	}
 
-	#[allow(single_use_lifetimes)]
-	fn spawn_scoped_async<'scope, 'env, F1, F2, T>(
+	fn spawn_scoped_async<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T>(
 		self,
 		scope: &'scope Scope<'scope, 'env>,
 		#[allow(clippy::min_ident_chars)] f: F1,

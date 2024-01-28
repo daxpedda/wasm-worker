@@ -31,8 +31,8 @@ fn sleep_ms() {
 }
 
 #[wasm_bindgen_test]
-fn has_wait_support() {
-	assert!(!web::has_wait_support());
+fn has_block_support() {
+	assert!(!web::has_block_support());
 }
 
 #[wasm_bindgen_test]
