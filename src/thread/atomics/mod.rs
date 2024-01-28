@@ -157,6 +157,11 @@ impl<T> JoinHandle<T> {
 			.lock()
 			.unwrap_or_else(PoisonError::into_inner);
 
+		assert!(
+			super::has_block_support(),
+			"current worker type cannot be blocked"
+		);
+
 		while value.is_none() {
 			value = self
 				.shared
@@ -181,6 +186,12 @@ impl<T> JoinHandle<T> {
 		assert!(
 			!self.taken.load(Ordering::Relaxed),
 			"`JoinHandleFuture` polled or created after completion"
+		);
+
+		assert_ne!(
+			self.thread().id(),
+			super::current().id(),
+			"called `JoinHandle::join()` on the thread to join"
 		);
 
 		let mut value = match self.shared.value.try_lock() {

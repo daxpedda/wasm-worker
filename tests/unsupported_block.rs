@@ -31,6 +31,17 @@ fn sleep_ms() {
 }
 
 #[wasm_bindgen_test]
+#[should_panic = "current worker type cannot be blocked"]
+fn join() {
+	assert!(
+		web::has_spawn_support(),
+		"current worker type cannot be blocked"
+	);
+
+	let _ = web_thread::spawn(|| ()).join();
+}
+
+#[wasm_bindgen_test]
 fn has_block_support() {
 	assert!(!web::has_block_support());
 }

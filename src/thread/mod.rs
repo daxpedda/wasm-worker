@@ -164,8 +164,14 @@ impl<T> JoinHandle<T> {
 	}
 
 	/// See [`std::thread::JoinHandle::join()`].
-	#[allow(clippy::missing_errors_doc)]
+	#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 	pub fn join(self) -> Result<T> {
+		assert_ne!(
+			self.thread().id(),
+			current().id(),
+			"called `JoinHandle::join()` on the thread to join"
+		);
+
 		self.0.join()
 	}
 
