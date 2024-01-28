@@ -13,7 +13,7 @@ use web_thread::{Builder, Scope};
 #[cfg(target_family = "wasm")]
 use {
 	wasm_bindgen_test::wasm_bindgen_test,
-	web_thread::web::{self, BuilderExt, JoinHandleExt, ScopedJoinHandleExt},
+	web_thread::web::{self, BuilderExt, JoinHandleExt, ScopeExt, ScopedJoinHandleExt},
 	web_time as time,
 };
 
@@ -231,6 +231,50 @@ async fn builder_async() {
 	} else {
 		handle.join_async().await.unwrap();
 	}
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_spawn_async() {
+	let mut test = 0;
+
+	let task = scope_task(|scope| {
+		scope.spawn_async(|| async { test = 1 });
+	});
+
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		web_thread::scope(task);
+	} else {
+		web::scope_async(move |scope| async move {
+			task(scope);
+		})
+		.await;
+	}
+
+	assert_eq!(test, 1);
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_builder_async() {
+	let mut test = 0;
+
+	let task = scope_task(|scope| {
+		Builder::new()
+			.spawn_scoped_async(scope, || async { test = 1 })
+			.unwrap();
+	});
+
+	if web::has_wait_support() && cfg!(not(unsupported_spawn_then_wait)) {
+		web_thread::scope(task);
+	} else {
+		web::scope_async(move |scope| async move {
+			task(scope);
+		})
+		.await;
+	}
+
+	assert_eq!(test, 1);
 }
 
 #[cfg(target_family = "wasm")]

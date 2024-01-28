@@ -242,7 +242,19 @@ pub trait BuilderExt {
 	where
 		F1: 'static + FnOnce() -> F2 + Send,
 		F2: 'static + Future<Output = T>,
-		T: Send + 'static;
+		T: 'static + Send;
+
+	/// Async version of [`Builder::spawn_scoped()`].
+	#[allow(clippy::missing_errors_doc, single_use_lifetimes)]
+	fn spawn_scoped_async<'scope, 'env, F1, F2, T>(
+		self,
+		scope: &'scope Scope<'scope, 'env>,
+		#[allow(clippy::min_ident_chars)] f: F1,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce() -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send;
 }
 
 impl BuilderExt for Builder {
@@ -254,6 +266,47 @@ impl BuilderExt for Builder {
 		F1: 'static + FnOnce() -> F2 + Send,
 		F2: 'static + Future<Output = T>,
 		T: Send + 'static,
+	{
+		self.spawn_async_internal(f)
+	}
+
+	#[allow(single_use_lifetimes)]
+	fn spawn_scoped_async<'scope, 'env, F1, F2, T>(
+		self,
+		scope: &'scope Scope<'scope, 'env>,
+		#[allow(clippy::min_ident_chars)] f: F1,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce() -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+	{
+		self.spawn_scoped_async_internal(scope, f)
+	}
+}
+
+/// Web-specific extension to [`web_thread::Scope`](crate::Scope).
+pub trait ScopeExt<'scope> {
+	/// Async version of [`Scope::spawn()`].
+	fn spawn_async<F1, F2, T>(
+		&'scope self,
+		#[allow(clippy::min_ident_chars)] f: F1,
+	) -> ScopedJoinHandle<'scope, T>
+	where
+		F1: 'scope + FnOnce() -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send;
+}
+
+impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
+	fn spawn_async<F1, F2, T>(
+		&'scope self,
+		#[allow(clippy::min_ident_chars)] f: F1,
+	) -> ScopedJoinHandle<'scope, T>
+	where
+		F1: 'scope + FnOnce() -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
 	{
 		self.spawn_async_internal(f)
 	}

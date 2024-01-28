@@ -78,7 +78,7 @@ impl Builder {
 	where
 		F1: 'static + FnOnce() -> F2 + Send,
 		F2: 'static + Future<Output = T>,
-		T: Send + 'static,
+		T: 'static + Send,
 	{
 		if has_spawn_support() {
 			self.0.spawn_async_internal(task).map(JoinHandle)
@@ -103,6 +103,29 @@ impl Builder {
 	{
 		if has_spawn_support() {
 			self.0.spawn_scoped(&scope.this, f)
+		} else {
+			Err(Error::new(
+				ErrorKind::Unsupported,
+				"operation not supported on this platform without the atomics target feature",
+			))
+		}
+	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_scoped_async()`](crate::web::BuilderExt::spawn_scoped_async).
+	#[allow(single_use_lifetimes)]
+	pub(crate) fn spawn_scoped_async_internal<'scope, 'env, F1, F2, T>(
+		self,
+		scope: &'scope Scope<'scope, 'env>,
+		task: F1,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce() -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+	{
+		if has_spawn_support() {
+			self.0.spawn_scoped_async_internal(&scope.this, task)
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,
@@ -280,6 +303,22 @@ impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
 	{
 		Builder::new()
 			.spawn_scoped(self, f)
+			.expect("failed to spawn thread")
+	}
+
+	/// Implementation for
+	/// [`ScopeExt::spawn_async()`](crate::web::ScopeExt::spawn_async).
+	pub(crate) fn spawn_async_internal<F1, F2, T>(
+		&'scope self,
+		task: F1,
+	) -> ScopedJoinHandle<'scope, T>
+	where
+		F1: 'scope + FnOnce() -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+	{
+		Builder::new()
+			.spawn_scoped_async_internal(self, task)
 			.expect("failed to spawn thread")
 	}
 }

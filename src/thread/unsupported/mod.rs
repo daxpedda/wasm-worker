@@ -59,6 +59,21 @@ impl Builder {
 	pub(super) fn spawn_scoped<F, T>(self, _: &Scope, _: F) -> io::Result<ScopedJoinHandle<'_, T>> {
 		unreachable!("reached `spawn_scoped()` without atomics target feature")
 	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_scoped_async()`](crate::web::BuilderExt::spawn_scoped_async).
+	#[allow(clippy::unused_self)]
+	pub(super) fn spawn_scoped_async_internal<F1, F2, T>(
+		self,
+		_: &Scope,
+		_: F1,
+	) -> io::Result<ScopedJoinHandle<'_, T>>
+	where
+		F1: FnOnce() -> F2 + Send,
+		F2: Future<Output = T>,
+	{
+		unreachable!("reached `spawn()` without atomics target feature")
+	}
 }
 
 /// Implementation of [`std::thread::JoinHandle`].

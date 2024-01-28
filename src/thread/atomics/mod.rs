@@ -88,6 +88,27 @@ impl Builder {
 			_scope: PhantomData,
 		})
 	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_scoped_async()`](crate::web::BuilderExt::spawn_scoped_async).
+	pub(super) fn spawn_scoped_async_internal<'scope, F1, F2, T>(
+		self,
+		scope: &Scope,
+		task: F1,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce() -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+	{
+		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
+		let result = unsafe { spawn::spawn(task, self.name, Some(Arc::clone(&scope.0))) };
+
+		result.map(|handle| ScopedJoinHandle {
+			handle,
+			_scope: PhantomData,
+		})
+	}
 }
 
 /// Implementation of [`std::thread::JoinHandle`].

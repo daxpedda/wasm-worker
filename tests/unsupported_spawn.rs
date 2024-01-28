@@ -2,7 +2,7 @@
 #![cfg(target_family = "wasm")]
 
 use wasm_bindgen_test::wasm_bindgen_test;
-use web_thread::web::BuilderExt;
+use web_thread::web::{BuilderExt, ScopeExt};
 use web_thread::{web, Builder};
 
 #[wasm_bindgen_test]
@@ -35,6 +35,40 @@ fn builder_async() {
 		.name(String::from("test"))
 		.spawn_async(|| async {})
 		.unwrap();
+}
+
+#[wasm_bindgen_test]
+#[should_panic = "operation not supported on this platform without the atomics target feature"]
+fn scope() {
+	web_thread::scope(|scope| {
+		scope.spawn(|| ());
+	});
+}
+
+#[wasm_bindgen_test]
+#[should_panic = "operation not supported on this platform without the atomics target feature"]
+fn scope_builder() {
+	web_thread::scope(|scope| {
+		Builder::new().spawn_scoped(scope, || ()).unwrap();
+	});
+}
+
+#[wasm_bindgen_test]
+#[should_panic = "operation not supported on this platform without the atomics target feature"]
+fn scope_async() {
+	web_thread::scope(|scope| {
+		scope.spawn_async(|| async {});
+	});
+}
+
+#[wasm_bindgen_test]
+#[should_panic = "operation not supported on this platform without the atomics target feature"]
+fn scope_builder_async() {
+	web_thread::scope(|scope| {
+		Builder::new()
+			.spawn_scoped_async(scope, || async {})
+			.unwrap();
+	});
 }
 
 #[wasm_bindgen_test]
