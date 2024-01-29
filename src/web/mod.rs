@@ -60,7 +60,7 @@ impl<T> Debug for JoinHandleFuture<'_, T> {
 impl<T> Future for JoinHandleFuture<'_, T> {
 	type Output = crate::Result<T>;
 
-	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		JoinHandle::poll(self.0, cx)
 	}
 }
@@ -146,7 +146,7 @@ impl<T> Debug for ScopedJoinHandleFuture<'_, '_, T> {
 impl<T> Future for ScopedJoinHandleFuture<'_, '_, T> {
 	type Output = crate::Result<T>;
 
-	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		ScopedJoinHandle::poll(self.0, cx)
 	}
 }

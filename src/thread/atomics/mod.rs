@@ -150,8 +150,18 @@ impl<T> JoinHandle<T> {
 	}
 
 	/// Implementation of [`std::thread::JoinHandle::join()`].
-	#[allow(clippy::unnecessary_wraps)]
 	pub(super) fn join(self) -> Result<T> {
+		assert_ne!(
+			self.thread().id(),
+			super::current().id(),
+			"called `JoinHandle::join()` on the thread to join"
+		);
+
+		assert!(
+			!self.taken.load(Ordering::Relaxed),
+			"`JoinHandle::join()` called after `JoinHandleFuture` polled to completion"
+		);
+
 		let mut value = self
 			.shared
 			.value
@@ -163,15 +173,17 @@ impl<T> JoinHandle<T> {
 			"current worker type cannot be blocked"
 		);
 
-		while value.is_none() {
+		loop {
+			if let Some(value) = value.take() {
+				return Ok(value);
+			}
+
 			value = self
 				.shared
 				.cvar
 				.wait(value)
 				.unwrap_or_else(PoisonError::into_inner);
 		}
-
-		Ok(value.take().expect("no value found after notification"))
 	}
 
 	/// Implementation of [`std::thread::JoinHandle::thread()`].
@@ -182,8 +194,7 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	#[allow(clippy::needless_pass_by_ref_mut)]
-	pub(super) fn poll(&self, cx: &Context<'_>) -> Poll<Result<T>> {
+	pub(super) fn poll(&mut self, cx: &Context<'_>) -> Poll<Result<T>> {
 		assert!(
 			!self.taken.load(Ordering::Relaxed),
 			"`JoinHandleFuture` polled or created after completion"

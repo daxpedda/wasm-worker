@@ -165,12 +165,6 @@ impl<T> JoinHandle<T> {
 	/// See [`std::thread::JoinHandle::join()`].
 	#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
 	pub fn join(self) -> Result<T> {
-		assert_ne!(
-			self.thread().id(),
-			current().id(),
-			"called `JoinHandle::join()` on the thread to join"
-		);
-
 		self.0.join()
 	}
 
@@ -182,8 +176,8 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	pub(crate) fn poll(&self, cx: &Context<'_>) -> Poll<Result<T>> {
-		Pin::new(&self.0).poll(cx)
+	pub(crate) fn poll(&mut self, cx: &Context<'_>) -> Poll<Result<T>> {
+		Pin::new(&mut self.0).poll(cx)
 	}
 }
 
@@ -365,8 +359,8 @@ impl<#[allow(single_use_lifetimes)] 'scope, T> ScopedJoinHandle<'scope, T> {
 
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	pub(crate) fn poll(&self, cx: &Context<'_>) -> Poll<Result<T>> {
-		Pin::new(&self.handle).poll(cx)
+	pub(crate) fn poll(&mut self, cx: &Context<'_>) -> Poll<Result<T>> {
+		Pin::new(&mut self.handle).poll(cx)
 	}
 }
 

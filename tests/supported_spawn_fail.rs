@@ -14,6 +14,14 @@ use std::sync::mpsc;
 use util::{Flag, SIGNAL_DURATION};
 
 #[wasm_bindgen_test]
+#[should_panic = "`JoinHandle::join()` called after `JoinHandleFuture` polled to completion"]
+async fn join_after_await() {
+	let mut handle = web_thread::spawn(|| ());
+	handle.join_async().await.unwrap();
+	let _ = handle.join();
+}
+
+#[wasm_bindgen_test]
 async fn join_circular() {
 	let flag = Flag::new();
 	let (sender, receiver) = mpsc::channel();
