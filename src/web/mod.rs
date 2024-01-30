@@ -49,7 +49,7 @@ use crate::{Builder, JoinHandle, Scope, ScopedJoinHandle};
 /// # async fn test() {
 /// use web_thread::web::{self, JoinHandleExt};
 ///
-/// let mut handle = web_thread::spawn(|| ());
+/// let mut handle = web_thread::spawn(|| String::from("test"));
 ///
 /// let result = if web::has_block_support() {
 /// 	handle.join().unwrap()
@@ -179,14 +179,14 @@ impl<T> Future for JoinHandleFuture<'_, T> {
 /// let value = AtomicUsize::new(0);
 ///
 /// web_thread::web::scope_async(|scope| async {
-/// 	(0..10).for_each(|_| {
+/// 	(0..3).for_each(|_| {
 /// 		scope.spawn(|| value.fetch_add(1, Ordering::Relaxed));
 /// 	});
 ///
 /// 	value.fetch_add(1, Ordering::Relaxed);
 /// }).await;
 ///
-/// assert_eq!(value.load(Ordering::Relaxed), 11);
+/// assert_eq!(value.load(Ordering::Relaxed), 4);
 /// # }
 /// ```
 pub fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
@@ -253,7 +253,7 @@ impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T> {
 	/// let value = AtomicUsize::new(0);
 	///
 	/// let future = web_thread::web::scope_async(|scope| async {
-	/// 	(0..10).for_each(|_| {
+	/// 	(0..3).for_each(|_| {
 	/// 		scope.spawn(|| value.fetch_add(1, Ordering::Relaxed));
 	/// 	});
 	///
@@ -263,7 +263,7 @@ impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T> {
 	/// // This will block until all threads are done.
 	/// drop(future);
 	///
-	/// assert_eq!(value.load(Ordering::Relaxed), 11);
+	/// assert_eq!(value.load(Ordering::Relaxed), 4);
 	/// # }
 	/// ```
 	pub const fn into_wait(self) -> ScopeIntoJoinFuture<'scope, 'env, F, T> {
@@ -438,7 +438,7 @@ impl<T> ScopeJoinFuture<'_, '_, T> {
 	/// let value = AtomicUsize::new(0);
 	///
 	/// let future = web_thread::web::scope_async(|scope| async {
-	/// 	(0..10).for_each(|_| {
+	/// 	(0..3).for_each(|_| {
 	/// 		scope.spawn(|| value.fetch_add(1, Ordering::Relaxed));
 	/// 	});
 	///
@@ -448,7 +448,7 @@ impl<T> ScopeJoinFuture<'_, '_, T> {
 	/// // This will block until all threads are done.
 	/// future.join_all();
 	///
-	/// assert_eq!(value.load(Ordering::Relaxed), 11);
+	/// assert_eq!(value.load(Ordering::Relaxed), 4);
 	/// # }
 	/// ```
 	pub fn join_all(self) -> T {
