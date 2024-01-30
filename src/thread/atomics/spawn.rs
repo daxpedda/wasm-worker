@@ -211,7 +211,7 @@ where
 				}
 
 				let value = Box::new(0);
-				let index: *const i32 = value.deref();
+				let index: *const i32 = ptr::addr_of!(*value);
 				#[allow(clippy::as_conversions)]
 				let index = index as u32 / 4;
 

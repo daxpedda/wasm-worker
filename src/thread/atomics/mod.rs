@@ -9,7 +9,6 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
-use std::io;
 use std::marker::PhantomData;
 use std::panic::RefUnwindSafe;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -17,6 +16,7 @@ use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
 use std::task::{Context, Poll};
 use std::thread::Result;
 use std::time::Duration;
+use std::{io, ptr};
 
 use atomic_waker::AtomicWaker;
 use js_sys::WebAssembly::{Memory, Module};
@@ -302,7 +302,7 @@ pub(super) fn sleep(dur: Duration) {
 /// Tests is blocking is supported.
 pub(super) fn test_block_support() -> bool {
 	let value = 0;
-	let index: *const i32 = &value;
+	let index: *const i32 = ptr::addr_of!(value);
 	#[allow(clippy::as_conversions)]
 	let index = index as u32 / 4;
 
