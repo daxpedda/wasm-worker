@@ -39,9 +39,9 @@ async fn scope_async_wait() {
 }
 
 #[wasm_bindgen_test]
-#[should_panic = "called after `ScopeWaitFuture` was polled to completion"]
+#[should_panic = "called after `ScopeJoinFuture` was polled to completion"]
 async fn scope_async_join() {
 	let mut handle = web::scope_async(|_| async {}).into_wait().await;
 	(&mut handle).await;
-	handle.join();
+	handle.join_all();
 }

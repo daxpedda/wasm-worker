@@ -51,9 +51,9 @@ impl Builder {
 	///
 	/// # Errors
 	///
-	/// This function will always return an error if the atomics target
-	/// feature is not enabled.
-	#[allow(clippy::missing_errors_doc, clippy::type_repetition_in_bounds)]
+	/// If the main thread does not support spawning threads, see
+	/// [`web::has_spawn_support()`](crate::web::has_spawn_support).
+	#[allow(clippy::type_repetition_in_bounds)]
 	pub fn spawn<F, T>(self, #[allow(clippy::min_ident_chars)] f: F) -> io::Result<JoinHandle<T>>
 	where
 		F: FnOnce() -> T,
@@ -65,14 +65,14 @@ impl Builder {
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,
-				"operation not supported on this platform without the atomics target feature",
+				"operation not supported on this platform without the atomics target feature and \
+				 cross-origin isolation",
 			))
 		}
 	}
 
 	/// Implementation for
 	/// [`BuilderExt::spawn_async()`](crate::web::BuilderExt::spawn_async).
-	#[allow(clippy::same_name_method)]
 	pub(crate) fn spawn_async_internal<F1, F2, T>(self, task: F1) -> io::Result<JoinHandle<T>>
 	where
 		F1: 'static + FnOnce() -> F2 + Send,
@@ -84,14 +84,19 @@ impl Builder {
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,
-				"operation not supported on this platform without the atomics target feature",
+				"operation not supported on this platform without the atomics target feature and \
+				 cross-origin isolation",
 			))
 		}
 	}
 
 	/// See [`std::thread::Builder::spawn_scoped()`].
-	#[allow(clippy::missing_errors_doc, single_use_lifetimes)]
-	pub fn spawn_scoped<'scope, 'env, F, T>(
+	///
+	/// # Errors
+	///
+	/// If the main thread does not support spawning threads, see
+	/// [`web::has_spawn_support()`](crate::web::has_spawn_support).
+	pub fn spawn_scoped<'scope, #[allow(single_use_lifetimes)] 'env, F, T>(
 		self,
 		scope: &'scope Scope<'scope, 'env>,
 		#[allow(clippy::min_ident_chars)] f: F,
@@ -105,17 +110,17 @@ impl Builder {
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,
-				"operation not supported on this platform without the atomics target feature",
+				"operation not supported on this platform without the atomics target feature and \
+				 cross-origin isolation",
 			))
 		}
 	}
 
 	/// Implementation for
 	/// [`BuilderExt::spawn_scoped_async()`](crate::web::BuilderExt::spawn_scoped_async).
-	#[allow(single_use_lifetimes)]
-	pub(crate) fn spawn_scoped_async_internal<'scope, 'env, F1, F2, T>(
+	pub(crate) fn spawn_scoped_async_internal<'scope, F1, F2, T>(
 		self,
-		scope: &'scope Scope<'scope, 'env>,
+		scope: &'scope Scope<'scope, '_>,
 		task: F1,
 	) -> io::Result<ScopedJoinHandle<'scope, T>>
 	where
@@ -128,7 +133,8 @@ impl Builder {
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,
-				"operation not supported on this platform without the atomics target feature",
+				"operation not supported on this platform without the atomics target feature and \
+				 cross-origin isolation",
 			))
 		}
 	}
@@ -157,13 +163,38 @@ impl<T> Debug for JoinHandle<T> {
 
 impl<T> JoinHandle<T> {
 	/// See [`std::thread::JoinHandle::is_finished()`].
+	///
+	/// # Notes
+	///
+	/// When this returns [`true`] it guarantees [`JoinHandle::join()`] not to
+	/// block.
 	#[allow(clippy::must_use_candidate)]
 	pub fn is_finished(&self) -> bool {
 		self.0.is_finished()
 	}
 
 	/// See [`std::thread::JoinHandle::join()`].
-	#[allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+	///
+	/// # Notes
+	///
+	/// When compiling with [`panic = "abort"`], which is the only option
+	/// without enabling the Wasm exception-handling proposal, this can never
+	/// return [`Err`].
+	///
+	/// # Panics
+	///
+	/// - If the calling thread doesn't support blocking, see
+	///   [`web::has_block_support()`](crate::web::has_block_support). Though it
+	///   is guaranteed to not block if [`JoinHandle::is_finished()`] returns
+	///   [`true`]. Alternatively consider using
+	///   [`web::JoinHandleExt::join_async()`].
+	/// - If called on the thread to join.
+	/// - If it was already polled to completion through
+	///   [`web::JoinHandleExt::join_async()`].
+	///
+	/// [`panic = "abort"`]: https://doc.rust-lang.org/1.75.0/cargo/reference/profiles.html#panic
+	/// [`web::JoinHandleExt::join_async()`]: crate::web::JoinHandleExt::join_async
+	#[allow(clippy::missing_errors_doc)]
 	pub fn join(self) -> Result<T> {
 		self.0.join()
 	}
@@ -288,8 +319,11 @@ pub struct Scope<'scope, 'env: 'scope> {
 }
 
 impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
-	/// See [`std::thread::Scope`].
-	#[allow(clippy::missing_panics_doc)]
+	/// See [`std::thread::Scope::spawn()`].
+	///
+	/// # Panics
+	///
+	/// See [`spawn()`].
 	pub fn spawn<F, T>(
 		&'scope self,
 		#[allow(clippy::min_ident_chars)] f: F,
@@ -346,12 +380,37 @@ impl<#[allow(single_use_lifetimes)] 'scope, T> ScopedJoinHandle<'scope, T> {
 	}
 
 	/// See [`std::thread::ScopedJoinHandle::join()`].
+	///
+	/// # Notes
+	///
+	/// When compiling with [`panic = "abort"`], which is the only option
+	/// without enabling the Wasm exception-handling proposal, this can never
+	/// return [`Err`].
+	///
+	/// # Panics
+	///
+	/// - If the calling thread doesn't support blocking, see
+	///   [`web::has_block_support()`](crate::web::has_block_support). Though it
+	///   is guaranteed to not block if [`ScopedJoinHandle::is_finished()`]
+	///   returns [`true`]. Alternatively consider using
+	///   [`web::ScopedJoinHandleExt::join_async()`].
+	/// - If called on the thread to join.
+	/// - If it was already polled to completion through
+	///   [`web::ScopedJoinHandleExt::join_async()`].
+	///
+	/// [`panic = "abort"`]: https://doc.rust-lang.org/1.75.0/cargo/reference/profiles.html#panic
+	/// [`web::ScopedJoinHandleExt::join_async()`]: crate::web::ScopedJoinHandleExt::join_async
 	#[allow(clippy::missing_errors_doc)]
 	pub fn join(self) -> Result<T> {
 		self.handle.join()
 	}
 
 	/// See [`std::thread::ScopedJoinHandle::is_finished()`].
+	///
+	/// # Notes
+	///
+	/// When this returns [`true`] it guarantees [`ScopedJoinHandle::join()`]
+	/// not to block.
 	#[allow(clippy::must_use_candidate)]
 	pub fn is_finished(&self) -> bool {
 		self.handle.is_finished()
@@ -368,16 +427,22 @@ impl<#[allow(single_use_lifetimes)] 'scope, T> ScopedJoinHandle<'scope, T> {
 ///
 /// # Notes
 ///
-/// Browsers might use lower values, a common case is to prevent fingerprinting.
+/// Browsers might return lower values, a common case is to prevent
+/// fingerprinting.
 ///
 /// # Errors
 ///
 /// This function will return an error if called from a worklet or any other
-/// unsupported worker type.
+/// unsupported thread type.
 #[allow(clippy::missing_panics_doc)]
 pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 	let value = GLOBAL.with(|global| {
-		let global = global.as_ref().ok_or_else(global::unsupported_global)?;
+		let global = global.as_ref().ok_or_else(|| {
+			Error::new(
+				ErrorKind::Unsupported,
+				"encountered unsupported thread type",
+			)
+		})?;
 
 		match global {
 			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
@@ -414,11 +479,16 @@ pub fn current() -> Thread {
 /// # Notes
 ///
 /// Unlike [`std::thread::park()`], when using the atomics target feature, this
-/// will not panic on the main thread, worklet or any other unsupported worker
-/// type.
+/// will not panic on the main thread, worklet or any other unsupported thread
+/// type. However, on supported thread types, this will function correctly even
+/// without the atomics target feature.
+///
+/// Keep in mind that this call will do nothing unless the calling thread
+/// supports blocking, see
+/// [`web::has_block_support()`](crate::web::has_block_support).
 pub fn park() {
 	if has_block_support() {
-		// SAFETY: park_timeout is called on the parker owned by this thread.
+		// SAFETY: `park` is called on the parker owned by this thread.
 		unsafe {
 			current().0.parker.park();
 		}
@@ -431,10 +501,15 @@ pub fn park() {
 ///
 /// Unlike [`std::thread::park_timeout()`], when using the atomics target
 /// feature, this will not panic on the main thread, worklet or any other
-/// unsupported worker type.
+/// unsupported thread type. However, on supported thread types, this will
+/// function correctly even without the atomics target feature.
+///
+/// Keep in mind that this call will do nothing unless the calling thread
+/// supports blocking, see
+/// [`web::has_block_support()`](crate::web::has_block_support).
 pub fn park_timeout(dur: Duration) {
 	if has_block_support() {
-		// SAFETY: park_timeout is called on the parker owned by this thread.
+		// SAFETY: `park_timeout` is called on the parker owned by this thread.
 		unsafe {
 			current().0.parker.park_timeout(dur);
 		}
@@ -447,13 +522,27 @@ pub fn park_timeout(dur: Duration) {
 ///
 /// Unlike [`std::thread::park_timeout_ms()`], when using the atomics target
 /// feature, this will not panic on the main thread, worklet or any other
-/// unsupported worker type.
+/// unsupported thread type. However, on supported thread types, this will
+/// function correctly even without the atomics target feature.
+///
+/// Keep in mind that this call will do nothing unless the calling thread
+/// supports blocking, see
+/// [`web::has_block_support()`](crate::web::has_block_support).
 #[deprecated(note = "replaced by `web_thread::park_timeout`")]
 pub fn park_timeout_ms(ms: u32) {
 	park_timeout(Duration::from_millis(ms.into()));
 }
 
 /// See [`std::thread::scope()`].
+///
+/// # Notes
+///
+/// Keep in mind that this will enter a spinloop until all threads are joined if
+/// blocking is not supported on this thread, see
+/// [`web::has_block_support()`](crate::web::has_block_support).
+///
+/// Alternatively consider using
+/// [`web::scope_async()`](crate::web::scope_async).
 #[track_caller]
 pub fn scope<'env, F, T>(#[allow(clippy::min_ident_chars)] f: F) -> T
 where
@@ -628,18 +717,30 @@ where
 	}
 
 	/// Implementation for
-	/// [`ScopeWaitFuture::join()`](crate::web::ScopeWaitFuture::join).
-	pub(crate) fn join(mut self) -> T {
+	/// [`ScopeJoinFuture::is_finished()`](crate::web::ScopeJoinFuture::is_finished).
+	pub(crate) fn is_finished(&self) -> bool {
+		match &self.0 {
+			ScopeFutureInner::Task { .. } => false,
+			ScopeFutureInner::Wait { scope, .. } => scope.this.thread_count() == 0,
+			ScopeFutureInner::None => true,
+		}
+	}
+
+	/// Implementation for
+	/// [`ScopeJoinFuture::join_all()`](crate::web::ScopeJoinFuture::join_all).
+	pub(crate) fn join_all(mut self) -> T {
 		match mem::replace(&mut self.0, ScopeFutureInner::None) {
 			ScopeFutureInner::Wait { result, scope } => {
+				assert!(has_block_support(), "current thread type cannot be blocked");
+
 				scope.this.finish();
 				result
 			}
 			ScopeFutureInner::None => {
-				panic!("called after `ScopeWaitFuture` was polled to completion")
+				panic!("called after `ScopeJoinFuture` was polled to completion")
 			}
 			ScopeFutureInner::Task { .. } => {
-				unreachable!("should only be called from `ScopeWaitFuture`")
+				unreachable!("should only be called from `ScopeJoinFuture`")
 			}
 		}
 	}
@@ -649,13 +750,13 @@ where
 ///
 /// # Panics
 ///
-/// This call will panic unless called from a worker type that allows blocking,
-/// e.g. a Web worker.
+/// This call will panic if the calling thread doesn't support blocking, see
+/// [`web::has_block_support()`](crate::web::has_block_support).
 pub fn sleep(dur: Duration) {
 	if has_block_support() {
 		r#impl::sleep(dur);
 	} else {
-		panic!("current worker type cannot be blocked")
+		panic!("current thread type cannot be blocked")
 	}
 }
 
@@ -663,8 +764,8 @@ pub fn sleep(dur: Duration) {
 ///
 /// # Panics
 ///
-/// This call will panic unless called from a worker type that allows blocking,
-/// e.g. a Web worker.
+/// This call will panic if the calling thread doesn't support blocking, see
+/// [`web::has_block_support()`](crate::web::has_block_support).
 #[deprecated(note = "replaced by `web_thread::sleep`")]
 pub fn sleep_ms(ms: u32) {
 	sleep(Duration::from_millis(ms.into()));
@@ -672,15 +773,11 @@ pub fn sleep_ms(ms: u32) {
 
 /// See [`std::thread::spawn()`].
 ///
-/// # Errors
+/// # Panics
 ///
-/// This function will always return an error if the atomics target
-/// feature is not enabled.
-#[allow(
-	clippy::min_ident_chars,
-	clippy::missing_panics_doc,
-	clippy::type_repetition_in_bounds
-)]
+/// If the main thread does not support spawning threads, see
+/// [`web::has_spawn_support()`](crate::web::has_spawn_support).
+#[allow(clippy::min_ident_chars, clippy::type_repetition_in_bounds)]
 pub fn spawn<F, T>(f: F) -> JoinHandle<T>
 where
 	F: FnOnce() -> T,
@@ -695,7 +792,7 @@ pub(crate) fn spawn_async<F1, F2, T>(task: F1) -> JoinHandle<T>
 where
 	F1: 'static + FnOnce() -> F2 + Send,
 	F2: 'static + Future<Output = T>,
-	T: Send + 'static,
+	T: 'static + Send,
 {
 	Builder::new()
 		.spawn_async_internal(task)

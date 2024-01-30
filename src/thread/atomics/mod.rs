@@ -12,7 +12,7 @@ use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
 use std::panic::RefUnwindSafe;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
 use std::task::{Context, Poll};
 use std::thread::Result;
@@ -52,7 +52,7 @@ impl Builder {
 	pub(super) fn spawn<F, T>(self, task: F) -> io::Result<JoinHandle<T>>
 	where
 		F: 'static + FnOnce() -> T + Send,
-		T: Send + 'static,
+		T: 'static + Send,
 	{
 		// SAFETY: `F` and `T` are `'static`.
 		unsafe { spawn::spawn(|| async { task() }, self.name, None) }
@@ -64,7 +64,7 @@ impl Builder {
 	where
 		F1: 'static + FnOnce() -> F2 + Send,
 		F2: 'static + Future<Output = T>,
-		T: Send + 'static,
+		T: 'static + Send,
 	{
 		// SAFETY: `F` and `T` are `'static`.
 		unsafe { spawn::spawn(task, self.name, None) }
@@ -77,8 +77,8 @@ impl Builder {
 		task: F,
 	) -> io::Result<ScopedJoinHandle<'scope, T>>
 	where
-		F: FnOnce() -> T + Send + 'scope,
-		T: Send + 'scope,
+		F: 'scope + FnOnce() -> T + Send,
+		T: 'scope + Send,
 	{
 		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
 		let result =
@@ -170,7 +170,7 @@ impl<T> JoinHandle<T> {
 
 		assert!(
 			super::has_block_support(),
-			"current worker type cannot be blocked"
+			"current thread type cannot be blocked"
 		);
 
 		loop {
@@ -248,7 +248,7 @@ impl RefUnwindSafe for Scope {}
 #[derive(Debug)]
 pub(super) struct ScopeData {
 	/// Number of running threads.
-	threads: AtomicUsize,
+	threads: AtomicU64,
 	/// Handle to the spawning thread.
 	thread: Thread,
 	/// [`Waker`](std::task::Waker) to wake up a waiting [`Scope`].
@@ -259,10 +259,15 @@ impl Scope {
 	/// Creates a new [`Scope`].
 	pub(super) fn new() -> Self {
 		Self(Arc::new(ScopeData {
-			threads: AtomicUsize::new(0),
+			threads: AtomicU64::new(0),
 			thread: thread::current(),
 			waker: AtomicWaker::new(),
 		}))
+	}
+
+	/// Returns the number of current threads.
+	pub(super) fn thread_count(&self) -> u64 {
+		self.0.threads.load(Ordering::Relaxed)
 	}
 
 	/// End the scope after calling the user function.

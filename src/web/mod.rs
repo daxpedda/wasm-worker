@@ -1,4 +1,4 @@
-//! Platform-specific extensions to `web-thread` for the Web platform.
+//! Platform-specific extensions to [`web-thread`](crate) for the Web platform.
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::{Future, Ready};
@@ -18,14 +18,88 @@ use pin_project::pin_project;
 use crate::thread;
 use crate::{Builder, JoinHandle, Scope, ScopedJoinHandle};
 
-/// Returns [`true`] if the current thread supports blocking, e.g. parking and
-/// sleeping.
+/// Returns [`true`] if the current thread supports blocking.
+///
+/// # Notes
+///
+/// Very notably, the thread containing [`Window`] (often called the main thread
+/// on Web), does not support blocking.
+///
+/// Currently known thread types to support blocking:
+/// - [Dedicated worker].
+/// - [Shared worker] (currently only on Chromium based browsers).
+///
+/// Currently known thread types to **not** support blocking:
+/// - [`Window`] (often called the main thread on Web).
+/// - [Service worker].
+/// - [Worklet].
+///
+/// [Dedicated worker]: https://developer.mozilla.org/en-US/docs/Web/API/Worker
+/// [Service worker]: https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API
+/// [Shared worker]: https://developer.mozilla.org/en-US/docs/Web/API/SharedWorker
+/// [Worklet]: https://developer.mozilla.org/en-US/docs/Web/API/Worklet
+/// [`Window`]: https://developer.mozilla.org/en-US/docs/Web/API/Window
+///
+/// # Example
+///
+/// ```
+/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+/// # async fn test() {
+/// use web_thread::web::{self, JoinHandleExt};
+///
+/// let mut handle = web_thread::spawn(|| ());
+///
+/// let result = if web::has_block_support() {
+/// 	handle.join().unwrap()
+/// } else {
+/// 	handle.join_async().await.unwrap()
+/// };
+/// # }
+/// ```
 #[must_use]
 pub fn has_block_support() -> bool {
 	thread::has_block_support()
 }
 
-/// Returns [`true`] if the platform supports spawning threads.
+/// Returns [`true`] if the main thread supports spawning threads.
+///
+/// # Notes
+///
+/// [`web-thread`](crate) will consider the first thread it finds itself in the
+/// "main thread". If Wasm is instantiated in a [dedicated worker], it will
+/// consider it as the "main thread".
+///
+/// Currently only two thread types are known to support spawning threads:
+/// - [`Window`] (often called the main thread on Web).
+/// - [Dedicated worker].
+///
+/// Additionally, the following is required to allow spawning threads:
+/// - The atomics target feature is enabled.
+/// - The site needs to be [cross-origin isolated].
+///
+/// [cross-origin isolated]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer#security_requirements
+/// [dedicated worker]: https://developer.mozilla.org/en-US/docs/Web/API/Worker
+/// [`Window`]: https://developer.mozilla.org/en-US/docs/Web/API/Window
+///
+/// # Example
+///
+/// ```
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[wasm_bindgen_test::wasm_bindgen_test]
+/// # fn test() {
+/// fn schedule_fun(f: impl 'static + FnOnce() + Send) {
+/// 	if web_thread::web::has_spawn_support() {
+/// 		web_thread::spawn(f);
+/// 	} else {
+/// 		wasm_bindgen_futures::spawn_local(async { f() });
+/// 	}
+/// }
+///
+/// schedule_fun(|| web_sys::console::log_1(&"Are we having fun yet?".into()));
+/// # }
+/// ```
 #[must_use]
 pub fn has_spawn_support() -> bool {
 	thread::has_spawn_support()
@@ -34,6 +108,25 @@ pub fn has_spawn_support() -> bool {
 /// Web-specific extension to [`web_thread::JoinHandle`](crate::JoinHandle).
 pub trait JoinHandleExt<T> {
 	/// Async version of [`JoinHandle::join()`].
+	///
+	/// # Panics
+	///
+	/// - If called on the thread to join.
+	/// - If it was already polled to completion by another call to
+	///   [`JoinHandleExt::join_async()`].
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// use web_thread::web::JoinHandleExt;
+	///
+	/// web_thread::spawn(|| ()).join_async().await.unwrap();
+	/// # }
+	/// ```
 	fn join_async(&mut self) -> JoinHandleFuture<'_, T>;
 }
 
@@ -65,7 +158,37 @@ impl<T> Future for JoinHandleFuture<'_, T> {
 	}
 }
 
-/// Async version of [`scope()`](std::thread::scope).
+/// Async version of [`scope()`](crate::scope).
+///
+/// # Notes
+///
+/// Keep in mind that if [`ScopeFuture`] is dropped it will block, or spinloop
+/// if blocking is not supported on this thread (see
+/// [`has_block_support()`]), until all threads are joined but does not continue
+/// polling the passed [`Future`].
+///
+/// # Example
+///
+/// ```
+/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+/// # async fn test() {
+/// # use std::sync::atomic::{AtomicUsize, Ordering};
+/// #
+/// let value = AtomicUsize::new(0);
+///
+/// web_thread::web::scope_async(|scope| async {
+/// 	(0..10).for_each(|_| {
+/// 		scope.spawn(|| value.fetch_add(1, Ordering::Relaxed));
+/// 	});
+///
+/// 	value.fetch_add(1, Ordering::Relaxed);
+/// }).await;
+///
+/// assert_eq!(value.load(Ordering::Relaxed), 11);
+/// # }
+/// ```
 pub fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
 	#[allow(clippy::min_ident_chars)] f: F1,
 ) -> ScopeFuture<'scope, 'env, F2, T>
@@ -78,9 +201,11 @@ where
 
 /// Waits for the associated scope to finish. See [`scope_async()`].
 ///
-/// If dropped but not polled to completion, will block until all spawned
-/// threads are finished but does not guarantee that the passed [`Future`] has
-/// finished executing.
+/// # Notes
+///
+/// Keep in mind that if dropped it will block, or spinloop if blocking is not
+/// supported on this thread (see [`has_block_support()`]), until all threads
+/// are joined but does not continue polling the passed [`Future`].
 #[must_use = "will block until all spawned threads are finished if not polled to completion"]
 #[cfg_attr(all(target_family = "wasm", target_os = "unknown"), pin_project)]
 pub struct ScopeFuture<'scope, 'env, F, T>(
@@ -106,13 +231,43 @@ where
 }
 
 impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T> {
-	/// Converts this [`ScopeFuture`] to a [`ScopeWaitFuture`] by waiting until
+	/// Converts this [`ScopeFuture`] to a [`ScopeJoinFuture`] by waiting until
 	/// the given [`Future`] to [`scope_async()`] is finished.
 	///
-	/// This is useful to get rid of `F` which often prevents [`ScopeFuture`] to
-	/// implement [`Unpin`].
-	pub const fn into_wait(self) -> ScopeIntoWaitFuture<'scope, 'env, F, T> {
-		ScopeIntoWaitFuture(self)
+	/// This is useful to:
+	/// - Use [`ScopeJoinFuture::join_all()`].
+	/// - Be able to drop [`ScopeJoinFuture`] while guaranteeing that the given
+	///   [`Future`] to [`scope_async()`] is finished.
+	/// - Get rid of `F` which often prevents [`ScopeFuture`] from implementing
+	///   [`Unpin`].
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn), not(unsupported_spawn_then_block)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_dedicated_worker);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn), not(unsupported_spawn_then_block)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// # use std::sync::atomic::{AtomicUsize, Ordering};
+	/// #
+	/// let value = AtomicUsize::new(0);
+	///
+	/// let future = web_thread::web::scope_async(|scope| async {
+	/// 	(0..10).for_each(|_| {
+	/// 		scope.spawn(|| value.fetch_add(1, Ordering::Relaxed));
+	/// 	});
+	///
+	/// 	value.fetch_add(1, Ordering::Relaxed);
+	/// }).into_wait().await;
+	///
+	/// // This will block until all threads are done.
+	/// drop(future);
+	///
+	/// assert_eq!(value.load(Ordering::Relaxed), 11);
+	/// # }
+	/// ```
+	pub const fn into_wait(self) -> ScopeIntoJoinFuture<'scope, 'env, F, T> {
+		ScopeIntoJoinFuture(self)
 	}
 }
 
@@ -120,6 +275,27 @@ impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T> {
 /// [`web_thread::ScopedJoinHandle`](crate::ScopedJoinHandle).
 pub trait ScopedJoinHandleExt<'scope, T> {
 	/// Async version of [`ScopedJoinHandle::join()`].
+	///
+	/// # Panics
+	///
+	/// - If called on the thread to join.
+	/// - If it was already polled to completion by another call to
+	///   [`ScopedJoinHandleExt::join_async()`].
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// use web_thread::web::{self, ScopedJoinHandleExt};
+	///
+	/// web::scope_async(|scope| async {
+	/// 	scope.spawn(|| ()).join_async().await.unwrap();
+	/// }).await;
+	/// # }
+	/// ```
 	fn join_async<'handle>(&'handle mut self) -> ScopedJoinHandleFuture<'handle, 'scope, T>;
 }
 
@@ -151,33 +327,36 @@ impl<T> Future for ScopedJoinHandleFuture<'_, '_, T> {
 	}
 }
 
-/// Poll to completion to get a [`ScopeWaitFuture`]. See
+/// Poll to completion to get a [`ScopeJoinFuture`]. See
 /// [`ScopeFuture::into_wait()`].
 ///
-/// If dropped but not polled to completion, will block until all spawned
-/// threads are finished but does not guarantee that the passed [`Future`] has
-/// finished executing.
+/// # Notes
+///
+/// Keep in mind that if dropped it will block, or spinloop if blocking is not
+/// supported on this thread (see [`has_block_support()`]), until all threads
+/// are joined but does not continue polling the [`Future`] passed into
+/// [`scope_async()`].
 #[must_use = "will block until all spawned threads are finished if not polled to completion"]
 #[cfg_attr(all(target_family = "wasm", target_os = "unknown"), pin_project)]
-pub struct ScopeIntoWaitFuture<'scope, 'env, F, T>(
+pub struct ScopeIntoJoinFuture<'scope, 'env, F, T>(
 	#[cfg_attr(all(target_family = "wasm", target_os = "unknown"), pin)]
 	ScopeFuture<'scope, 'env, F, T>,
 );
 
-impl<F, T> Debug for ScopeIntoWaitFuture<'_, '_, F, T> {
+impl<F, T> Debug for ScopeIntoJoinFuture<'_, '_, F, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		formatter
-			.debug_tuple("ScopeIntoWaitFuture")
+			.debug_tuple("ScopeIntoJoinFuture")
 			.field(&self.0)
 			.finish()
 	}
 }
 
-impl<'scope, 'env, F, T> Future for ScopeIntoWaitFuture<'scope, 'env, F, T>
+impl<'scope, 'env, F, T> Future for ScopeIntoJoinFuture<'scope, 'env, F, T>
 where
 	F: Future<Output = T>,
 {
-	type Output = ScopeWaitFuture<'scope, 'env, T>;
+	type Output = ScopeJoinFuture<'scope, 'env, T>;
 
 	fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		self.project()
@@ -186,11 +365,11 @@ where
 			.0
 			.poll_into_wait(cx)
 			.map(ScopeFuture)
-			.map(ScopeWaitFuture)
+			.map(ScopeJoinFuture)
 	}
 }
 
-impl<'scope, 'env, F, T> ScopeIntoWaitFuture<'scope, 'env, F, T> {
+impl<'scope, 'env, F, T> ScopeIntoJoinFuture<'scope, 'env, F, T> {
 	/// Reverts back to [`ScopeFuture`]. See [`ScopeFuture::into_wait()`].
 	pub fn revert(self) -> ScopeFuture<'scope, 'env, F, T> {
 		self.0
@@ -199,21 +378,24 @@ impl<'scope, 'env, F, T> ScopeIntoWaitFuture<'scope, 'env, F, T> {
 
 /// Waits for the associated scope to finish. See [`ScopeFuture::into_wait()`].
 ///
-/// If dropped but not polled to completion, will block until all spawned
-/// threads are finished.
+/// # Notes
+///
+/// Keep in mind that if dropped it will block, or spinloop if blocking is not
+/// supported on this thread (see [`has_block_support()`]), until all threads
+/// are joined.
 #[must_use = "will block until all spawned threads are finished if not polled to completion"]
-pub struct ScopeWaitFuture<'scope, 'env, T>(ScopeFuture<'scope, 'env, Ready<T>, T>);
+pub struct ScopeJoinFuture<'scope, 'env, T>(ScopeFuture<'scope, 'env, Ready<T>, T>);
 
-impl<T> Debug for ScopeWaitFuture<'_, '_, T> {
+impl<T> Debug for ScopeJoinFuture<'_, '_, T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		formatter
-			.debug_tuple("ScopeWaitFuture")
+			.debug_tuple("ScopeJoinFuture")
 			.field(&self.0)
 			.finish()
 	}
 }
 
-impl<T> Future for ScopeWaitFuture<'_, '_, T> {
+impl<T> Future for ScopeJoinFuture<'_, '_, T> {
 	type Output = T;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -221,20 +403,69 @@ impl<T> Future for ScopeWaitFuture<'_, '_, T> {
 	}
 }
 
-impl<T> ScopeWaitFuture<'_, '_, T> {
+impl<T> ScopeJoinFuture<'_, '_, T> {
+	/// Returns [`true`] if all threads have finished.
+	///
+	/// # Notes
+	///
+	/// When this returns [`true`] it guarantees [`ScopeJoinFuture::join_all()`]
+	/// not to block.
+	#[must_use]
+	pub fn is_finished(&self) -> bool {
+		self.0 .0.is_finished()
+	}
+
 	/// This will block until all associated threads are finished.
 	///
 	/// # Panics
-	/// If called after being polled to completion.
-	pub fn join(self) -> T {
-		self.0 .0.join()
+	///
+	/// - If the calling thread doesn't support blocking, see
+	///   [`web::has_block_support()`](crate::web::has_block_support). Though it
+	///   is guaranteed to not block if [`ScopeJoinFuture::is_finished()`]
+	///   returns [`true`]. Alternatively consider just polling this [`Future`]
+	///   to completion.
+	/// - If called after being polled to completion.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn), not(unsupported_spawn_then_block)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_dedicated_worker);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn), not(unsupported_spawn_then_block)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// # use std::sync::atomic::{AtomicUsize, Ordering};
+	/// #
+	/// let value = AtomicUsize::new(0);
+	///
+	/// let future = web_thread::web::scope_async(|scope| async {
+	/// 	(0..10).for_each(|_| {
+	/// 		scope.spawn(|| value.fetch_add(1, Ordering::Relaxed));
+	/// 	});
+	///
+	/// 	value.fetch_add(1, Ordering::Relaxed);
+	/// }).into_wait().await;
+	///
+	/// // This will block until all threads are done.
+	/// future.join_all();
+	///
+	/// assert_eq!(value.load(Ordering::Relaxed), 11);
+	/// # }
+	/// ```
+	pub fn join_all(self) -> T {
+		self.0 .0.join_all()
 	}
 }
 
 /// Web-specific extension to [`web_thread::Builder`](crate::Builder).
 pub trait BuilderExt {
 	/// Async version of [`Builder::spawn()`].
-	#[allow(clippy::missing_errors_doc)]
+	///
+	/// For a more complete documentation see [`spawn_async()`].
+	///
+	/// # Errors
+	///
+	/// If the main thread does not support spawning threads, see
+	/// [`has_spawn_support()`].
 	fn spawn_async<F1, F2, T>(
 		self,
 		#[allow(clippy::min_ident_chars)] f: F1,
@@ -245,7 +476,13 @@ pub trait BuilderExt {
 		T: 'static + Send;
 
 	/// Async version of [`Builder::spawn_scoped()`].
-	#[allow(clippy::missing_errors_doc)]
+	///
+	/// For a more complete documentation see [`Scope::spawn_async()`].
+	///
+	/// # Errors
+	///
+	/// If the main thread does not support spawning threads, see
+	/// [`has_spawn_support()`].
 	fn spawn_scoped_async<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T>(
 		self,
 		scope: &'scope Scope<'scope, 'env>,
@@ -265,7 +502,7 @@ impl BuilderExt for Builder {
 	where
 		F1: 'static + FnOnce() -> F2 + Send,
 		F2: 'static + Future<Output = T>,
-		T: Send + 'static,
+		T: 'static + Send,
 	{
 		self.spawn_async_internal(f)
 	}
@@ -287,6 +524,51 @@ impl BuilderExt for Builder {
 /// Web-specific extension to [`web_thread::Scope`](crate::Scope).
 pub trait ScopeExt<'scope> {
 	/// Async version of [`Scope::spawn()`].
+	///
+	/// # Notes
+	///
+	/// Commonly a long-running thread is used by sending messages or tasks to
+	/// it and blocking it when there is no work. Unfortunately this is often
+	/// undesirable on the Web platform as it prevents yielding to the event
+	/// loop.
+	///
+	/// Therefor being able to `await` the next task instead of blocking the
+	/// thread is essential to build long-running threads on the Web platform.
+	///
+	/// # Panics
+	///
+	/// If the main thread does not support spawning threads, see
+	/// [`has_spawn_support()`].
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg(target_feature = "atomics")]
+	/// # #[cfg_attr(not(unsupported_spawn), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// use web_thread::web::{self, ScopeExt};
+	///
+	/// let (sender, receiver) = async_channel::unbounded::<usize>();
+	///
+	/// # let mut handle =
+	/// web::scope_async(move |scope| async move {
+	/// 	scope.spawn_async(move || async move {
+	/// 		while let Ok(message) = receiver.recv().await {
+	/// 			web_sys::console::log_1(&message.into());
+	/// 		}
+	/// 	});
+	/// });
+	///
+	/// for message in 0..10 {
+	/// 	sender.try_send(message).unwrap();
+	/// }
+	///
+	/// # drop(sender);
+	/// # handle.await;
+	/// # }
+	/// ```
 	fn spawn_async<F1, F2, T>(
 		&'scope self,
 		#[allow(clippy::min_ident_chars)] f: F1,
@@ -312,11 +594,54 @@ impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
 }
 
 /// Async version of [`spawn()`](std::thread::spawn).
+///
+/// # Notes
+///
+/// Commonly a long-running thread is used by sending messages or tasks to
+/// it and blocking it when there is no work. Unfortunately this is often
+/// undesirable on the Web platform as it prevents yielding to the event
+/// loop.
+///
+/// Therefor being able to `await` the next task instead of blocking the
+/// thread is essential to build long-running threads on the Web platform.
+///
+/// # Panics
+///
+/// If the main thread does not support spawning threads, see
+/// [`has_spawn_support()`].
+///
+/// # Example
+///
+/// ```
+/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[cfg(target_feature = "atomics")]
+/// # #[cfg_attr(not(unsupported_spawn), wasm_bindgen_test::wasm_bindgen_test)]
+/// # async fn test() {
+/// # use web_thread::web::JoinHandleExt;
+/// #
+/// let (sender, receiver) = async_channel::unbounded::<usize>();
+///
+/// # let mut handle =
+/// web_thread::web::spawn_async(move || async move {
+/// 	while let Ok(message) = receiver.recv().await {
+/// 		web_sys::console::log_1(&message.into());
+/// 	}
+/// });
+///
+/// for message in 0..10 {
+/// 	sender.try_send(message).unwrap();
+/// }
+///
+/// # drop(sender);
+/// # handle.join_async().await.unwrap();
+/// # }
+/// ```
 pub fn spawn_async<F1, F2, T>(#[allow(clippy::min_ident_chars)] f: F1) -> JoinHandle<T>
 where
 	F1: 'static + FnOnce() -> F2 + Send,
 	F2: 'static + Future<Output = T>,
-	T: Send + 'static,
+	T: 'static + Send,
 {
 	thread::spawn_async(f)
 }

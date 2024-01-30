@@ -58,7 +58,7 @@ jobs:
         with:
           tool: wasm-bindgen-cli
           git: https://github.com/daxpedda/wasm-bindgen
-          rev: f9093e6cb4211470648044b14183a57c639ea3cf
+          rev: b42b04bf1fabce68a883102daeba5ac16bdecb38
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
@@ -138,7 +138,7 @@ jobs:
         with:
           tool: wasm-bindgen-cli
           git: https://github.com/daxpedda/wasm-bindgen
-          rev: f9093e6cb4211470648044b14183a57c639ea3cf
+          rev: b42b04bf1fabce68a883102daeba5ac16bdecb38
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
@@ -157,6 +157,7 @@ jobs:
         if: matrix.rust.version == 'nightly'
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
+          RUSTDOCFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
         run: cargo +nightly test --doc --no-fail-fast --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile
 
   compile-test-web:

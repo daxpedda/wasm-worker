@@ -387,7 +387,7 @@ async fn scope_async_join() {
 	})
 	.into_wait()
 	.await
-	.join();
+	.join_all();
 
 	assert_eq!(test, 1);
 }

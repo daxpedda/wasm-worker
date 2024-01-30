@@ -127,6 +127,12 @@ impl Scope {
 		Self
 	}
 
+	/// Returns the number of current threads.
+	#[allow(clippy::missing_const_for_fn, clippy::unused_self)]
+	pub(super) fn thread_count(&self) -> u64 {
+		0
+	}
+
 	/// End the scope after calling the user function.
 	#[allow(clippy::missing_const_for_fn, clippy::unused_self)]
 	pub(super) fn finish(&self) {}

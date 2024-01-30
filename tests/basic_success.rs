@@ -52,16 +52,3 @@ async fn scope_async_wait() {
 
 	assert_eq!(test, 1);
 }
-
-#[cfg(target_family = "wasm")]
-#[wasm_bindgen_test]
-async fn scope_async_join() {
-	let mut test = 0;
-
-	web::scope_async(|_| async { test = 1 })
-		.into_wait()
-		.await
-		.join();
-
-	assert_eq!(test, 1);
-}

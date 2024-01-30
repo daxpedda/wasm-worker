@@ -8,7 +8,7 @@
 //! - Chrome doesn't support spawning workers when blocking afterwards (e.g. `spawn(..).join()`): <https://bugs.chromium.org/p/chromium/issues/detail?id=977924>.
 //! - Chrome doesn't support sending messages when blocking afterwards: <https://bugs.chromium.org/p/chromium/issues/detail?id=1075645>.
 //! - Safari doesn't support spawning or sending message when blocking
-//!   afterwars: needs research.
+//!   afterwards: needs research.
 
 #![cfg_attr(
 	all(

@@ -25,19 +25,19 @@ pub struct Parker {
 // monotonic/consistent order when looking at just a single atomic variable.
 //
 // So, since this parker is just a single atomic variable, we only need to look
-// at the ordering guarantees we need to provide to the 'outside world'.
+// at the ordering guarantees we need to provide to the "outside world".
 //
 // The only memory ordering guarantee that parking and unparking provide, is
-// that things which happened before unpark() are visible on the thread
+// that things which happened before `unpark()` are visible on the thread
 // returning from park() afterwards. Otherwise, it was effectively unparked
-// before unpark() was called while still consuming the 'token'.
+// before `unpark()` was called while still consuming the "token".
 //
-// In other words, unpark() needs to synchronize with the part of park() that
-// consumes the token and returns.
+// In other words, `unpark()` needs to synchronize with the part of `park()`
+// that consumes the token and returns.
 //
 // This is done with a release-acquire synchronization, by using
-// Ordering::Release when writing NOTIFIED (the 'token') in unpark(), and using
-// Ordering::Acquire when checking for this state in park().
+// Ordering::Release when writing NOTIFIED (the "token") in `unpark()`, and
+// using Ordering::Acquire when checking for this state in `park()`.
 impl Parker {
 	// MODIFIED: This can be safe.
 	pub fn new() -> Self {
@@ -50,7 +50,7 @@ impl Parker {
 	// which means that `self.state != PARKED`.
 	// CHANGED: Remove `Pin` requirement.
 	pub unsafe fn park(&self) {
-		// Change NOTIFIED=>EMPTY or EMPTY=>PARKED, and directly return in the
+		// Change `NOTIFIED=>EMPTY` or `EMPTY=>PARKED`, and directly return in the
 		// first case.
 		if self.state.fetch_sub(1, Acquire) == NOTIFIED {
 			return;
@@ -58,7 +58,7 @@ impl Parker {
 		loop {
 			// Wait for something to happen, assuming it's still set to PARKED.
 			futex_wait(&self.state, PARKED, None);
-			// Change NOTIFIED=>EMPTY and return in that case.
+			// Change `NOTIFIED=>EMPTY` and return in that case.
 			if self
 				.state
 				.compare_exchange(NOTIFIED, EMPTY, Acquire, Acquire)
@@ -75,7 +75,7 @@ impl Parker {
 	// which means that `self.state != PARKED`.
 	// CHANGED: Remove `Pin` requirement.
 	pub unsafe fn park_timeout(&self, timeout: Duration) {
-		// Change NOTIFIED=>EMPTY or EMPTY=>PARKED, and directly return in the
+		// Change `NOTIFIED=>EMPTY` or `EMPTY=>PARKED`, and directly return in the
 		// first case.
 		if self.state.fetch_sub(1, Acquire) == NOTIFIED {
 			return;
@@ -83,9 +83,9 @@ impl Parker {
 		// Wait for something to happen, assuming it's still set to PARKED.
 		futex_wait(&self.state, PARKED, Some(timeout));
 		// This is not just a store, because we need to establish a
-		// release-acquire ordering with unpark().
+		// release-acquire ordering with `unpark()`.
 		if self.state.swap(EMPTY, Acquire) == NOTIFIED {
-			// Woke up because of unpark().
+			// Woke up because of `unpark()`.
 		} else {
 			// Timeout or spurious wake up.
 			// We return either way, because we can't easily tell if it was the
@@ -96,12 +96,12 @@ impl Parker {
 	// CHANGED: Remove `Pin` requirement.
 	#[inline]
 	pub fn unpark(&self) {
-		// Change PARKED=>NOTIFIED, EMPTY=>NOTIFIED, or NOTIFIED=>NOTIFIED, and
+		// Change `PARKED=>NOTIFIED`, `EMPTY=>NOTIFIED`, or `NOTIFIED=>NOTIFIED`, and
 		// wake the thread in the first case.
 		//
-		// Note that even NOTIFIED=>NOTIFIED results in a write. This is on
-		// purpose, to make sure every unpark() has a release-acquire ordering
-		// with park().
+		// Note that even `NOTIFIED=>NOTIFIED` results in a write. This is on
+		// purpose, to make sure every `unpark()` has a release-acquire ordering
+		// with `park()`.
 		if self.state.swap(NOTIFIED, Release) == PARKED {
 			futex_wake(&self.state);
 		}
@@ -110,7 +110,7 @@ impl Parker {
 
 // See <https://github.com/rust-lang/rust/blob/1.75.0/library/std/src/sys/wasm/atomics/futex.rs>.
 
-/// Wait for a futex_wake operation to wake us.
+/// Wait for a `futex_wake` operation to wake us.
 ///
 /// Returns directly if the futex doesn't hold the expected value.
 ///
@@ -128,7 +128,7 @@ pub fn futex_wait(futex: &AtomicU32, expected: u32, timeout: Option<Duration>) -
 	}
 }
 
-/// Wake up one thread that's blocked on futex_wait on this futex.
+/// Wake up one thread that's blocked on `futex_wait` on this futex.
 ///
 /// Returns true if this actually woke up such a thread,
 /// or false if no thread was waiting on this futex.

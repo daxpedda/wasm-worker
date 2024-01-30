@@ -1,7 +1,5 @@
 //! Global context of each worker type.
 
-use std::io::{Error, ErrorKind};
-
 use wasm_bindgen::JsCast;
 use web_sys::{DedicatedWorkerGlobalScope, SharedWorkerGlobalScope, Window, WorkerGlobalScope};
 
@@ -39,12 +37,4 @@ pub(super) enum Global {
 	Service(WorkerGlobalScope),
 	/// Worklet.
 	Worklet,
-}
-
-/// Generates the appropriate error for an unsupported worker type.
-pub(super) fn unsupported_global() -> Error {
-	Error::new(
-		ErrorKind::Unsupported,
-		"encountered unsupported thread worker type",
-	)
 }

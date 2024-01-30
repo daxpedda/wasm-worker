@@ -18,24 +18,24 @@ fn park_no_op() {
 }
 
 #[wasm_bindgen_test]
-#[should_panic = "current worker type cannot be blocked"]
+#[should_panic = "current thread type cannot be blocked"]
 fn sleep() {
 	web_thread::sleep(Duration::from_secs(1));
 }
 
 #[wasm_bindgen_test]
-#[should_panic = "current worker type cannot be blocked"]
+#[should_panic = "current thread type cannot be blocked"]
 fn sleep_ms() {
 	#[allow(deprecated)]
 	web_thread::sleep_ms(1000);
 }
 
 #[wasm_bindgen_test]
-#[should_panic = "current worker type cannot be blocked"]
+#[should_panic = "current thread type cannot be blocked"]
 fn join() {
 	assert!(
 		web::has_spawn_support(),
-		"current worker type cannot be blocked"
+		"current thread type cannot be blocked"
 	);
 
 	let _ = web_thread::spawn(|| ()).join();

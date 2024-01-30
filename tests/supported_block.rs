@@ -5,9 +5,7 @@ use std::time;
 
 use time::{Duration, Instant};
 #[cfg(target_family = "wasm")]
-use wasm_bindgen_test::wasm_bindgen_test;
-#[cfg(target_family = "wasm")]
-use web_time as time;
+use {wasm_bindgen_test::wasm_bindgen_test, web_thread::web, web_time as time};
 
 #[cfg_attr(not(target_family = "wasm"), test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
@@ -41,7 +39,19 @@ fn sleep() {
 
 #[cfg(target_family = "wasm")]
 #[wasm_bindgen_test::wasm_bindgen_test]
-#[allow(clippy::absolute_paths)]
 fn has_block_support() {
-	assert!(web_thread::web::has_block_support());
+	assert!(web::has_block_support());
+}
+
+#[cfg(target_family = "wasm")]
+#[wasm_bindgen_test]
+async fn scope_async_join() {
+	let mut test = 0;
+
+	web::scope_async(|_| async { test = 1 })
+		.into_wait()
+		.await
+		.join_all();
+
+	assert_eq!(test, 1);
 }

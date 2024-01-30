@@ -9,7 +9,7 @@ GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_s
 
 ## Single-Threaded Doc Tests
 CHROMEDRIVER=chromedriver cargo +nightly test --doc --target wasm32-unknown-unknown -Zdoctest-xcompile
-GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block" cargo +nightly test --doc --target wasm32-unknown-unknown -Zdoctest-xcompile
+GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block" RUSTDOCFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block" cargo +nightly test --doc --target wasm32-unknown-unknown -Zdoctest-xcompile
 
 ## Single-Threaded without Cross-Origin Isolation
 
@@ -19,7 +19,7 @@ WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg
 ## Single-Threaded Doc Tests without Cross-Origin Isolation
 
 WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 CHROMEDRIVER=chromedriver cargo +nightly test --doc --target wasm32-unknown-unknown -Zdoctest-xcompile
-WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block" cargo +nightly test --doc --target wasm32-unknown-unknown -Zdoctest-xcompile
+WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block" RUSTDOCFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block" cargo +nightly test --doc --target wasm32-unknown-unknown -Zdoctest-xcompile
 
 ## Single-Threaded Compile Tests
 
@@ -27,13 +27,13 @@ UI_TEST_TARGET=wasm32-unknown-unknown cargo test --test compile_test
 
 ## Multi-Threaded
 
-CHROMEDRIVER=chromedriver RUSTFLAGS="--cfg=unsupported_spawn_then_block -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
-GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
+CHROMEDRIVER=chromedriver RUSTFLAGS="--cfg=unsupported_spawn_then_block -Ctarget-feature=+atomics,+bulk-memory" RUSTDOCFLAGS="--cfg=unsupported_spawn_then_block -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
+GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block -Ctarget-feature=+atomics,+bulk-memory" RUSTDOCFLAGS="--cfg=unsupported_service --cfg=unsupported_shared_block -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
 
 ## Multi-Threaded without Cross-Origin Isolation
 
-WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 CHROMEDRIVER=chromedriver RUSTFLAGS="--cfg=unsupported_spawn -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
-WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_spawn --cfg=unsupported_service --cfg=unsupported_shared_block -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
+WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 CHROMEDRIVER=chromedriver RUSTFLAGS="--cfg=unsupported_spawn -Ctarget-feature=+atomics,+bulk-memory" RUSTDOCFLAGS="--cfg=unsupported_spawn -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
+WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg=unsupported_spawn --cfg=unsupported_service --cfg=unsupported_shared_block -Ctarget-feature=+atomics,+bulk-memory" RUSTDOCFLAGS="--cfg=unsupported_spawn --cfg=unsupported_service --cfg=unsupported_shared_block -Ctarget-feature=+atomics,+bulk-memory" cargo +nightly test --target wasm32-unknown-unknown -Zdoctest-xcompile -Zbuild-std=panic_abort,std
 
 ## Multi-Threaded Compile Tests
 
