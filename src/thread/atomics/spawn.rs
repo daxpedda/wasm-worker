@@ -4,11 +4,10 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::future::Future;
-use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
-use std::{fmt, io, mem};
+use std::{fmt, io, mem, ptr};
 
 use atomic_waker::AtomicWaker;
 use js_sys::WebAssembly::Global;
@@ -78,7 +77,7 @@ enum Command {
 		/// [`ThreadId`] of the thread to be terminated.
 		id: ThreadId,
 		/// Value to use `Atomics.waitAsync` on.
-		value: Box<i32>,
+		value: Pin<&'static i32>,
 		/// TLS base address.
 		tls_base: f64,
 		/// Size of the allocated space.
@@ -210,7 +209,7 @@ where
 					}
 				}
 
-				let value = Box::new(0);
+				let value = Pin::new(&0);
 				let index: *const i32 = ptr::addr_of!(*value);
 				#[allow(clippy::as_conversions)]
 				let index = index as u32 / 4;
