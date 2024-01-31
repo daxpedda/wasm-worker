@@ -17,7 +17,7 @@ thread_local! {
 			Some(Global::Shared(global.unchecked_into()))
 		} else if !global.service_worker_global_scope().is_undefined() {
 			Some(Global::Service(global.unchecked_into()))
-		} else if !global.audio_worklet_global_scope().is_undefined() {
+		} else if !global.worklet_global_scope().is_undefined() {
 			Some(Global::Worklet)
 		} else {
 			None
