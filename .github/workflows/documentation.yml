@@ -37,7 +37,7 @@ jobs:
       - name: Run Rustdoc
         env:
           RUSTDOCFLAGS: --crate-version main --cfg=docsrs
-        run: cargo doc --target wasm32-unknown-unknown --no-deps -Zrustdoc-map -Zrustdoc-scrape-examples
+        run: cargo doc --all-features --target wasm32-unknown-unknown --no-deps -Zrustdoc-map -Zrustdoc-scrape-examples
       - name: Setup Pages
         uses: actions/configure-pages@v4
       - name: Fix permissions

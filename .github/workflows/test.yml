@@ -14,7 +14,7 @@ env:
 
 jobs:
   build-test:
-    name: ${{ matrix.target.description }} ${{ matrix.rust.description }}
+    name: ${{ matrix.target.description }} ${{ matrix.rust.description }} ${{ matrix.features.description }}
 
     runs-on: ubuntu-latest
 
@@ -36,6 +36,9 @@ jobs:
             }
         rust:
           - { version: stable }
+        features:
+          - { features: "" }
+          - { features: --all-features, description: (all features) }
         include:
           - rust: {
               version: nightly,
@@ -58,7 +61,7 @@ jobs:
         with:
           tool: wasm-bindgen-cli
           git: https://github.com/daxpedda/wasm-bindgen
-          rev: b42b04bf1fabce68a883102daeba5ac16bdecb38
+          rev: d59d442b6999aff53c9c1b13b181556eb511ccb5
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
@@ -66,21 +69,23 @@ jobs:
       - name: Build
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }}
-        run: cargo build --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+        run: |
+          cargo build ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Documentation
         env:
           RUSTDOCFLAGS: ${{ matrix.rust.flags }}
           RUSTFLAGS: ${{ matrix.rust.flags }}
-        run: cargo doc --no-deps --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+        run: |
+          cargo doc --no-deps ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test
-        if: matrix.target.web == false
+        if: matrix.target.web == false && matrix.target.features == ''
         run: cargo test --all-targets --no-fail-fast
       - name: Documentation tests
-        if: matrix.target.web == false
+        if: matrix.target.web == false && matrix.target.features == ''
         run: cargo test --doc --no-fail-fast
 
   test-browsers:
-    name: ${{ matrix.rust.pre_description }} ${{ matrix.driver.description }} ${{ matrix.rust.post_description }} ${{ matrix.cross-origin-isolation.description }}
+    name: ${{ matrix.rust.pre_description }} ${{ matrix.driver.description }} ${{ matrix.rust.post_description }} ${{ matrix.cross-origin-isolation.description }} ${{ matrix.features.description }}
 
     runs-on: ${{ matrix.driver.os }}
 
@@ -101,6 +106,9 @@ jobs:
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
             }
+        features:
+          - { features: "" }
+          - { features: --all-features, description: (all features) }
         cross-origin-isolation:
           - { state: true }
           - {
@@ -138,7 +146,7 @@ jobs:
         with:
           tool: wasm-bindgen-cli
           git: https://github.com/daxpedda/wasm-bindgen
-          rev: b42b04bf1fabce68a883102daeba5ac16bdecb38
+          rev: d59d442b6999aff53c9c1b13b181556eb511ccb5
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
@@ -152,13 +160,15 @@ jobs:
         if: matrix.rust.version != 'nightly' || matrix.rust.atomics
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
-        run: cargo test --all-targets --no-fail-fast --target wasm32-unknown-unknown ${{ matrix.rust.args }}
+        run: |
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }}
       - name: Documentation tests
         if: matrix.rust.version == 'nightly'
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
           RUSTDOCFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
-        run: cargo +nightly test --doc --no-fail-fast --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile -- --test-threads 1
+        run: |
+          cargo +nightly test --doc --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile -- --test-threads 1
 
   compile-test-web:
     name: Compile Tests on Web ${{ matrix.rust.description }}
@@ -195,7 +205,7 @@ jobs:
         run: cargo test --test compile_test
 
   minimal-versions:
-    name: Minimal Versions on ${{ matrix.target.description }} (${{ matrix.rust.description }})
+    name: Minimal Versions on ${{ matrix.target.description }} (${{ matrix.rust.description }}) ${{ matrix.features.description }}
 
     runs-on: ubuntu-latest
     defaults:
@@ -211,6 +221,9 @@ jobs:
         target:
           - { target: x86_64-unknown-linux-gnu, description: Native }
           - { target: wasm32-unknown-unknown, description: Web }
+        features:
+          - { features: "" }
+          - { features: --all-features, description: (all features) }
         include:
           - rust: {
               version: nightly,
@@ -220,6 +233,9 @@ jobs:
               args: "-Zbuild-std=panic_abort,std",
             }
             target: { target: wasm32-unknown-unknown, description: Web }
+        exclude:
+          - rust: { target: x86_64-unknown-linux-gnu, description: Native }
+            features: { features: --all-features, description: (all features) }
 
     steps:
       - name: Checkout
@@ -238,4 +254,4 @@ jobs:
       - name: Build
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }}
-        run: cargo build --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+        run: cargo build ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}

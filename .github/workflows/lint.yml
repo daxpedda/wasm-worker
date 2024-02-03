@@ -14,7 +14,7 @@ env:
 
 jobs:
   clippy-rustdoc:
-    name: Clippy & Rustdoc ${{ matrix.target.description }} ${{ matrix.rust.description }}
+    name: Clippy & Rustdoc ${{ matrix.target.description }} ${{ matrix.rust.description }} ${{ matrix.features.description }}
 
     runs-on: ubuntu-latest
 
@@ -26,6 +26,9 @@ jobs:
           - { target: wasm32-unknown-unknown, description: Web }
         rust:
           - { version: stable }
+        features:
+          - { features: "" }
+          - { features: --all-features, description: (all features) }
         include:
           - target: { target: wasm32-unknown-unknown, description: Web }
             rust: {
@@ -46,16 +49,17 @@ jobs:
       - name: Run Clippy
         env:
           RUSTFLAGS: ${{ matrix.rust.flags }}
-        run: cargo clippy --all-targets --target ${{ matrix.target.target }} ${{ matrix.rust.args }} -- -D warnings
+        run: |
+          cargo clippy --all-targets ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }} -- -D warnings
       - name: Run Rustdoc
         env:
           RUSTDOCFLAGS: -D warnings ${{ matrix.rust.flags }}
           RUSTFLAGS: ${{ matrix.rust.flags }}
         run: |
-          cargo doc --no-deps --document-private-items --lib --examples --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+          cargo doc --no-deps --document-private-items --lib --examples ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
 
   rustdoc-docsrs:
-    name: Rustdoc (docsrs) ${{ matrix.target.description }} ${{ matrix.rust.description }}
+    name: Rustdoc (docsrs) ${{ matrix.target.description }} ${{ matrix.rust.description }} ${{ matrix.features.description }}
 
     runs-on: ubuntu-latest
 
@@ -67,6 +71,9 @@ jobs:
           - { target: wasm32-unknown-unknown, description: Web }
         rust:
           - { version: nightly }
+        features:
+          - { features: "" }
+          - { features: --all-features, description: (all features) }
         include:
           - target: { target: wasm32-unknown-unknown, description: Web }
             rust: {
@@ -89,4 +96,4 @@ jobs:
           RUSTDOCFLAGS: -D warnings --cfg=docsrs ${{ matrix.rust.flags }}
           RUSTFLAGS: ${{ matrix.rust.flags }}
         run: |
-          cargo doc --no-deps --document-private-items --lib --examples --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+          cargo doc --no-deps --document-private-items --lib --examples ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}

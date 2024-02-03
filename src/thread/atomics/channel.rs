@@ -1,4 +1,4 @@
-//! Async primitives.
+//! Async channel.
 
 use std::fmt::{self, Debug, Formatter};
 use std::future;

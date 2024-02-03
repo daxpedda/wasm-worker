@@ -2,6 +2,8 @@
 
 #[cfg(target_feature = "atomics")]
 mod atomics;
+#[cfg(feature = "audio-worklet")]
+pub(crate) mod audio_worklet;
 mod global;
 mod js;
 #[cfg(not(target_feature = "atomics"))]
@@ -207,7 +209,7 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	pub(crate) fn poll(&mut self, cx: &Context<'_>) -> Poll<Result<T>> {
+	pub(crate) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<Result<T>> {
 		Pin::new(&mut self.0).poll(cx)
 	}
 }
@@ -417,8 +419,8 @@ impl<#[allow(single_use_lifetimes)] 'scope, T> ScopedJoinHandle<'scope, T> {
 	}
 
 	/// Implementation for
-	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	pub(crate) fn poll(&mut self, cx: &Context<'_>) -> Poll<Result<T>> {
+	/// [`ScopedJoinHandleFuture::poll()`](crate::web::ScopedJoinHandleFuture).
+	pub(crate) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<Result<T>> {
 		Pin::new(&mut self.handle).poll(cx)
 	}
 }

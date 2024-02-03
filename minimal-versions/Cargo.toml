@@ -4,5 +4,8 @@ name = "minimal-versions"
 publish = false
 version = "0.0.0"
 
+[features]
+audio-worklet = ["web-thread/audio-worklet"]
+
 [dependencies]
 web-thread = { path = ".." }

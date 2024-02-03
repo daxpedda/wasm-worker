@@ -1,4 +1,7 @@
-//! Platform-specific extensions to [`web-thread`](crate) for the Web platform.
+//! Platform-specific extensions for [`web-thread`](crate) on the Web platform.
+
+#[cfg(any(feature = "audio-worklet", docsrs))]
+pub mod audio_worklet;
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::{Future, Ready};
@@ -105,7 +108,7 @@ pub fn has_spawn_support() -> bool {
 	thread::has_spawn_support()
 }
 
-/// Web-specific extension to [`web_thread::JoinHandle`](crate::JoinHandle).
+/// Web-specific extension for [`web_thread::JoinHandle`](crate::JoinHandle).
 pub trait JoinHandleExt<T> {
 	/// Async version of [`JoinHandle::join()`].
 	///
@@ -271,7 +274,7 @@ impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T> {
 	}
 }
 
-/// Web-specific extension to
+/// Web-specific extension for
 /// [`web_thread::ScopedJoinHandle`](crate::ScopedJoinHandle).
 pub trait ScopedJoinHandleExt<'scope, T> {
 	/// Async version of [`ScopedJoinHandle::join()`].
@@ -456,7 +459,7 @@ impl<T> ScopeJoinFuture<'_, '_, T> {
 	}
 }
 
-/// Web-specific extension to [`web_thread::Builder`](crate::Builder).
+/// Web-specific extension for [`web_thread::Builder`](crate::Builder).
 pub trait BuilderExt {
 	/// Async version of [`Builder::spawn()`].
 	///
@@ -466,10 +469,7 @@ pub trait BuilderExt {
 	///
 	/// If the main thread does not support spawning threads, see
 	/// [`has_spawn_support()`].
-	fn spawn_async<F1, F2, T>(
-		self,
-		#[allow(clippy::min_ident_chars)] f: F1,
-	) -> io::Result<JoinHandle<T>>
+	fn spawn_async<F1, F2, T>(self, f: F1) -> io::Result<JoinHandle<T>>
 	where
 		F1: 'static + FnOnce() -> F2 + Send,
 		F2: 'static + Future<Output = T>,
@@ -486,7 +486,7 @@ pub trait BuilderExt {
 	fn spawn_scoped_async<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T>(
 		self,
 		scope: &'scope Scope<'scope, 'env>,
-		#[allow(clippy::min_ident_chars)] f: F1,
+		f: F1,
 	) -> io::Result<ScopedJoinHandle<'scope, T>>
 	where
 		F1: 'scope + FnOnce() -> F2 + Send,
@@ -521,7 +521,7 @@ impl BuilderExt for Builder {
 	}
 }
 
-/// Web-specific extension to [`web_thread::Scope`](crate::Scope).
+/// Web-specific extension for [`web_thread::Scope`](crate::Scope).
 pub trait ScopeExt<'scope> {
 	/// Async version of [`Scope::spawn()`].
 	///
@@ -569,10 +569,7 @@ pub trait ScopeExt<'scope> {
 	/// # handle.await;
 	/// # }
 	/// ```
-	fn spawn_async<F1, F2, T>(
-		&'scope self,
-		#[allow(clippy::min_ident_chars)] f: F1,
-	) -> ScopedJoinHandle<'scope, T>
+	fn spawn_async<F1, F2, T>(&'scope self, f: F1) -> ScopedJoinHandle<'scope, T>
 	where
 		F1: 'scope + FnOnce() -> F2 + Send,
 		F2: 'scope + Future<Output = T>,

@@ -5,10 +5,12 @@ atomics
 futex
 Invariance
 JS
+oneshot
 parker
 Polyfill
 Polyfills
 spinloop
+spinloops
 TLS
 TODO
 unparks

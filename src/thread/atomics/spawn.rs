@@ -2,25 +2,22 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fmt::{Debug, Formatter};
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Condvar, Mutex, OnceLock, PoisonError};
-use std::{fmt, io, mem, ptr};
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, OnceLock};
+use std::{io, mem, ptr};
 
-use atomic_waker::AtomicWaker;
-use js_sys::WebAssembly::Global;
-use js_sys::{Array, Number, Object};
+use js_sys::Array;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsCast;
 use web_sys::{Worker, WorkerOptions, WorkerType};
 
 use super::channel::Sender;
-use super::js::{Exports, GlobalDescriptor, META};
+use super::js::META;
+use super::memory::ThreadMemory;
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
-use super::{channel, JoinHandle, ScopeData, MEMORY, MODULE};
+use super::{channel, oneshot, JoinHandle, ScopeData, MEMORY, MODULE};
 use crate::thread::{Thread, ThreadId, THREAD};
 
 /// Saves the [`ThreadId`] of the main thread.
@@ -39,28 +36,6 @@ type Task = Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = u32>>> + Send>;
 type TaskStatic =
 	Box<dyn 'static + FnOnce() -> Pin<Box<dyn 'static + Future<Output = u32>>> + Send>;
 
-/// Shared state between thread and [`JoinHandle`].
-pub(super) struct Shared<T> {
-	/// [`Mutex`] holding the returned value.
-	pub(super) value: Mutex<Option<T>>,
-	/// [`Condvar`] to wake up any thread waiting on the return value.
-	pub(super) cvar: Condvar,
-	/// Registered [`Waker`](std::task::Waker) to be notified when the thread is
-	/// finished.
-	pub(super) waker: AtomicWaker,
-}
-
-impl<T> Debug for Shared<T> {
-	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-		formatter
-			.debug_struct("Inner")
-			.field("value", &"Mutex")
-			.field("cvar", &self.cvar)
-			.field("waker", &self.waker)
-			.finish()
-	}
-}
-
 /// Command sent to the main thread.
 enum Command {
 	/// Spawn a new thread.
@@ -78,10 +53,8 @@ enum Command {
 		id: ThreadId,
 		/// Value to use `Atomics.waitAsync` on.
 		value: Pin<&'static i32>,
-		/// TLS base address.
-		tls_base: f64,
-		/// Size of the allocated space.
-		stack_alloc: f64,
+		/// Thread memory.
+		memory: ThreadMemory,
 	},
 }
 
@@ -103,12 +76,7 @@ fn init_main() {
 					Command::Spawn { id, task, name } => {
 						spawn_internal(id, task, name.as_deref());
 					}
-					Command::Terminate {
-						id,
-						value,
-						tls_base,
-						stack_alloc,
-					} => {
+					Command::Terminate { id, value, memory } => {
 						wasm_bindgen_futures::spawn_local(async move {
 							WaitAsync::wait(&value, 0).await;
 
@@ -121,35 +89,15 @@ fn init_main() {
 								})
 								.terminate();
 
-							thread_local! {
-								/// Caches the [`Exports`] object.
-								static EXPORTS: Exports = wasm_bindgen::exports().unchecked_into();
-								/// Caches the [`GlobalDescriptor`] needed to reconstruct the [`Global`] values.
-								static DESCRIPTOR: GlobalDescriptor = {
-									let descriptor: GlobalDescriptor = Object::new().unchecked_into();
-									descriptor.set_value("i32");
-									descriptor
-								};
-							}
-
-							let (tls_base, stack_alloc) = DESCRIPTOR.with(|descriptor| {
-								(
-									Global::new(descriptor, &tls_base.into())
-										.expect("unexpected invalid `Global` constructor"),
-									Global::new(descriptor, &stack_alloc.into())
-										.expect("unexpected invalid `Global` constructor"),
-								)
-							});
-
 							// SAFETY:
 							// - We don't get here until we are sure the thread is blocked and can't
 							//   be executing Rust code anymore.
 							// - This is only done once per thread.
 							// - The correct values are attained by the thread and sent when
 							//   finished.
-							EXPORTS.with(|exports| unsafe {
-								exports.thread_destroy(&tls_base, &stack_alloc);
-							});
+							unsafe {
+								memory.destroy();
+							}
 						});
 					}
 				}
@@ -173,11 +121,7 @@ where
 	T: Send,
 {
 	let thread = Thread::new_with_name(name);
-	let shared = Arc::new(Shared {
-		value: Mutex::new(None),
-		cvar: Condvar::new(),
-		waker: AtomicWaker::new(),
-	});
+	let (sender, receiver) = oneshot::channel();
 
 	if let Some(scope) = &scope {
 		// This can't overflow because creating a `ThreadId` would fail beforehand.
@@ -186,21 +130,12 @@ where
 
 	let task: Box<dyn FnOnce() -> Pin<Box<dyn Future<Output = u32>>> + Send> = Box::new({
 		let thread = thread.clone();
-		let shared = Arc::downgrade(&shared);
 		move || {
 			Thread::register(thread);
 			let task = task();
 
 			Box::pin(async move {
-				let result = task.await;
-
-				if let Some(shared) = shared.upgrade() {
-					*shared.value.lock().unwrap_or_else(PoisonError::into_inner) = Some(result);
-					shared.cvar.notify_one();
-					shared.waker.wake();
-				} else {
-					drop(result);
-				}
+				sender.send(task.await);
 
 				if let Some(scope) = scope {
 					if scope.threads.fetch_sub(1, Ordering::Release) == 1 {
@@ -214,10 +149,7 @@ where
 				#[allow(clippy::as_conversions)]
 				let index = index as u32 / 4;
 
-				let exports: Exports = wasm_bindgen::exports().unchecked_into();
-				let tls_base = Number::unchecked_from_js(exports.tls_base().value()).value_of();
-				let stack_alloc =
-					Number::unchecked_from_js(exports.stack_alloc().value()).value_of();
+				let memory = ThreadMemory::new();
 
 				SENDER
 					.get()
@@ -225,8 +157,7 @@ where
 					.send(Command::Terminate {
 						id: current_id(),
 						value,
-						tls_base,
-						stack_alloc,
+						memory,
 					})
 					.expect("`Receiver` was somehow dropped from the main thread");
 
@@ -255,9 +186,8 @@ where
 	}
 
 	Ok(JoinHandle {
-		shared,
+		receiver: Some(receiver),
 		thread,
-		taken: AtomicBool::new(false),
 	})
 }
 
@@ -267,7 +197,7 @@ fn spawn_internal(id: ThreadId, task: TaskStatic, name: Option<&str>) {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(&{
 			format!(
-				"import {{initSync, __web_thread_entry}} from '{}';\n\n{}",
+				"import {{initSync, __web_thread_worker_entry}} from '{}';\n\n{}",
 				META.url(),
 				include_str!("worker.js")
 			)
@@ -303,7 +233,7 @@ fn spawn_internal(id: ThreadId, task: TaskStatic, name: Option<&str>) {
 #[doc(hidden)]
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
-pub async unsafe fn __web_thread_entry(task: *mut Task) -> u32 {
+pub async unsafe fn __web_thread_worker_entry(task: *mut Task) -> u32 {
 	// SAFETY: Has to be a valid pointer to a `Box<dyn FnOnce() -> u32>`. We only
 	// call `__web_thread_entry` from `worker.js`. The data sent to it should
 	// only come from `self::spawn_internal()`.

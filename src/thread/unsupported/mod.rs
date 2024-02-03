@@ -1,5 +1,7 @@
 //! Implementation without the atomics target feature enabled.
 
+#[cfg(feature = "audio-worklet")]
+pub(super) mod audio_worklet;
 mod js;
 mod parker;
 
@@ -111,7 +113,7 @@ impl<T> JoinHandle<T> {
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
 	#[allow(clippy::unused_self)]
-	pub(super) fn poll(&self, _: &Context<'_>) -> Poll<Result<T>> {
+	pub(super) fn poll(&self, _: &mut Context<'_>) -> Poll<Result<T>> {
 		unreachable!("found instanced `JoinHandle` without threading support")
 	}
 }

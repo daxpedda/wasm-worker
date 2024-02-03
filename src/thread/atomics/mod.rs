@@ -1,7 +1,11 @@
 //! Implementation when the atomics target feature is enabled.
 
+#[cfg(feature = "audio-worklet")]
+pub(super) mod audio_worklet;
 mod channel;
 mod js;
+mod memory;
+mod oneshot;
 mod parker;
 mod spawn;
 mod url;
@@ -11,8 +15,9 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::panic::RefUnwindSafe;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock, PoisonError, TryLockError};
+use std::pin::Pin;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use std::thread::Result;
 use std::time::Duration;
@@ -23,6 +28,7 @@ use js_sys::WebAssembly::{Memory, Module};
 use js_sys::{Atomics, Int32Array};
 use wasm_bindgen::JsCast;
 
+use self::oneshot::Receiver;
 pub(super) use self::parker::Parker;
 use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
 use super::{ScopedJoinHandle, Thread, THREAD};
@@ -114,22 +120,18 @@ impl Builder {
 
 /// Implementation of [`std::thread::JoinHandle`].
 pub(super) struct JoinHandle<T> {
-	/// Shared state between [`JoinHandle`] and thread.
-	shared: Arc<spawn::Shared<T>>,
+	/// Receiver for the return value.
+	receiver: Option<Receiver<T>>,
 	/// Corresponding [`Thread`].
 	thread: Thread,
-	/// Marker to know if the return value was already taken by
-	/// [`JoinHandle::join_async()`](crate::web::JoinHandleExt::join_async).
-	taken: AtomicBool,
 }
 
 impl<T> Debug for JoinHandle<T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		formatter
 			.debug_struct("JoinHandle")
-			.field("shared", &self.shared)
+			.field("receiver", &self.receiver)
 			.field("thread", &self.thread)
-			.field("taken", &self.taken)
 			.finish()
 	}
 }
@@ -137,19 +139,11 @@ impl<T> Debug for JoinHandle<T> {
 impl<T> JoinHandle<T> {
 	/// Implementation of [`std::thread::JoinHandle::is_finished()`].
 	pub(super) fn is_finished(&self) -> bool {
-		if self.taken.load(Ordering::Relaxed) {
-			return true;
-		}
-
-		#[allow(clippy::significant_drop_in_scrutinee)]
-		match self.shared.value.try_lock().as_deref() {
-			Ok(Some(_)) => true,
-			Err(TryLockError::Poisoned(error)) => error.get_ref().is_some(),
-			Err(TryLockError::WouldBlock) | Ok(None) => false,
-		}
+		self.receiver.as_ref().map_or(true, Receiver::is_ready)
 	}
 
 	/// Implementation of [`std::thread::JoinHandle::join()`].
+	#[allow(clippy::unnecessary_wraps)]
 	pub(super) fn join(self) -> Result<T> {
 		assert_ne!(
 			self.thread().id(),
@@ -157,33 +151,11 @@ impl<T> JoinHandle<T> {
 			"called `JoinHandle::join()` on the thread to join"
 		);
 
-		assert!(
-			!self.taken.load(Ordering::Relaxed),
-			"`JoinHandle::join()` called after `JoinHandleFuture` polled to completion"
-		);
-
-		let mut value = self
-			.shared
-			.value
-			.lock()
-			.unwrap_or_else(PoisonError::into_inner);
-
-		assert!(
-			super::has_block_support(),
-			"current thread type cannot be blocked"
-		);
-
-		loop {
-			if let Some(value) = value.take() {
-				return Ok(value);
-			}
-
-			value = self
-				.shared
-				.cvar
-				.wait(value)
-				.unwrap_or_else(PoisonError::into_inner);
-		}
+		Ok(self
+			.receiver
+			.expect("`JoinHandle::join()` called after `JoinHandleFuture` polled to completion")
+			.receive()
+			.expect("thread terminated without returning"))
 	}
 
 	/// Implementation of [`std::thread::JoinHandle::thread()`].
@@ -194,39 +166,25 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	pub(super) fn poll(&mut self, cx: &Context<'_>) -> Poll<Result<T>> {
-		assert!(
-			!self.taken.load(Ordering::Relaxed),
-			"`JoinHandleFuture` polled or created after completion"
-		);
-
+	pub(super) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<Result<T>> {
 		assert_ne!(
 			self.thread().id(),
 			super::current().id(),
 			"called `JoinHandle::join()` on the thread to join"
 		);
 
-		let mut value = match self.shared.value.try_lock() {
-			Ok(mut value) => value.take(),
-			Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
-			Err(TryLockError::WouldBlock) => None,
-		};
+		let mut receiver = self
+			.receiver
+			.take()
+			.expect("`JoinHandleFuture` polled or created after completion");
 
-		if value.is_none() {
-			self.shared.waker.register(cx.waker());
-
-			value = match self.shared.value.try_lock() {
-				Ok(mut value) => value.take(),
-				Err(TryLockError::Poisoned(error)) => error.into_inner().take(),
-				Err(TryLockError::WouldBlock) => None,
-			};
-		}
-
-		if let Some(value) = value {
-			self.taken.store(true, Ordering::Relaxed);
-			Poll::Ready(Ok(value))
-		} else {
-			Poll::Pending
+		match Pin::new(&mut receiver).poll(cx) {
+			Poll::Ready(Some(value)) => Poll::Ready(Ok(value)),
+			Poll::Pending => {
+				self.receiver = Some(receiver);
+				Poll::Pending
+			}
+			Poll::Ready(None) => unreachable!("thread terminated without returning"),
 		}
 	}
 }
