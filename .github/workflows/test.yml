@@ -52,6 +52,20 @@ jobs:
               description: Build Web,
               web: true,
             }
+            features: { features: "" }
+          - rust: {
+              version: nightly,
+              description: with Atomics,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            target: {
+              target: wasm32-unknown-unknown,
+              description: Build Web,
+              web: true,
+            }
+            features: { features: --all-features, description: (all features) }
 
     steps:
       - name: Checkout
@@ -233,6 +247,16 @@ jobs:
               args: "-Zbuild-std=panic_abort,std",
             }
             target: { target: wasm32-unknown-unknown, description: Web }
+            features: { features: "" }
+          - rust: {
+              version: nightly,
+              description: Nightly (Atomics),
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            target: { target: wasm32-unknown-unknown, description: Web }
+            features: { features: --all-features, description: (all features) }
         exclude:
           - rust: { target: x86_64-unknown-linux-gnu, description: Native }
             features: { features: --all-features, description: (all features) }

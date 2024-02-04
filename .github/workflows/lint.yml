@@ -38,6 +38,16 @@ jobs:
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
             }
+            features: { features: "" }
+          - target: { target: wasm32-unknown-unknown, description: Web }
+            rust: {
+              version: nightly,
+              description: with Atomics,
+              component: ",rust-src",
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            features: { features: --all-features, description: (all features) }
 
     steps:
       - name: Checkout
@@ -83,6 +93,16 @@ jobs:
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
               args: "-Zbuild-std=panic_abort,std",
             }
+            features: { features: "" }
+          - target: { target: wasm32-unknown-unknown, description: Web }
+            rust: {
+              version: nightly,
+              description: with Atomics,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            features: { features: --all-features, description: (all features) }
 
     steps:
       - name: Checkout
