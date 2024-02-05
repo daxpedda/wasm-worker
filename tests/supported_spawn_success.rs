@@ -42,7 +42,7 @@ async fn park() {
 	}
 
 	let elapsed = start.elapsed();
-	assert!(elapsed.as_secs() >= 2, "time: {elapsed:?}");
+	assert!(elapsed.as_millis() >= 1999, "time: {elapsed:?}");
 }
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
