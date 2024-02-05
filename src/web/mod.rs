@@ -1,6 +1,7 @@
 //! Platform-specific extensions for [`web-thread`](crate) on the Web platform.
 
 #[cfg(any(feature = "audio-worklet", docsrs))]
+#[cfg_attr(docsrs, doc(cfg(feature = "audio-worklet")))]
 pub mod audio_worklet;
 
 use std::fmt::{self, Debug, Formatter};
