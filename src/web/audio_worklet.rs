@@ -41,18 +41,31 @@ mod audio_worklet {
 pub trait BaseAudioContextExt<'context> {
 	/// Registers a thread at this [`BaseAudioContext`].
 	///
+	/// # Notes
+	///
+	/// This will automatically clean up thread-local resources when
+	/// [`BaseAudioContext`] reaches the [`closed`] [state]. Unfortunately some
+	/// browsers are not fully spec-compliant and don't fully shut-down the
+	/// thread when the [`closed`] [state] is reached. If any calls into the
+	/// Wasm module are made at that point, it could lead to undefined behavior.
+	/// To avoid this make sure to clean up any resources before [shutting down
+	/// the audio worklet].
+	///
 	/// # Errors
 	///
 	/// - If a thread was already registered at this [`BaseAudioContext`].
 	/// - If the [`BaseAudioContext`] was closed.
 	/// - If the main thread does not support spawning threads, see
 	///   [`has_spawn_support()`](super::has_spawn_support).
+	///
+	/// [`closed`]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#closed
+	/// [state]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state
+	/// [shutting down the audio worklet]: https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/close
 	#[cfg_attr(
 		any(
 			not(all(target_family = "wasm", target_os = "unknown")),
 			not(feature = "audio-worklet")
 		),
-		doc = "",
 		doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.67/web_sys/struct.BaseAudioContext.html"
 	)]
 	fn register_thread<F>(self, f: F) -> RegisterThreadFuture<'context>
