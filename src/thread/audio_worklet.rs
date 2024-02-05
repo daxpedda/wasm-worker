@@ -16,7 +16,10 @@ use super::Thread;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
-pub(crate) fn register_thread<F>(context: Cow<'_, BaseAudioContext>, task: F) -> RegisterThreadFuture<'_>
+pub(crate) fn register_thread<F>(
+	context: Cow<'_, BaseAudioContext>,
+	task: F,
+) -> RegisterThreadFuture<'_>
 where
 	F: 'static + FnOnce() + Send,
 {
