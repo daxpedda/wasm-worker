@@ -1,14 +1,15 @@
 //! TODO
 //!
 //! - Firefox doesn't support module service workers: <https://bugzilla.mozilla.org/show_bug.cgi?id=1360870>.
-//! - Browser don't support blocking in shared workers:
+//! - Browsers don't support blocking in shared workers:
 //!   - Firefox: <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>
 //!   - Safari: ?
 //! - Spec doesn't allow cross-origin isolation in shared and service workers: <https://github.com/w3c/ServiceWorker/pull/1545>.
-//! - Chrome doesn't support spawning workers when blocking afterwards (e.g. `spawn(..).join()`): <https://bugs.chromium.org/p/chromium/issues/detail?id=977924>.
-//! - Chrome doesn't support sending messages when blocking afterwards: <https://bugs.chromium.org/p/chromium/issues/detail?id=1075645>.
+//! - Chrome doesn't support spawning workers when blocking afterwards (e.g. `spawn(..).join()`): <https://issues.chromium.org/issues/40633395>.
+//! - Chrome doesn't support sending messages when blocking afterwards: <https://issues.chromium.org/issues/40687798>.
 //! - Safari doesn't support spawning or sending message when blocking
 //!   afterwards: needs research.
+//! - Firefox doesn't properly shutdown audio worklet when state is `closed`: <https://bugzilla.mozilla.org/show_bug.cgi?id=1878516>.
 
 #![cfg_attr(
 	all(
