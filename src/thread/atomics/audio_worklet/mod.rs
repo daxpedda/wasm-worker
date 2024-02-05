@@ -45,6 +45,12 @@ where
 		});
 	}
 
+	if let AudioContextState::Closed = context.state() {
+		return RegisterThreadFuture(Some(State::Error(Error::other(
+			"`BaseAudioContext` is closed",
+		))));
+	}
+
 	if let Some(true) = context.unchecked_ref::<BaseAudioContextExt>().registered() {
 		return RegisterThreadFuture(Some(State::Error(Error::new(
 			ErrorKind::AlreadyExists,
