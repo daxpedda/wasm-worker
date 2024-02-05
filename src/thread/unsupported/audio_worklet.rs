@@ -1,8 +1,8 @@
 //! Audio worklet extension implementations.
 
+use std::borrow::Cow;
 use std::future::Future;
-use std::io;
-use std::io::Error;
+use std::io::{self, Error};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -13,7 +13,10 @@ use super::super::Thread;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
-pub(in super::super) fn register_thread<F>(_: &BaseAudioContext, _: F) -> RegisterThreadFuture<'_> {
+pub(in super::super) fn register_thread<F>(
+	_: Cow<'_, BaseAudioContext>,
+	_: F,
+) -> RegisterThreadFuture<'_> {
 	unreachable!("reached `register_thread()` without atomics target feature")
 }
 

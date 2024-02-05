@@ -1,5 +1,6 @@
 //! Audio worklet extensions.
 
+use std::borrow::Cow;
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
@@ -37,7 +38,7 @@ mod audio_worklet {
 	doc = "",
 	doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.67/web_sys/struct.BaseAudioContext.html"
 )]
-pub trait BaseAudioContextExt {
+pub trait BaseAudioContextExt<'context> {
 	/// Registers a thread at this [`BaseAudioContext`].
 	///
 	/// # Errors
@@ -54,7 +55,7 @@ pub trait BaseAudioContextExt {
 		doc = "",
 		doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.67/web_sys/struct.BaseAudioContext.html"
 	)]
-	fn register_thread<F>(&self, f: F) -> RegisterThreadFuture<'_>
+	fn register_thread<F>(self, f: F) -> RegisterThreadFuture<'context>
 	where
 		F: 'static + FnOnce() + Send;
 }
@@ -64,12 +65,32 @@ pub trait BaseAudioContextExt {
 	target_os = "unknown",
 	feature = "audio-worklet"
 ))]
-impl BaseAudioContextExt for BaseAudioContext {
-	fn register_thread<F>(&self, #[allow(clippy::min_ident_chars)] f: F) -> RegisterThreadFuture<'_>
+impl BaseAudioContextExt<'static> for BaseAudioContext {
+	fn register_thread<F>(
+		self,
+		#[allow(clippy::min_ident_chars)] f: F,
+	) -> RegisterThreadFuture<'static>
 	where
 		F: 'static + FnOnce() + Send,
 	{
-		RegisterThreadFuture(audio_worklet::register_thread(self, f))
+		RegisterThreadFuture(audio_worklet::register_thread(Cow::Owned(self), f))
+	}
+}
+
+#[cfg(all(
+	target_family = "wasm",
+	target_os = "unknown",
+	feature = "audio-worklet"
+))]
+impl<'context> BaseAudioContextExt<'context> for &'context BaseAudioContext {
+	fn register_thread<F>(
+		self,
+		#[allow(clippy::min_ident_chars)] f: F,
+	) -> RegisterThreadFuture<'context>
+	where
+		F: 'static + FnOnce() + Send,
+	{
+		RegisterThreadFuture(audio_worklet::register_thread(Cow::Borrowed(self), f))
 	}
 }
 

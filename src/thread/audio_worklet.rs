@@ -1,5 +1,6 @@
 //! Audio worklet extension redirection.
 
+use std::borrow::Cow;
 use std::future::Future;
 use std::io::{self, Error, ErrorKind};
 use std::pin::Pin;
@@ -15,7 +16,7 @@ use super::Thread;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
-pub(crate) fn register_thread<F>(context: &BaseAudioContext, task: F) -> RegisterThreadFuture<'_>
+pub(crate) fn register_thread<F>(context: Cow<'_, BaseAudioContext>, task: F) -> RegisterThreadFuture<'_>
 where
 	F: 'static + FnOnce() + Send,
 {

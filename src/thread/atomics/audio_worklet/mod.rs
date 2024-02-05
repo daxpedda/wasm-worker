@@ -28,7 +28,7 @@ use super::{oneshot, Thread};
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
 pub(in super::super) fn register_thread<F>(
-	context: &BaseAudioContext,
+	context: Cow<'_, BaseAudioContext>,
 	task: F,
 ) -> RegisterThreadFuture<'_>
 where
@@ -79,7 +79,7 @@ where
 				});
 
 				State::Module {
-					context: Cow::Borrowed(context),
+					context,
 					promise,
 					task: Box::new(task),
 					receiver,
