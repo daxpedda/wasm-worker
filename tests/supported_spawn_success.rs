@@ -42,6 +42,7 @@ async fn park() {
 	}
 
 	let elapsed = start.elapsed();
+	// Geckodriver seems unable to measure the time correctly.
 	assert!(elapsed.as_millis() >= 1999, "time: {elapsed:?}");
 }
 

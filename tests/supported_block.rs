@@ -21,6 +21,7 @@ fn park() {
 	web_thread::park_timeout_ms(1000);
 
 	let elapsed = start.elapsed();
+	// Geckodriver seems unable to measure the time correctly.
 	assert!(elapsed.as_millis() >= 1999, "time: {elapsed:?}");
 }
 
@@ -34,7 +35,8 @@ fn sleep() {
 	web_thread::sleep_ms(1000);
 
 	let elapsed = start.elapsed();
-	assert!(elapsed.as_secs() >= 2, "time: {elapsed:?}");
+	// Geckodriver seems unable to measure the time correctly.
+	assert!(elapsed.as_millis() >= 1999, "time: {elapsed:?}");
 }
 
 #[cfg(target_family = "wasm")]
