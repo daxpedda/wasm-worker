@@ -48,6 +48,9 @@ jobs:
               args: "-Zbuild-std=panic_abort,std",
             }
             features: { features: --all-features, description: (all features) }
+        exclude:
+          - target: { target: x86_64-unknown-linux-gnu, description: Native }
+            features: { features: --all-features, description: (all features) }
 
     steps:
       - name: Checkout
