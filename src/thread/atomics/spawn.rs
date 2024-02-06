@@ -235,7 +235,7 @@ fn spawn_internal(id: ThreadId, task: TaskStatic, name: Option<&str>) {
 #[allow(unreachable_pub)]
 pub async unsafe fn __web_thread_worker_entry(task: *mut Task) -> u32 {
 	// SAFETY: Has to be a valid pointer to a `Box<dyn FnOnce() -> u32>`. We only
-	// call `__web_thread_entry` from `worker.js`. The data sent to it should
+	// call `__web_thread_worker_entry` from `worker.js`. The data sent to it should
 	// only come from `self::spawn_internal()`.
 	let task = *unsafe { Box::from_raw(task) };
 	task().await

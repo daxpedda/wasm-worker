@@ -12,6 +12,7 @@ use std::task::{Context, Poll};
 
 use js_sys::Array;
 use wasm_bindgen::closure::Closure;
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
@@ -310,4 +311,15 @@ fn error_from_exception(error: JsValue) -> Error {
 	let error: DomException = error.unchecked_into();
 
 	Error::other(format!("{}: {}", error.name(), error.message()))
+}
+
+#[doc(hidden)]
+#[wasm_bindgen]
+#[allow(unreachable_pub)]
+pub unsafe fn __web_thread_worklet_entry(task: *mut Box<dyn FnOnce() + Send>) {
+	// SAFETY: Has to be a valid pointer to a `Box<dyn FnOnce() + Send>`. We only
+	// call `__web_thread_worker_entry` from `worklet.js`. The data sent to it
+	// should only come from `RegisterThreadFuture::poll()`.
+	let task = *unsafe { Box::from_raw(task) };
+	task();
 }
