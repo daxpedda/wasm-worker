@@ -1,6 +1,5 @@
 //! Audio worklet extension redirection.
 
-use std::borrow::Cow;
 use std::future::Future;
 use std::io::{self, Error, ErrorKind};
 use std::pin::Pin;
@@ -16,10 +15,7 @@ use super::Thread;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
-pub(crate) fn register_thread<F>(
-	context: Cow<'_, BaseAudioContext>,
-	task: F,
-) -> RegisterThreadFuture<'_>
+pub(crate) fn register_thread<F>(context: BaseAudioContext, task: F) -> RegisterThreadFuture
 where
 	F: 'static + FnOnce() + Send,
 {
@@ -36,20 +32,12 @@ where
 
 /// Implementation for [`crate::web::audio_worklet::RegisterThreadFuture`].
 #[derive(Debug)]
-pub(crate) struct RegisterThreadFuture<'context>(audio_worklet::RegisterThreadFuture<'context>);
+pub(crate) struct RegisterThreadFuture(audio_worklet::RegisterThreadFuture);
 
-impl Future for RegisterThreadFuture<'_> {
+impl Future for RegisterThreadFuture {
 	type Output = io::Result<Thread>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		Pin::new(&mut self.0).poll(cx)
-	}
-}
-
-impl RegisterThreadFuture<'_> {
-	/// Implementation for
-	/// [`crate::web::audio_worklet::RegisterThreadFuture::into_static()`].
-	pub(crate) fn into_static(self) -> RegisterThreadFuture<'static> {
-		RegisterThreadFuture(self.0.into_static())
 	}
 }

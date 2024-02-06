@@ -2,11 +2,12 @@
 
 mod js;
 
-use std::borrow::Cow;
+use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io::{self, Error, ErrorKind};
 use std::pin::Pin;
+use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use js_sys::Array;
@@ -15,7 +16,6 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{
 	AudioContextState, AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, DomException,
-	Event,
 };
 
 use self::js::BaseAudioContextExt;
@@ -28,9 +28,9 @@ use super::{oneshot, Thread};
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
 pub(in super::super) fn register_thread<F>(
-	context: Cow<'_, BaseAudioContext>,
+	context: BaseAudioContext,
 	task: F,
-) -> RegisterThreadFuture<'_>
+) -> RegisterThreadFuture
 where
 	F: 'static + FnOnce() + Send,
 {
@@ -92,16 +92,16 @@ where
 
 /// Implementation for [`crate::web::audio_worklet::RegisterThreadFuture`].
 #[derive(Debug)]
-pub(in super::super) struct RegisterThreadFuture<'context>(Option<State<'context>>);
+pub(in super::super) struct RegisterThreadFuture(Option<State>);
 
 /// State of [`RegisterThreadFuture`].
-enum State<'context> {
+enum State {
 	/// Early error.
 	Error(Error),
 	/// Waiting for `Worklet.addModule()`.
 	Module {
 		/// Corresponding [`BaseAudioContext`].
-		context: Cow<'context, BaseAudioContext>,
+		context: BaseAudioContext,
 		/// `Promise` returned by `Worklet.addModule()`.
 		promise: JsFuture,
 		/// User-supplied task.
@@ -112,7 +112,7 @@ enum State<'context> {
 	/// Waiting for [`Package`].
 	Package {
 		/// Corresponding [`BaseAudioContext`].
-		context: Cow<'context, BaseAudioContext>,
+		context: BaseAudioContext,
 		/// Receiver for the [`Package`].
 		receiver: Receiver<Package>,
 	},
@@ -126,7 +126,7 @@ struct Package {
 	memory: ThreadMemory,
 }
 
-impl Debug for State<'_> {
+impl Debug for State {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Error(error) => formatter.debug_tuple("Error").field(error).finish(),
@@ -150,21 +150,19 @@ impl Debug for State<'_> {
 	}
 }
 
-impl Drop for RegisterThreadFuture<'_> {
+impl Drop for RegisterThreadFuture {
 	fn drop(&mut self) {
 		let Some(state) = self.0.take() else { return };
 
 		if !matches!(state, State::Error(_)) {
-			let future = Self(Some(state)).into_static();
-
 			wasm_bindgen_futures::spawn_local(async move {
-				let _ = future.await;
+				let _ = Self(Some(state)).await;
 			});
 		}
 	}
 }
 
-impl Future for RegisterThreadFuture<'_> {
+impl Future for RegisterThreadFuture {
 	type Output = io::Result<Thread>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -218,39 +216,21 @@ impl Future for RegisterThreadFuture<'_> {
 					}
 				},
 				State::Package {
-					#[allow(clippy::ref_patterns)]
-					ref context,
-					ref mut receiver,
-				} => match Pin::new(receiver).poll(cx) {
+					context,
+					mut receiver,
+				} => match Pin::new(&mut receiver).poll(cx) {
 					Poll::Ready(Some(Package { thread, memory })) => {
-						let mut memory = Some(memory);
-						let closure = Closure::<dyn FnMut(_)>::new(move |event: Event| {
-							let context: BaseAudioContext = event
-								.target()
-								.expect("`Event.target` is not expected to be empty")
-								.unchecked_into();
-
-							if let AudioContextState::Closed = context.state() {
-								let memory = memory
-									.take()
-									.expect("`BaseAudioContext` reached `closed` state twice");
-								// SAFETY: When reaching the `closed` state, all resources should
-								// have been freed. See <https://webaudio.github.io/web-audio-api/#dom-audiocontextstate-closed>.
-								unsafe { memory.destroy() }
-							}
-						});
-						context
-							.add_event_listener_with_callback(
-								"statechange",
-								closure.as_ref().unchecked_ref(),
-							)
-							.expect("`EventTarget.addEventListener()` is not expected to fail");
-						closure.into_js_value();
-
+						if let AudioContextState::Closed = context.state() {
+							// SAFETY: When reaching the `closed` state, all resources
+							// should have been freed. See <https://webaudio.github.io/web-audio-api/#dom-audiocontextstate-closed>.
+							unsafe { memory.destroy() };
+						} else {
+							Self::schedule_clean(context, memory);
+						}
 						return Poll::Ready(Ok(thread));
 					}
 					Poll::Pending => {
-						self.0 = Some(state);
+						self.0 = Some(State::Package { context, receiver });
 						return Poll::Pending;
 					}
 					Poll::Ready(None) => unreachable!("`Sender` dropped somehow"),
@@ -260,39 +240,68 @@ impl Future for RegisterThreadFuture<'_> {
 	}
 }
 
-impl RegisterThreadFuture<'_> {
+impl RegisterThreadFuture {
 	/// Create a [`RegisterThreadFuture`] that returns `error`.
 	pub(in super::super) const fn error(error: Error) -> Self {
 		Self(Some(State::Error(error)))
 	}
 
-	/// Remove the lifetime.
-	pub(in super::super) fn into_static(mut self) -> RegisterThreadFuture<'static> {
-		RegisterThreadFuture(Some(match self.0.take() {
-			Some(State::Error(error)) => State::Error(error),
-			Some(State::Module {
-				context,
-				promise,
-				task,
-				receiver,
-			}) => State::Module {
-				context: match context {
-					Cow::Borrowed(context) => Cow::Owned(context.clone()),
-					Cow::Owned(context) => Cow::Owned(context),
-				},
-				promise,
-				task,
-				receiver,
-			},
-			Some(State::Package { context, receiver }) => State::Package {
-				context: match context {
-					Cow::Borrowed(context) => Cow::Owned(context.clone()),
-					Cow::Owned(context) => Cow::Owned(context),
-				},
-				receiver,
-			},
-			None => return RegisterThreadFuture(None),
-		}))
+	/// Schedule thread cleanup.
+	fn schedule_clean(context: BaseAudioContext, memory: ThreadMemory) {
+		/// Hold data necessary to schedule the cleanup.
+		struct Data {
+			/// The corresponding [`BaseAudioContext`].
+			context: BaseAudioContext,
+			/// The corresponding [`ThreadMemory`].
+			memory: ThreadMemory,
+			/// The [`Closure`] to clean up.
+			closure: Closure<dyn FnMut()>,
+		}
+
+		let data_rc = Rc::new(RefCell::new(None));
+
+		let closure = Closure::new({
+			let data_rc = Rc::clone(&data_rc);
+			move || {
+				let data: Data = data_rc
+					.borrow_mut()
+					.take()
+					.expect("`BaseAudioContext` reached `closed` state twice");
+
+				if let AudioContextState::Closed = data.context.state() {
+					// SAFETY: When reaching the `closed` state, all resources
+					// should have been freed. See <https://webaudio.github.io/web-audio-api/#dom-audiocontextstate-closed>.
+					unsafe { data.memory.destroy() };
+
+					// Remove the event listener and drop the associated `Closure`.
+					// This has to be done carefully to not drop the `Closure` while the `Closure`
+					// is being called.
+					js::queue_microtask(
+						&Closure::once_into_js(move || {
+							data.context
+								.remove_event_listener_with_callback(
+									"statechange",
+									data.closure.as_ref().unchecked_ref(),
+								)
+								.expect(
+									"`EventTarget.removeEventListener()` is not expected to fail",
+								);
+						})
+						.unchecked_into(),
+					);
+				} else {
+					*data_rc.borrow_mut() = Some(data);
+				}
+			}
+		});
+		context
+			.add_event_listener_with_callback("statechange", closure.as_ref().unchecked_ref())
+			.expect("`EventTarget.addEventListener()` is not expected to fail");
+		*data_rc.borrow_mut() = Some(Data {
+			context,
+			memory,
+			closure,
+		});
 	}
 }
 
