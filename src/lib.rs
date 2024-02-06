@@ -17,7 +17,7 @@
 		target_os = "unknown",
 		target_feature = "atomics"
 	),
-	feature(stdsimd)
+	feature(stdarch_wasm_atomic_wait)
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
