@@ -74,8 +74,6 @@ jobs:
         if: matrix.target.web
         with:
           tool: wasm-bindgen-cli
-          git: https://github.com/rustwasm/wasm-bindgen
-          rev: fe8bc949b5553ca6da811f13209d9f3b86cc5b1e
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
@@ -159,8 +157,6 @@ jobs:
       - uses: taiki-e/cache-cargo-install-action@v1
         with:
           tool: wasm-bindgen-cli
-          git: https://github.com/rustwasm/wasm-bindgen
-          rev: fe8bc949b5553ca6da811f13209d9f3b86cc5b1e
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown

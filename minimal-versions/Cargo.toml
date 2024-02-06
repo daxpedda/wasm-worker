@@ -9,10 +9,3 @@ audio-worklet = ["web-thread/audio-worklet"]
 
 [dependencies]
 web-thread = { path = ".." }
-
-[patch.crates-io]
-js-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
-wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
-wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
-wasm-bindgen-test = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
-web-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
