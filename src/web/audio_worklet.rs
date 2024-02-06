@@ -77,12 +77,15 @@ pub trait BaseAudioContextExt {
 	target_os = "unknown",
 	feature = "audio-worklet"
 ))]
-impl BaseAudioContextExt for BaseAudioContext {
+impl<T> BaseAudioContextExt for T
+where
+	BaseAudioContext: From<T>,
+{
 	fn register_thread<F>(self, #[allow(clippy::min_ident_chars)] f: F) -> RegisterThreadFuture
 	where
 		F: 'static + FnOnce() + Send,
 	{
-		RegisterThreadFuture(audio_worklet::register_thread(self, f))
+		RegisterThreadFuture(audio_worklet::register_thread(self.into(), f))
 	}
 }
 
