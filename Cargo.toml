@@ -21,9 +21,9 @@ audio-worklet = [
 ]
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-js-sys = "0.3.65"
+js-sys = "0.3.68"
 pin-project = "1"
-wasm-bindgen = { version = "0.2.88", default-features = false }
+wasm-bindgen = { version = "0.2.91", default-features = false }
 web-sys = { version = "0.3.65", features = [
 	"DedicatedWorkerGlobalScope",
 	"Navigator",
@@ -34,7 +34,7 @@ web-sys = { version = "0.3.65", features = [
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown", target_feature = "atomics"))'.dependencies]
 atomic-waker = "1"
-wasm-bindgen-futures = "0.4.38"
+wasm-bindgen-futures = "0.4.41"
 web-sys = { version = "0.3", features = [
 	"Blob",
 	"BlobPropertyBag",
@@ -64,11 +64,11 @@ console_error_panic_hook = "0.1"
 futures-util = { version = "0.3", default-features = false }
 
 [patch.crates-io]
-js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-wasm-bindgen-test = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+js-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
+wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
+wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
+wasm-bindgen-test = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
+web-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "fe8bc949b5553ca6da811f13209d9f3b86cc5b1e" }
 
 [[test]]
 name = "basic_fail"
