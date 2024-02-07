@@ -35,7 +35,7 @@ mod audio_worklet {
 		not(feature = "audio-worklet")
 	),
 	doc = "",
-	doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.67/web_sys/struct.BaseAudioContext.html"
+	doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.68/web_sys/struct.BaseAudioContext.html"
 )]
 pub trait BaseAudioContextExt {
 	/// Registers a thread at this [`BaseAudioContext`].
@@ -65,7 +65,7 @@ pub trait BaseAudioContextExt {
 			not(all(target_family = "wasm", target_os = "unknown")),
 			not(feature = "audio-worklet")
 		),
-		doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.67/web_sys/struct.BaseAudioContext.html"
+		doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.68/web_sys/struct.BaseAudioContext.html"
 	)]
 	fn register_thread<F>(self, f: F) -> RegisterThreadFuture
 	where

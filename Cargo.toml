@@ -24,7 +24,7 @@ audio-worklet = [
 js-sys = "0.3.68"
 pin-project = "1"
 wasm-bindgen = { version = "0.2.91", default-features = false }
-web-sys = { version = "0.3.65", features = [
+web-sys = { version = "0.3.68", features = [
 	"DedicatedWorkerGlobalScope",
 	"Navigator",
 	"SharedWorkerGlobalScope",
