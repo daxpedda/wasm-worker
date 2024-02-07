@@ -1,4 +1,4 @@
-17
+20
 1MB
 Async
 atomics
@@ -18,3 +18,4 @@ unparked
 unparking
 Wasm
 worklet
+worklets

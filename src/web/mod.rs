@@ -13,6 +13,7 @@ use std::task::{Context, Poll};
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 mod thread {
 	pub(super) struct ScopeFuture<'scope, 'env, F, T>(&'scope &'env (F, T));
+	pub(super) struct YieldNowFuture;
 }
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
@@ -642,4 +643,75 @@ where
 	T: 'static + Send,
 {
 	thread::spawn_async(f)
+}
+
+/// Async version of [`yield_now()`](std::thread::yield_now).
+///
+/// # Notes
+///
+/// This is no-op in worklets.
+pub fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
+	YieldNowFuture(thread::yield_now_async(priority))
+}
+
+/// What kind of priority to yield to the event loop.
+#[derive(Clone, Copy, Debug, Default)]
+pub enum YieldPriority {
+	/// Translates to [`TaskPriority."user-blocking"`].
+	///
+	/// # Notes
+	///
+	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
+	/// not supported.
+	///
+	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
+	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
+	/// [`TaskPriority."user-blocking"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#user-blocking
+	UserBlocking,
+	/// Translates to [`TaskPriority."user-visible"`].
+	///
+	/// # Notes
+	///
+	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
+	/// not supported.
+	///
+	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
+	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
+	/// [`TaskPriority."user-visible"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#user-visible
+	UserVisible,
+	/// Translates to [`TaskPriority."background"`].
+	///
+	/// # Notes
+	///
+	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
+	/// not supported.
+	///
+	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
+	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
+	/// [`TaskPriority."background"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#background
+	Background,
+	/// Default. Uses [`Window.requestIdleCallback()`].
+	///
+	/// # Notes
+	///
+	/// Will fall back to [`MessagePort.postMessage()`] when
+	/// [`Window.requestIdleCallback()`] is not supported.
+	///
+	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
+	/// [`Window.requestIdleCallback()`]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback
+	#[default]
+	Idle,
+}
+
+/// Waits for yielding to the event loop to happen. See [`yield_now_async()`].
+#[derive(Debug)]
+#[must_use = "does nothing if not polled"]
+pub struct YieldNowFuture(thread::YieldNowFuture);
+
+impl Future for YieldNowFuture {
+	type Output = ();
+
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		Pin::new(&mut self.0).poll(cx)
+	}
 }

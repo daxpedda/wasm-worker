@@ -23,14 +23,21 @@ use std::thread::Result;
 use std::time::Duration;
 use std::{mem, thread};
 
+use js_sys::{Object, Promise};
 use pin_project::{pin_project, pinned_drop};
 use r#impl::Parker;
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{AbortController, MessageChannel, MessagePort};
 
 #[cfg(target_feature = "atomics")]
 use self::atomics as r#impl;
 use self::global::{Global, GLOBAL};
+use self::js::{SchedulerPostTaskOptions, TaskPriority, WindowExt};
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
+use crate::web::YieldPriority;
 
 /// See [`std::thread::Builder`].
 #[derive(Debug)]
@@ -241,7 +248,9 @@ impl Thread {
 			.with(|global| match global.as_ref()? {
 				Global::Dedicated(worker) => Some(worker.name()),
 				Global::Shared(worker) => Some(worker.name()),
-				Global::Window(_) | Global::Service(_) | Global::Worklet => None,
+				Global::Window(_) | Global::Service(_) | Global::Worklet | Global::Worker(_) => {
+					None
+				}
 			})
 			.filter(|name| !name.is_empty());
 
@@ -450,7 +459,9 @@ pub fn available_parallelism() -> io::Result<NonZeroUsize> {
 			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
 			Global::Dedicated(worker) => Ok(worker.navigator().hardware_concurrency()),
 			Global::Shared(worker) => Ok(worker.navigator().hardware_concurrency()),
-			Global::Service(worker) => Ok(worker.navigator().hardware_concurrency()),
+			Global::Service(worker) | Global::Worker(worker) => {
+				Ok(worker.navigator().hardware_concurrency())
+			}
 			Global::Worklet => Err(Error::new(
 				ErrorKind::Unsupported,
 				"operation not supported in worklets",
@@ -805,7 +816,8 @@ where
 ///
 /// # Notes
 ///
-/// This call is no-op.
+/// This call is no-op. Alternatively consider using
+/// [`web::yield_now_async()`](crate::web::yield_now_async).
 pub fn yield_now() {
 	thread::yield_now();
 }
@@ -815,9 +827,9 @@ pub(crate) fn has_block_support() -> bool {
 	thread_local! {
 		static HAS_BLOCK_SUPPORT: bool = GLOBAL
 			.with(|global| {
-				global.as_ref().map(|global| match global {
-					Global::Window(_) | Global::Worklet | Global::Service(_) => false,
-					Global::Dedicated(_) => true,
+				global.as_ref().and_then(|global| match global {
+					Global::Window(_) | Global::Worklet | Global::Service(_) => Some(false),
+					Global::Dedicated(_) => Some(true),
 					// Firefox doesn't support blocking in shared workers, so for cross-browser
 					// support we have to test manually.
 					// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
@@ -825,8 +837,9 @@ pub(crate) fn has_block_support() -> bool {
 						/// Cache if blocking on shared workers is supported.
 						static HAS_SHARED_WORKER_BLOCK_SUPPORT: OnceLock<bool> = OnceLock::new();
 
-						*HAS_SHARED_WORKER_BLOCK_SUPPORT.get_or_init(r#impl::test_block_support)
+						Some(*HAS_SHARED_WORKER_BLOCK_SUPPORT.get_or_init(r#impl::test_block_support))
 					}
+					Global::Worker(_) => None,
 				})
 			})
 			// For unknown worker types we test manually.
@@ -839,4 +852,161 @@ pub(crate) fn has_block_support() -> bool {
 /// Implementation for [`crate::web::has_spawn_support()`].
 pub(crate) fn has_spawn_support() -> bool {
 	r#impl::has_spawn_support()
+}
+
+/// Implementation for [`crate::web::yield_now_async()`].
+pub(crate) fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
+	thread_local! {
+		static HAS_SCHEDULER: bool = Global::with_window_or_worker(|global| !global.has_scheduler().is_undefined()).unwrap_or(false);
+		static HAS_REQUEST_IDLE_CALLBACK: bool = GLOBAL.with(|global| {
+			if let Some(Global::Window(window)) = global.as_ref() {
+				let window: &WindowExt = window.unchecked_ref();
+				!window.has_request_idle_callback().is_undefined()
+			} else {
+				false
+			}
+		});
+		static EMPTY_CLOSURE: Closure<dyn FnMut(JsValue)> = Closure::new(|_| ());
+	}
+
+	match priority {
+		YieldPriority::UserBlocking | YieldPriority::UserVisible | YieldPriority::Background
+			if HAS_SCHEDULER.with(bool::clone) =>
+		{
+			Global::with_window_or_worker(|global| {
+				let options: SchedulerPostTaskOptions = Object::new().unchecked_into();
+				let controller =
+					AbortController::new().expect("`new AbortController` is not expected to fail");
+				options.set_signal(&controller.signal());
+
+				match priority {
+					YieldPriority::UserBlocking => options.set_priority(TaskPriority::UserBlocking),
+					YieldPriority::UserVisible => (),
+					YieldPriority::Background => options.set_priority(TaskPriority::Background),
+					YieldPriority::Idle => unreachable!("found invalid `YieldPriority`"),
+				}
+
+				let future = JsFuture::from(EMPTY_CLOSURE.with(|closure| {
+					global
+						.scheduler()
+						.post_task_with_options(closure.as_ref().unchecked_ref(), &options)
+						.catch(closure)
+				}));
+
+				YieldNowFuture(Some(State::Scheduler { future, controller }))
+			})
+			.expect("found invalid global context despite previous check")
+		}
+		YieldPriority::Idle if HAS_REQUEST_IDLE_CALLBACK.with(bool::clone) => {
+			GLOBAL.with(|global| {
+				let Some(Global::Window(window)) = global.as_ref() else {
+					unreachable!("expected `Window`")
+				};
+				let mut handle = None;
+				let future = JsFuture::from(Promise::new(&mut |resolve, _| {
+					handle = Some(
+						window
+							.request_idle_callback(&resolve)
+							.expect("`setTimeout` is not expected to fail"),
+					);
+				}));
+				let handle =
+					handle.expect("Callback passed into `Promise` not executed immediately");
+
+				YieldNowFuture(Some(State::Idle { future, handle }))
+			})
+		}
+		// `MessageChannel` can't be instantiated in a worklet.
+		// TODO: Send a `MessageChannel` to a Worklet to make this possible.
+		_ => Global::with_window_or_worker(|_| {
+			let channel =
+				MessageChannel::new().expect("`new MessageChannel` is not expected to fail");
+			let port1 = channel.port1();
+			let future = JsFuture::from(Promise::new(&mut |resolve, _| {
+				port1.set_onmessage(Some(&resolve));
+			}));
+			channel
+				.port2()
+				.post_message(&JsValue::UNDEFINED)
+				.expect("failed to send empty message");
+
+			YieldNowFuture(Some(State::Channel {
+				future,
+				port: port1,
+			}))
+		})
+		.unwrap_or(YieldNowFuture(Some(State::None))),
+	}
+}
+
+/// Waits for yielding to the event loop to happen.
+#[derive(Debug)]
+pub(crate) struct YieldNowFuture(Option<State>);
+
+/// State of [`YieldNowFuture`].
+#[derive(Debug)]
+enum State {
+	/// Used [`Scheduler.postTask()`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask).
+	Scheduler {
+		/// [`Future`].
+		future: JsFuture,
+		/// Abort when dropped.
+		controller: AbortController,
+	},
+	/// Used [`Window.requestIdleCallback()`](https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback).
+	Idle {
+		/// [`Future`].
+		future: JsFuture,
+		/// Abort when dropped.
+		handle: u32,
+	},
+	/// Used [`MessagePort.postMessage()`](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage).
+	Channel {
+		/// [`Future`].
+		future: JsFuture,
+		/// Abort when dropped.
+		port: MessagePort,
+	},
+	/// Yielding to the event loop not supported.
+	None,
+}
+
+impl Drop for YieldNowFuture {
+	fn drop(&mut self) {
+		if let Some(state) = self.0.take() {
+			match state {
+				State::Scheduler { controller, .. } => controller.abort(),
+				State::Idle { handle, .. } => GLOBAL.with(|global| {
+					let Some(Global::Window(window)) = global.as_ref() else {
+						unreachable!("expected `Window`")
+					};
+					window.cancel_idle_callback(handle);
+				}),
+				State::Channel { port, .. } => port.close(),
+				State::None => (),
+			}
+		}
+	}
+}
+
+impl Future for YieldNowFuture {
+	type Output = ();
+
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		match self
+			.0
+			.as_mut()
+			.expect("`YieldNowFuture` polled after completion")
+		{
+			State::Scheduler { future, .. }
+			| State::Idle { future, .. }
+			| State::Channel { future, .. } => {
+				ready!(Pin::new(future).poll(cx)).expect("unexpected failure in empty `Promise`");
+			}
+			State::None => (),
+		}
+
+		self.0.take().expect("found empty `State`");
+		Poll::Ready(())
+	}
 }
