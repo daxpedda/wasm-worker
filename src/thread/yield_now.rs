@@ -1,11 +1,13 @@
 //! Implementation of [`yield_now()`] and [`YieldNowFuture`].
 
+use std::cell::RefCell;
 use std::future::Future;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::rc::Rc;
+use std::task::{ready, Context, Poll, Waker};
 use std::thread;
 
-use js_sys::{Object, Promise};
+use js_sys::Object;
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
@@ -41,15 +43,19 @@ enum State {
 	},
 	/// Used [`Window.requestIdleCallback()`](https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback).
 	Idle {
-		/// [`Future`].
-		future: JsFuture,
+		/// [`WakerData`].
+		waker: Rc<RefCell<WakerData>>,
+		/// Callback to wake up the [`Future`].
+		_callback: Closure<dyn FnMut()>,
 		/// Abort when dropped.
 		handle: u32,
 	},
 	/// Used [`MessagePort.postMessage()`](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage).
 	Channel {
-		/// [`Future`].
-		future: JsFuture,
+		/// [`WakerData`].
+		waker: Rc<RefCell<WakerData>>,
+		/// Callback to wake up the [`Future`].
+		_callback: Closure<dyn FnMut()>,
 		/// Abort when dropped.
 		port: MessagePort,
 	},
@@ -84,10 +90,11 @@ impl Future for YieldNowFuture {
 			.as_mut()
 			.expect("`YieldNowFuture` polled after completion")
 		{
-			State::Scheduler { future, .. }
-			| State::Idle { future, .. }
-			| State::Channel { future, .. } => {
+			State::Scheduler { future, .. } => {
 				ready!(Pin::new(future).poll(cx)).expect("unexpected failure in empty `Promise`");
+			}
+			State::Idle { waker, .. } | State::Channel { waker, .. } => {
+				ready!(waker.borrow_mut().poll(cx));
 			}
 			State::None => (),
 		}
@@ -110,7 +117,7 @@ impl YieldNowFuture {
 					false
 				}
 			});
-			static EMPTY_CLOSURE: Closure<dyn FnMut(JsValue)> = Closure::new(|_| ());
+			static CATCH_CALLBACK: Closure<dyn FnMut(JsValue)> = Closure::new(|_| ());
 		}
 
 		match time {
@@ -130,7 +137,7 @@ impl YieldNowFuture {
 						YieldTime::Idle => unreachable!("found invalid `YieldTime`"),
 					}
 
-					let future = JsFuture::from(EMPTY_CLOSURE.with(|closure| {
+					let future = JsFuture::from(CATCH_CALLBACK.with(|closure| {
 						global
 							.scheduler()
 							.post_task_with_options(closure.as_ref().unchecked_ref(), &options)
@@ -146,18 +153,17 @@ impl YieldNowFuture {
 					let Some(Global::Window(window)) = global.as_ref() else {
 						unreachable!("expected `Window`")
 					};
-					let mut handle = None;
-					let future = JsFuture::from(Promise::new(&mut |resolve, _| {
-						handle = Some(
-							window
-								.request_idle_callback(&resolve)
-								.expect("`setTimeout` is not expected to fail"),
-						);
-					}));
-					let handle =
-						handle.expect("Callback passed into `Promise` not executed immediately");
 
-					Self(Some(State::Idle { future, handle }))
+					let (waker, callback) = WakerData::new();
+					let handle = window
+						.request_idle_callback(callback.as_ref().unchecked_ref())
+						.expect("`requestIdleCallback()` is not expected to fail");
+
+					Self(Some(State::Idle {
+						waker,
+						_callback: callback,
+						handle,
+					}))
 				})
 			}
 			// `MessageChannel` can't be instantiated in a worklet.
@@ -165,20 +171,64 @@ impl YieldNowFuture {
 				let channel =
 					MessageChannel::new().expect("`new MessageChannel` is not expected to fail");
 				let port1 = channel.port1();
-				let future = JsFuture::from(Promise::new(&mut |resolve, _| {
-					port1.set_onmessage(Some(&resolve));
-				}));
+
+				let (waker, callback) = WakerData::new();
+				port1.set_onmessage(Some(callback.as_ref().unchecked_ref()));
 				channel
 					.port2()
 					.post_message(&JsValue::UNDEFINED)
 					.expect("failed to send empty message");
 
 				Self(Some(State::Channel {
-					future,
+					waker,
+					_callback: callback,
 					port: port1,
 				}))
 			})
 			.unwrap_or(Self(Some(State::None))),
+		}
+	}
+}
+
+/// Data required to wake up the [`Future`].
+#[derive(Debug)]
+struct WakerData {
+	/// Represents if it has completed or not.
+	completed: bool,
+	/// Stores the [`Waker`].
+	waker: Option<Waker>,
+}
+
+impl WakerData {
+	/// Creates a new [`WakerData`] and a corresponding [`Closure`].
+	fn new() -> (Rc<RefCell<Self>>, Closure<dyn FnMut()>) {
+		let this = Rc::new(RefCell::new(Self {
+			completed: false,
+			waker: None,
+		}));
+		let callback = Closure::once({
+			let this = Rc::clone(&this);
+			move || this.borrow_mut().complete()
+		});
+		(this, callback)
+	}
+
+	/// Completes the [`Future`] and wakes up a registered [`Waker`].
+	fn complete(&mut self) {
+		self.completed = true;
+
+		if let Some(waker) = self.waker.take() {
+			waker.wake();
+		}
+	}
+
+	/// Polls the [`WakerData`].
+	fn poll(&mut self, cx: &Context<'_>) -> Poll<()> {
+		if self.completed {
+			Poll::Ready(())
+		} else {
+			self.waker = Some(cx.waker().clone());
+			Poll::Pending
 		}
 	}
 }
