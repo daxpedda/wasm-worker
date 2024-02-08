@@ -31,8 +31,11 @@ use wasm_bindgen::JsCast;
 use self::oneshot::Receiver;
 pub(super) use self::parker::Parker;
 use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
-use super::{ScopedJoinHandle, Thread, THREAD};
-use crate::thread;
+use crate::thread::{self, ScopedJoinHandle, Thread, ThreadId, THREAD};
+
+/// Saves the [`ThreadId`] of the main thread. Make sure this gets initialized
+/// before spawning any threads.
+static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
 
 /// Implementation of [`std::thread::Builder`].
 #[derive(Debug)]
@@ -282,6 +285,12 @@ pub(super) fn has_spawn_support() -> bool {
 			!global.worker().is_undefined()
 		}
 	})
+}
+
+/// Returns the [`ThreadId`] of the current thread without cloning the
+/// [`Arc`].
+fn current_id() -> ThreadId {
+	THREAD.with(|cell| cell.get_or_init(Thread::new).id())
 }
 
 thread_local! {

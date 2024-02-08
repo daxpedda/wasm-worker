@@ -12,6 +12,7 @@ use super::atomics::audio_worklet;
 #[cfg(not(target_feature = "atomics"))]
 use super::unsupported::audio_worklet;
 use super::Thread;
+use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -39,5 +40,20 @@ impl Future for RegisterThreadFuture {
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		Pin::new(&mut self.0).poll(cx)
+	}
+}
+
+/// Implementation for
+/// [`crate::web::audio_worklet::AudioWorkletGlobalScopeExt::register_processor_ext()`].
+pub(crate) fn register_processor<T: 'static + ExtendAudioWorkletProcessor>(
+	name: &str,
+) -> Result<(), Error> {
+	if audio_worklet::is_main_thread() {
+		Err(Error::new(
+			ErrorKind::Unsupported,
+			"thread was not spawned by `web-thread`",
+		))
+	} else {
+		audio_worklet::register_processor::<T>(name)
 	}
 }

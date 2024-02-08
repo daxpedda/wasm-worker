@@ -34,3 +34,17 @@ impl RegisterThreadFuture {
 		Self(Some(error))
 	}
 }
+
+/// Determined if the current thread is the main thread.
+#[allow(clippy::missing_const_for_fn)]
+pub(in super::super) fn is_main_thread() -> bool {
+	// We can't spawn threads, so this is always `true`.
+	true
+}
+
+/// Implementation for
+/// [`crate::web::audio_worklet::AudioWorkletGlobalScopeExt::register_processor_ext()`].
+#[allow(clippy::extra_unused_type_parameters)]
+pub(in super::super) fn register_processor<T>(_: &str) -> Result<(), Error> {
+	unreachable!("reached `register_processor()` on the main thread")
+}

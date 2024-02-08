@@ -17,11 +17,9 @@ use super::js::META;
 use super::memory::ThreadMemory;
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
-use super::{channel, oneshot, JoinHandle, ScopeData, MEMORY, MODULE};
-use crate::thread::{Thread, ThreadId, THREAD};
+use super::{channel, oneshot, JoinHandle, ScopeData, MAIN_THREAD, MEMORY, MODULE};
+use crate::thread::{Thread, ThreadId};
 
-/// Saves the [`ThreadId`] of the main thread.
-static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
 /// [`Sender`] to the main thread.
 static SENDER: OnceLock<Sender<Command>> = OnceLock::new();
 
@@ -58,12 +56,8 @@ enum Command {
 	},
 }
 
-/// Returns the [`ThreadId`] of the current thread without cloning the [`Arc`].
-fn current_id() -> ThreadId {
-	THREAD.with(|cell| cell.get_or_init(Thread::new).id())
-}
-
-/// Initializes the main thread sender and receiver.
+/// Initializes the main thread sender and receiver. Make sure to only call this
+/// from the main thread.
 fn init_main() {
 	SENDER.get_or_init(|| {
 		super::has_spawn_support();
@@ -155,7 +149,7 @@ where
 					.get()
 					.expect("closing thread without `SENDER` being initialized")
 					.send(Command::Terminate {
-						id: current_id(),
+						id: super::current_id(),
 						value,
 						memory,
 					})
@@ -169,7 +163,7 @@ where
 	// its lifetime.
 	let task: TaskStatic = unsafe { mem::transmute(task) };
 
-	if *MAIN_THREAD.get_or_init(current_id) == current_id() {
+	if *MAIN_THREAD.get_or_init(super::current_id) == super::current_id() {
 		init_main();
 
 		spawn_internal(thread.id(), task, thread.name());
@@ -230,7 +224,7 @@ fn spawn_internal(id: ThreadId, task: TaskStatic, name: Option<&str>) {
 	);
 }
 
-#[doc(hidden)]
+/// Entry function for the worker.
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
 pub async unsafe fn __web_thread_worker_entry(task: *mut Task) -> u32 {

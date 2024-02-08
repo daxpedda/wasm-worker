@@ -20,8 +20,7 @@ use wasm_bindgen::JsCast;
 
 pub(super) use self::parker::Parker;
 use super::js::CROSS_ORIGIN_ISOLATED;
-use super::ScopedJoinHandle;
-use crate::thread;
+use crate::thread::{self, ScopedJoinHandle};
 
 /// Implementation of [`std::thread::Builder`].
 #[derive(Debug)]

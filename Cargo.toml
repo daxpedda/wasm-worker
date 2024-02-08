@@ -14,8 +14,10 @@ version = "0.0.0"
 audio-worklet = [
 	"web-sys/AudioContextState",
 	"web-sys/AudioWorklet",
+	"web-sys/AudioWorkletGlobalScope",
 	"web-sys/AudioWorkletNode",
 	"web-sys/AudioWorkletNodeOptions",
+	"web-sys/AudioWorkletProcessor",
 	"web-sys/BaseAudioContext",
 	"web-sys/DomException",
 ]
@@ -56,16 +58,27 @@ pollster = { version = "0.3", features = ["macro"] }
 ui_test = { git = "https://github.com/daxpedda/ui_test", branch = "web-thread" }
 
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
+async-channel = "2"
+console_error_panic_hook = "0.1"
 wasm-bindgen-futures = "0.4"
 wasm-bindgen-test = "0.3"
-web-sys = { version = "0.3", features = ["console"] }
+web-sys = { version = "0.3", features = [
+	"AudioContext",
+	"Blob",
+	"BlobPropertyBag",
+	"console",
+	"Url",
+] }
 web-time = "1"
 
 [target.'cfg(all(target_family = "wasm", target_feature = "atomics"))'.dev-dependencies]
-async-channel = "2"
 atomic-waker = "1"
-console_error_panic_hook = "0.1"
 futures-util = { version = "0.3", default-features = false }
+
+[[example]]
+doc-scrape-examples = true
+name = "audio_worklet"
+required-features = ["audio-worklet"]
 
 [[test]]
 name = "basic_fail"

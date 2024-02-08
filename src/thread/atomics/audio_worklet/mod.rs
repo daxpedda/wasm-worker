@@ -6,11 +6,12 @@ use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io::{self, Error, ErrorKind};
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 
-use js_sys::Array;
+use js_sys::{Array, Object};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
@@ -24,7 +25,8 @@ use super::js::META;
 use super::memory::ThreadMemory;
 use super::oneshot::Receiver;
 use super::url::ScriptUrl;
-use super::{oneshot, Thread};
+use super::{oneshot, Thread, MAIN_THREAD};
+use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -176,6 +178,9 @@ impl Future for RegisterThreadFuture {
 					ref mut promise, ..
 				} => match Pin::new(promise).poll(cx) {
 					Poll::Ready(Ok(_)) => {
+						// Before spawning a new thread make sure we initialize [`MAIN_THREAD`].
+						MAIN_THREAD.get_or_init(super::current_id);
+
 						let State::Module {
 							context,
 							task,
@@ -306,6 +311,98 @@ impl RegisterThreadFuture {
 	}
 }
 
+/// Determined if the current thread is the main thread.
+pub(in super::super) fn is_main_thread() -> bool {
+	*MAIN_THREAD.get_or_init(super::current_id) == super::current_id()
+}
+
+/// Implementation for
+/// [`crate::web::audio_worklet::AudioWorkletGlobalScopeExt::register_processor_ext()`].
+pub(in super::super) fn register_processor<T: 'static + ExtendAudioWorkletProcessor>(
+	name: &str,
+) -> Result<(), Error> {
+	__web_thread_register_processor(
+		name,
+		__WebThreadProcessorConstructor(Box::new(ProcessorConstructorWrapper::<T>(PhantomData))),
+	)
+	.map_err(|error| error_from_exception(error.into()))
+}
+
+/// Holds the user-supplied [`ExtendAudioWorkletProcessor`] while type-erasing
+/// it.
+#[wasm_bindgen]
+struct __WebThreadProcessorConstructor(Box<dyn ProcessorConstructor>);
+
+#[wasm_bindgen]
+impl __WebThreadProcessorConstructor {
+	/// Calls the underlying [`ExtendAudioWorkletProcessor::new`].
+	#[wasm_bindgen]
+	#[allow(unreachable_pub)]
+	pub fn instantiate(
+		&mut self,
+		this: web_sys::AudioWorkletProcessor,
+		options: AudioWorkletNodeOptions,
+	) -> __WebThreadProcessor {
+		self.0.instantiate(this, options)
+	}
+
+	/// Calls the underlying
+	/// [`ExtendAudioWorkletProcessor::parameter_descriptors`].
+	#[wasm_bindgen(js_name = parameterDescriptors)]
+	#[allow(unreachable_pub)]
+	pub fn parameter_descriptors(&self) -> Array {
+		self.0.parameter_descriptors()
+	}
+}
+
+/// Wrapper for the user-supplied [`ExtendAudioWorkletProcessor`].
+struct ProcessorConstructorWrapper<T: 'static + ExtendAudioWorkletProcessor>(PhantomData<T>);
+
+/// Object-safe version of [`ExtendAudioWorkletProcessor`].
+trait ProcessorConstructor {
+	/// Calls the underlying [`ExtendAudioWorkletProcessor::new`].
+	fn instantiate(
+		&mut self,
+		this: web_sys::AudioWorkletProcessor,
+		options: AudioWorkletNodeOptions,
+	) -> __WebThreadProcessor;
+
+	/// Calls the underlying
+	/// [`ExtendAudioWorkletProcessor::parameter_descriptors`].
+	fn parameter_descriptors(&self) -> Array;
+}
+
+impl<T: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
+	for ProcessorConstructorWrapper<T>
+{
+	fn instantiate(
+		&mut self,
+		this: web_sys::AudioWorkletProcessor,
+		options: AudioWorkletNodeOptions,
+	) -> __WebThreadProcessor {
+		__WebThreadProcessor(Box::new(T::new(this, options)))
+	}
+
+	fn parameter_descriptors(&self) -> Array {
+		T::parameter_descriptors()
+	}
+}
+
+/// Holds the user-supplied [`ExtendAudioWorkletProcessor`] while type-erasing
+/// it.
+#[wasm_bindgen]
+struct __WebThreadProcessor(Box<dyn ExtendAudioWorkletProcessor>);
+
+#[wasm_bindgen]
+impl __WebThreadProcessor {
+	/// Calls the underlying [`ExtendAudioWorkletProcessor::new`].
+	#[wasm_bindgen]
+	#[allow(unreachable_pub)]
+	pub fn process(&mut self, inputs: Array, outputs: Array, parameters: Object) -> bool {
+		self.0.process(inputs, outputs, parameters)
+	}
+}
+
 /// Convert a [`JsValue`] to an [`DomException`] and then to an [`Error`].
 fn error_from_exception(error: JsValue) -> Error {
 	let error: DomException = error.unchecked_into();
@@ -313,7 +410,7 @@ fn error_from_exception(error: JsValue) -> Error {
 	Error::other(format!("{}: {}", error.name(), error.message()))
 }
 
-#[doc(hidden)]
+/// Entry function for the worklet.
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
 pub unsafe fn __web_thread_worklet_entry(task: *mut Box<dyn FnOnce() + Send>) {
@@ -322,4 +419,15 @@ pub unsafe fn __web_thread_worklet_entry(task: *mut Box<dyn FnOnce() + Send>) {
 	// should only come from `RegisterThreadFuture::poll()`.
 	let task = *unsafe { Box::from_raw(task) };
 	task();
+}
+
+/// Entry function for the worklet.
+#[wasm_bindgen]
+#[allow(unreachable_pub)]
+extern "C" {
+	#[wasm_bindgen(catch)]
+	fn __web_thread_register_processor(
+		name: &str,
+		processor: __WebThreadProcessorConstructor,
+	) -> Result<(), DomException>;
 }

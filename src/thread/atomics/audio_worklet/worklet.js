@@ -1,3 +1,20 @@
+globalThis.__web_thread_register_processor = (__web_thread_name, __web_thread_processor) => {
+    globalThis.registerProcessor(__web_thread_name, class extends AudioWorkletProcessor {
+        constructor(__web_thread_options) {
+            super()
+            this.__web_thread_this = __web_thread_processor.instantiate(this, __web_thread_options)
+        }
+
+        process(__web_thread_inputs, __web_thread_outputs, __web_thread_parameters) {
+            return this.__web_thread_this.process(__web_thread_inputs, __web_thread_outputs, __web_thread_parameters)
+        }
+
+        static get parameterDescriptors() {
+            return __web_thread_processor.parameterDescriptors()
+        }
+    })
+}
+
 globalThis.registerProcessor('__web_thread_worklet', class extends AudioWorkletProcessor {
     constructor(__web_thread_options) {
         super()
