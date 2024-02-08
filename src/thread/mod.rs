@@ -16,14 +16,13 @@ use std::cell::OnceCell;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io::{self, Error, ErrorKind};
-use std::marker::PhantomData;
 use std::num::{NonZeroU64, NonZeroUsize};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
+use std::thread;
 use std::time::Duration;
-use std::{mem, thread};
 
 use r#impl::Parker;
 
@@ -31,8 +30,8 @@ use r#impl::Parker;
 use self::atomics as r#impl;
 pub use self::builder::Builder;
 use self::global::{Global, GLOBAL};
-pub(crate) use self::scope::ScopeFuture;
-pub use self::scope::{Scope, ScopedJoinHandle};
+pub use self::scope::{scope, Scope, ScopedJoinHandle};
+pub(crate) use self::scope::{scope_async, ScopeFuture};
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
 pub use self::yield_now::yield_now;
@@ -304,53 +303,6 @@ pub fn park_timeout(dur: Duration) {
 #[deprecated(note = "replaced by `web_thread::park_timeout`")]
 pub fn park_timeout_ms(ms: u32) {
 	park_timeout(Duration::from_millis(ms.into()));
-}
-
-/// See [`std::thread::scope()`].
-///
-/// # Notes
-///
-/// Keep in mind that this will enter a spinloop until all threads are joined if
-/// blocking is not supported on this thread, see
-/// [`web::has_block_support()`](crate::web::has_block_support).
-///
-/// Alternatively consider using
-/// [`web::scope_async()`](crate::web::scope_async).
-#[track_caller]
-pub fn scope<'env, F, T>(#[allow(clippy::min_ident_chars)] f: F) -> T
-where
-	F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
-{
-	let scope = Scope {
-		this: r#impl::Scope::new(),
-		_scope: PhantomData,
-		_env: PhantomData,
-	};
-	let result = f(&scope);
-
-	scope.this.finish();
-
-	result
-}
-
-/// Implementation for [`crate::web::scope_async()`].
-pub(crate) fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
-	task: F1,
-) -> ScopeFuture<'scope, 'env, F2, T>
-where
-	F1: FnOnce(&'scope Scope<'scope, 'env>) -> F2,
-	F2: Future<Output = T>,
-{
-	let scope = Box::pin(Scope {
-		this: r#impl::Scope::new(),
-		_scope: PhantomData,
-		_env: PhantomData,
-	});
-	// SAFETY: We have to make sure that `task` is dropped and all threads have
-	// finished before `scope` is dropped.
-	let task = task(unsafe { mem::transmute(scope.as_ref()) });
-
-	ScopeFuture::new(task, scope)
 }
 
 /// See [`std::thread::sleep()`].

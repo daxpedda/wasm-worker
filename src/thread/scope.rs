@@ -1,4 +1,4 @@
-//! Implementation of [`Scope`] and types related to it.
+//! Implementation of [`scope()`] and types related to it.
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::{Future, Ready};
@@ -11,6 +11,53 @@ use pin_project::{pin_project, pinned_drop};
 
 use super::r#impl::JoinHandle;
 use super::{r#impl, Builder, Thread};
+
+/// See [`std::thread::scope()`].
+///
+/// # Notes
+///
+/// Keep in mind that this will enter a spinloop until all threads are joined if
+/// blocking is not supported on this thread, see
+/// [`web::has_block_support()`](crate::web::has_block_support).
+///
+/// Alternatively consider using
+/// [`web::scope_async()`](crate::web::scope_async).
+#[track_caller]
+pub fn scope<'env, F, T>(#[allow(clippy::min_ident_chars)] f: F) -> T
+where
+	F: for<'scope> FnOnce(&'scope Scope<'scope, 'env>) -> T,
+{
+	let scope = Scope {
+		this: r#impl::Scope::new(),
+		_scope: PhantomData,
+		_env: PhantomData,
+	};
+	let result = f(&scope);
+
+	scope.this.finish();
+
+	result
+}
+
+/// Implementation for [`crate::web::scope_async()`].
+pub(crate) fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
+	task: F1,
+) -> ScopeFuture<'scope, 'env, F2, T>
+where
+	F1: FnOnce(&'scope Scope<'scope, 'env>) -> F2,
+	F2: Future<Output = T>,
+{
+	let scope = Box::pin(Scope {
+		this: r#impl::Scope::new(),
+		_scope: PhantomData,
+		_env: PhantomData,
+	});
+	// SAFETY: We have to make sure that `task` is dropped and all threads have
+	// finished before `scope` is dropped.
+	let task = task(unsafe { mem::transmute(scope.as_ref()) });
+
+	ScopeFuture::new(task, scope)
+}
 
 /// See [`std::thread::Scope`].
 #[derive(Debug)]
@@ -29,7 +76,7 @@ impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
 	///
 	/// # Panics
 	///
-	/// See [`spawn()`].
+	/// See [`spawn()`](super::spawn).
 	pub fn spawn<F, T>(
 		&'scope self,
 		#[allow(clippy::min_ident_chars)] f: F,
@@ -80,6 +127,7 @@ impl<T> Debug for ScopedJoinHandle<'_, T> {
 
 impl<#[allow(single_use_lifetimes)] 'scope, T> ScopedJoinHandle<'scope, T> {
 	/// Creates a new [`ScopedJoinHandle`].
+	#[cfg_attr(not(target_feature = "atomics"), allow(dead_code))]
 	pub(super) const fn new(handle: JoinHandle<T>) -> Self {
 		Self {
 			handle,
