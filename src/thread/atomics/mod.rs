@@ -13,15 +13,13 @@ mod wait_async;
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
-use std::marker::PhantomData;
 use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
-use std::thread::Result;
 use std::time::Duration;
-use std::{io, ptr};
+use std::{io, ptr, thread};
 
 use atomic_waker::AtomicWaker;
 use js_sys::WebAssembly::{Memory, Module};
@@ -31,7 +29,7 @@ use wasm_bindgen::JsCast;
 use self::oneshot::Receiver;
 pub(super) use self::parker::Parker;
 use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
-use crate::thread::{self, ScopedJoinHandle, Thread, ThreadId, THREAD};
+use super::{ScopedJoinHandle, Thread, ThreadId, THREAD};
 
 /// Saves the [`ThreadId`] of the main thread. Make sure this gets initialized
 /// before spawning any threads.
@@ -93,10 +91,7 @@ impl Builder {
 		let result =
 			unsafe { spawn::spawn(|| async { task() }, self.name, Some(Arc::clone(&scope.0))) };
 
-		result.map(|handle| ScopedJoinHandle {
-			handle,
-			_scope: PhantomData,
-		})
+		result.map(|handle| ScopedJoinHandle::new(handle))
 	}
 
 	/// Implementation for
@@ -114,10 +109,7 @@ impl Builder {
 		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
 		let result = unsafe { spawn::spawn(task, self.name, Some(Arc::clone(&scope.0))) };
 
-		result.map(|handle| ScopedJoinHandle {
-			handle,
-			_scope: PhantomData,
-		})
+		result.map(|handle| ScopedJoinHandle::new(handle))
 	}
 }
 
@@ -147,7 +139,7 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation of [`std::thread::JoinHandle::join()`].
 	#[allow(clippy::unnecessary_wraps)]
-	pub(super) fn join(self) -> Result<T> {
+	pub(super) fn join(self) -> thread::Result<T> {
 		assert_ne!(
 			self.thread().id(),
 			super::current().id(),
@@ -169,7 +161,7 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	pub(super) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<Result<T>> {
+	pub(super) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<thread::Result<T>> {
 		assert_ne!(
 			self.thread().id(),
 			super::current().id(),
@@ -221,7 +213,7 @@ impl Scope {
 	pub(super) fn new() -> Self {
 		Self(Arc::new(ScopeData {
 			threads: AtomicU64::new(0),
-			thread: thread::current(),
+			thread: super::current(),
 			waker: AtomicWaker::new(),
 		}))
 	}
@@ -234,7 +226,7 @@ impl Scope {
 	/// End the scope after calling the user function.
 	pub(super) fn finish(&self) {
 		while self.0.threads.load(Ordering::Acquire) != 0 {
-			thread::park();
+			super::park();
 		}
 	}
 

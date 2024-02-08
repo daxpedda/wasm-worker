@@ -17,8 +17,9 @@ use super::js::META;
 use super::memory::ThreadMemory;
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
-use super::{channel, oneshot, JoinHandle, ScopeData, MAIN_THREAD, MEMORY, MODULE};
-use crate::thread::{Thread, ThreadId};
+use super::{
+	channel, oneshot, JoinHandle, ScopeData, Thread, ThreadId, MAIN_THREAD, MEMORY, MODULE,
+};
 
 /// [`Sender`] to the main thread.
 static SENDER: OnceLock<Sender<Command>> = OnceLock::new();

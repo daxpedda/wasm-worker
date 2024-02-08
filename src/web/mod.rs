@@ -654,8 +654,8 @@ where
 /// This is no-op in worklets.
 ///
 /// [event loop]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop
-pub fn yield_now_async(priority: YieldTime) -> YieldNowFuture {
-	YieldNowFuture(thread::yield_now_async(priority))
+pub fn yield_now_async(time: YieldTime) -> YieldNowFuture {
+	YieldNowFuture(thread::YieldNowFuture::new(time))
 }
 
 /// How long it should yield execution to the event loop.

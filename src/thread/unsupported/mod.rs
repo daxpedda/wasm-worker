@@ -7,11 +7,10 @@ mod parker;
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
-use std::io;
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
-use std::thread::Result;
 use std::time::Duration;
+use std::{io, thread};
 
 use js::MemoryDescriptor;
 use js_sys::WebAssembly::Memory;
@@ -20,7 +19,7 @@ use wasm_bindgen::JsCast;
 
 pub(super) use self::parker::Parker;
 use super::js::CROSS_ORIGIN_ISOLATED;
-use crate::thread::{self, ScopedJoinHandle};
+use super::ScopedJoinHandle;
 
 /// Implementation of [`std::thread::Builder`].
 #[derive(Debug)]
@@ -99,20 +98,20 @@ impl<T> JoinHandle<T> {
 
 	/// Implementation of [`std::thread::JoinHandle::join()`].
 	#[allow(clippy::unused_self)]
-	pub(super) fn join(self) -> Result<T> {
+	pub(super) fn join(self) -> thread::Result<T> {
 		unreachable!("found instanced `JoinHandle` without threading support")
 	}
 
 	/// Implementation of [`std::thread::JoinHandle::thread()`].
 	#[allow(clippy::unused_self)]
-	pub(super) fn thread(&self) -> &thread::Thread {
+	pub(super) fn thread(&self) -> &super::Thread {
 		unreachable!("found instanced `JoinHandle` without threading support")
 	}
 
 	/// Implementation for
 	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
 	#[allow(clippy::unused_self)]
-	pub(super) fn poll(&self, _: &mut Context<'_>) -> Poll<Result<T>> {
+	pub(super) fn poll(&self, _: &mut Context<'_>) -> Poll<thread::Result<T>> {
 		unreachable!("found instanced `JoinHandle` without threading support")
 	}
 }
