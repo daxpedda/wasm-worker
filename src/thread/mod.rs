@@ -914,7 +914,6 @@ pub(crate) fn yield_now_async(priority: YieldTime) -> YieldNowFuture {
 			YieldNowFuture(Some(State::Idle { future, handle }))
 		}),
 		// `MessageChannel` can't be instantiated in a worklet.
-		// TODO: Send a `MessageChannel` to a Worklet to make this possible.
 		_ => Global::with_window_or_worker(|_| {
 			let channel =
 				MessageChannel::new().expect("`new MessageChannel` is not expected to fail");
