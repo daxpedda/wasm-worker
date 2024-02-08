@@ -150,7 +150,7 @@ pub trait AudioWorkletGlobalScopeExt {
 	/// corresponding [`AudioWorkletNode`] immediately and requires at least one
 	/// yield to the event loop cycle in the [`AudioWorkletNode`]s thread for
 	/// [`AudioWorkletNode::new()`] to successfully find the requested
-	/// [`AudioWorkletProcessor`] by its name.
+	/// [`AudioWorkletProcessor`] by its name. See [`yield_now_async()`].
 	///
 	/// # Errors
 	///
@@ -160,6 +160,7 @@ pub trait AudioWorkletGlobalScopeExt {
 	///
 	/// [`AudioWorkletGlobalScope.registerProcessor()`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletGlobalScope/registerProcessor
 	/// [`AudioWorkletProcessor`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor
+	/// [`yield_now_async()`]: super::yield_now_async
 	#[cfg_attr(
 		all(
 			target_family = "wasm",
