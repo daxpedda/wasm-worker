@@ -653,6 +653,20 @@ where
 ///
 /// This is no-op in worklets.
 ///
+/// # Example
+///
+/// ```
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[wasm_bindgen_test::wasm_bindgen_test]
+/// # async fn test() {
+/// # use web_thread::web::{yield_now_async, YieldTime};
+/// # fn long_running_task() -> bool { false }
+/// while long_running_task() {
+/// 	yield_now_async(YieldTime::default()).await
+/// }
+/// # }
+/// ```
+///
 /// [event loop]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop
 pub fn yield_now_async(time: YieldTime) -> YieldNowFuture {
 	YieldNowFuture(thread::YieldNowFuture::new(time))
@@ -684,7 +698,7 @@ pub enum YieldTime {
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
 	/// [`TaskPriority."user-visible"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#user-visible
 	UserVisible,
-	/// Translates to [`TaskPriority."background"`].
+	/// Default. Translates to [`TaskPriority."background"`].
 	///
 	/// # Notes
 	///
@@ -695,7 +709,7 @@ pub enum YieldTime {
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
 	/// [`TaskPriority."background"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#background
 	Background,
-	/// Default. Longest execution yield to the event loop. Uses
+	/// Longest execution yield to the event loop. Uses
 	/// [`Window.requestIdleCallback()`].
 	///
 	/// # Notes
