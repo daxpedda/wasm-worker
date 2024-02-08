@@ -7,6 +7,7 @@ pub mod audio_worklet;
 use std::fmt::{self, Debug, Formatter};
 use std::future::{Future, Ready};
 use std::io;
+use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -655,7 +656,7 @@ pub fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
 }
 
 /// What kind of priority to yield to the event loop.
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 pub enum YieldPriority {
 	/// Translates to [`TaskPriority."user-blocking"`].
 	///
@@ -715,3 +716,5 @@ impl Future for YieldNowFuture {
 		Pin::new(&mut self.0).poll(cx)
 	}
 }
+
+impl RefUnwindSafe for YieldNowFuture {}

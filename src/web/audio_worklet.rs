@@ -2,6 +2,7 @@
 
 use std::future::Future;
 use std::io::{self, Error};
+use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -125,6 +126,8 @@ impl Future for RegisterThreadFuture {
 	}
 }
 
+impl RefUnwindSafe for RegisterThreadFuture {}
+
 /// Extension for [`AudioWorkletGlobalScope`].
 #[cfg_attr(
 	not(all(
@@ -139,7 +142,7 @@ pub trait AudioWorkletGlobalScopeExt {
 	/// Creates a class that extends [`AudioWorkletProcessor`] and calls
 	/// [`AudioWorkletGlobalScope.registerProcessor()`]. This is a workaround
 	/// for [`wasm-bindgen`] currently unable to extend classes, see
-	/// <https://github.com/rustwasm/wasm-bindgen/issues/210>.
+	/// [this `wasm-bindgen` issue](https://github.com/rustwasm/wasm-bindgen/issues/210).
 	///
 	/// # Notes
 	///

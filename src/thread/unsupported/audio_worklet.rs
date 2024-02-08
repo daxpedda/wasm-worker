@@ -2,6 +2,7 @@
 
 use std::future::Future;
 use std::io::{self, Error};
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
@@ -17,13 +18,18 @@ pub(in super::super) fn register_thread<F>(_: BaseAudioContext, _: F) -> Registe
 
 /// Implementation for [`crate::web::audio_worklet::RegisterThreadFuture`].
 #[derive(Debug)]
-pub(in super::super) struct RegisterThreadFuture(Option<Error>);
+pub(in super::super) struct RegisterThreadFuture {
+	/// Only possible state is an error.
+	error: Option<Error>,
+	/// Make sure it doesn't implement [`Send`] or [`Sync`].
+	_marker: PhantomData<*const ()>,
+}
 
 impl Future for RegisterThreadFuture {
 	type Output = io::Result<Thread>;
 
 	fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
-		Poll::Ready(Err(self.0.take().expect("polled after completion")))
+		Poll::Ready(Err(self.error.take().expect("polled after completion")))
 	}
 }
 
@@ -31,7 +37,10 @@ impl RegisterThreadFuture {
 	/// Create a [`RegisterThreadFuture`] that returns `error`.
 
 	pub(in super::super) const fn error(error: Error) -> Self {
-		Self(Some(error))
+		Self {
+			error: Some(error),
+			_marker: PhantomData,
+		}
 	}
 }
 

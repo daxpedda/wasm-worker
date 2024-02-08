@@ -39,7 +39,7 @@ const fn web() {
 	use static_assertions::assert_obj_safe;
 	use web_thread::web::{
 		JoinHandleExt, JoinHandleFuture, ScopeFuture, ScopeIntoJoinFuture, ScopeJoinFuture,
-		ScopedJoinHandleExt, ScopedJoinHandleFuture,
+		ScopedJoinHandleExt, ScopedJoinHandleFuture, YieldNowFuture, YieldPriority,
 	};
 
 	assert_impl_all!(JoinHandleFuture<'_, PhantomPinned>: Debug, Send, Sync, Unpin);
@@ -59,5 +59,21 @@ const fn web() {
 	assert_impl_all!(ScopeJoinFuture<'_, '_, PhantomPinned>: Debug, Send, Sync, Unpin, RefUnwindSafe);
 	assert_not_impl_any!(ScopeJoinFuture<'_, '_, PhantomPinned>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, UnwindSafe);
 
+	assert_impl_all!(YieldNowFuture: Debug, Unpin, RefUnwindSafe);
+	assert_not_impl_any!(YieldNowFuture: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, Send, Sync, UnwindSafe);
+
+	assert_impl_all!(YieldPriority: Clone, Copy, Debug, Hash, Eq, PartialEq, Send, Sync, Unpin, RefUnwindSafe, UnwindSafe);
+	assert_not_impl_any!(YieldPriority: Ord, PartialOrd);
+
 	assert_obj_safe!(JoinHandleExt<()>, ScopedJoinHandleExt<'_, ()>);
+
+	#[cfg(feature = "audio-worklet")]
+	{
+		use web_thread::web::audio_worklet::{ExtendAudioWorkletProcessor, RegisterThreadFuture};
+
+		assert_impl_all!(RegisterThreadFuture: Debug, Unpin, RefUnwindSafe);
+		assert_not_impl_any!(RegisterThreadFuture: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, Send, Sync, UnwindSafe);
+
+		assert_obj_safe!(ExtendAudioWorkletProcessor);
+	}
 }
