@@ -37,7 +37,7 @@ use self::global::{Global, GLOBAL};
 use self::js::{SchedulerPostTaskOptions, TaskPriority, WindowExt};
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
-use crate::web::YieldPriority;
+use crate::web::YieldTime;
 
 /// See [`std::thread::Builder`].
 #[derive(Debug)]
@@ -855,7 +855,7 @@ pub(crate) fn has_spawn_support() -> bool {
 }
 
 /// Implementation for [`crate::web::yield_now_async()`].
-pub(crate) fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
+pub(crate) fn yield_now_async(priority: YieldTime) -> YieldNowFuture {
 	thread_local! {
 		static HAS_SCHEDULER: bool = Global::with_window_or_worker(|global| !global.has_scheduler().is_undefined()).unwrap_or(false);
 		static HAS_REQUEST_IDLE_CALLBACK: bool = GLOBAL.with(|global| {
@@ -870,7 +870,7 @@ pub(crate) fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
 	}
 
 	match priority {
-		YieldPriority::UserBlocking | YieldPriority::UserVisible | YieldPriority::Background
+		YieldTime::UserBlocking | YieldTime::UserVisible | YieldTime::Background
 			if HAS_SCHEDULER.with(bool::clone) =>
 		{
 			Global::with_window_or_worker(|global| {
@@ -880,10 +880,10 @@ pub(crate) fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
 				options.set_signal(&controller.signal());
 
 				match priority {
-					YieldPriority::UserBlocking => options.set_priority(TaskPriority::UserBlocking),
-					YieldPriority::UserVisible => (),
-					YieldPriority::Background => options.set_priority(TaskPriority::Background),
-					YieldPriority::Idle => unreachable!("found invalid `YieldPriority`"),
+					YieldTime::UserBlocking => options.set_priority(TaskPriority::UserBlocking),
+					YieldTime::UserVisible => (),
+					YieldTime::Background => options.set_priority(TaskPriority::Background),
+					YieldTime::Idle => unreachable!("found invalid `YieldTime`"),
 				}
 
 				let future = JsFuture::from(EMPTY_CLOSURE.with(|closure| {
@@ -897,25 +897,22 @@ pub(crate) fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
 			})
 			.expect("found invalid global context despite previous check")
 		}
-		YieldPriority::Idle if HAS_REQUEST_IDLE_CALLBACK.with(bool::clone) => {
-			GLOBAL.with(|global| {
-				let Some(Global::Window(window)) = global.as_ref() else {
-					unreachable!("expected `Window`")
-				};
-				let mut handle = None;
-				let future = JsFuture::from(Promise::new(&mut |resolve, _| {
-					handle = Some(
-						window
-							.request_idle_callback(&resolve)
-							.expect("`setTimeout` is not expected to fail"),
-					);
-				}));
-				let handle =
-					handle.expect("Callback passed into `Promise` not executed immediately");
+		YieldTime::Idle if HAS_REQUEST_IDLE_CALLBACK.with(bool::clone) => GLOBAL.with(|global| {
+			let Some(Global::Window(window)) = global.as_ref() else {
+				unreachable!("expected `Window`")
+			};
+			let mut handle = None;
+			let future = JsFuture::from(Promise::new(&mut |resolve, _| {
+				handle = Some(
+					window
+						.request_idle_callback(&resolve)
+						.expect("`setTimeout` is not expected to fail"),
+				);
+			}));
+			let handle = handle.expect("Callback passed into `Promise` not executed immediately");
 
-				YieldNowFuture(Some(State::Idle { future, handle }))
-			})
-		}
+			YieldNowFuture(Some(State::Idle { future, handle }))
+		}),
 		// `MessageChannel` can't be instantiated in a worklet.
 		// TODO: Send a `MessageChannel` to a Worklet to make this possible.
 		_ => Global::with_window_or_worker(|_| {

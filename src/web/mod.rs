@@ -646,19 +646,23 @@ where
 	thread::spawn_async(f)
 }
 
-/// Async version of [`yield_now()`](std::thread::yield_now).
+/// Async version of [`yield_now()`](std::thread::yield_now). This yields
+/// execution to the [event loop].
 ///
 /// # Notes
 ///
 /// This is no-op in worklets.
-pub fn yield_now_async(priority: YieldPriority) -> YieldNowFuture {
+///
+/// [event loop]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop
+pub fn yield_now_async(priority: YieldTime) -> YieldNowFuture {
 	YieldNowFuture(thread::yield_now_async(priority))
 }
 
-/// What kind of priority to yield to the event loop.
+/// How long it should yield execution to the event loop.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub enum YieldPriority {
-	/// Translates to [`TaskPriority."user-blocking"`].
+pub enum YieldTime {
+	/// Shortest execution yield to the event loop. Translates to
+	/// [`TaskPriority."user-blocking"`].
 	///
 	/// # Notes
 	///
@@ -691,7 +695,8 @@ pub enum YieldPriority {
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
 	/// [`TaskPriority."background"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#background
 	Background,
-	/// Default. Uses [`Window.requestIdleCallback()`].
+	/// Default. Longest execution yield to the event loop. Uses
+	/// [`Window.requestIdleCallback()`].
 	///
 	/// # Notes
 	///

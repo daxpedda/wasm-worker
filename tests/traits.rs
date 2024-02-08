@@ -39,7 +39,7 @@ const fn web() {
 	use static_assertions::assert_obj_safe;
 	use web_thread::web::{
 		JoinHandleExt, JoinHandleFuture, ScopeFuture, ScopeIntoJoinFuture, ScopeJoinFuture,
-		ScopedJoinHandleExt, ScopedJoinHandleFuture, YieldNowFuture, YieldPriority,
+		ScopedJoinHandleExt, ScopedJoinHandleFuture, YieldNowFuture, YieldTime,
 	};
 
 	assert_impl_all!(JoinHandleFuture<'_, PhantomPinned>: Debug, Send, Sync, Unpin);
@@ -62,8 +62,8 @@ const fn web() {
 	assert_impl_all!(YieldNowFuture: Debug, Unpin, RefUnwindSafe);
 	assert_not_impl_any!(YieldNowFuture: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, Send, Sync, UnwindSafe);
 
-	assert_impl_all!(YieldPriority: Clone, Copy, Debug, Hash, Eq, PartialEq, Send, Sync, Unpin, RefUnwindSafe, UnwindSafe);
-	assert_not_impl_any!(YieldPriority: Ord, PartialOrd);
+	assert_impl_all!(YieldTime: Clone, Copy, Debug, Hash, Eq, PartialEq, Send, Sync, Unpin, RefUnwindSafe, UnwindSafe);
+	assert_not_impl_any!(YieldTime: Ord, PartialOrd);
 
 	assert_obj_safe!(JoinHandleExt<()>, ScopedJoinHandleExt<'_, ()>);
 

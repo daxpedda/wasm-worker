@@ -26,7 +26,7 @@ mod web {
 	use web_thread::web::audio_worklet::{
 		AudioWorkletGlobalScopeExt, BaseAudioContextExt, ExtendAudioWorkletProcessor,
 	};
-	use web_thread::web::{self, YieldPriority};
+	use web_thread::web::{self, YieldTime};
 
 	/// `fn main` implementation.
 	pub(crate) fn main() {
@@ -78,7 +78,7 @@ mod web {
 
 		// Wait until processor is registered.
 		receiver.recv().await.unwrap();
-		web::yield_now_async(YieldPriority::UserBlocking).await;
+		web::yield_now_async(YieldTime::UserBlocking).await;
 
 		AudioWorkletNode::new(&context, "test").unwrap();
 	}
