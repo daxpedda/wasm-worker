@@ -4,7 +4,7 @@
 
 #[cfg(not(target_family = "wasm"))]
 fn main() {
-	todo!()
+	panic!("This example is supposed to only be run with the `wasm32-unknown-unknown` target.")
 }
 
 #[cfg(target_family = "wasm")]
