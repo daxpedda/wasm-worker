@@ -36,7 +36,7 @@ impl Builder {
 		T: Send + 'static,
 	{
 		if super::has_spawn_support() {
-			self.0.spawn(f).map(JoinHandle)
+			self.0.spawn(f).map(JoinHandle::new)
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,
@@ -55,7 +55,7 @@ impl Builder {
 		T: 'static + Send,
 	{
 		if super::has_spawn_support() {
-			self.0.spawn_async_internal(task).map(JoinHandle)
+			self.0.spawn_async_internal(task).map(JoinHandle::new)
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,

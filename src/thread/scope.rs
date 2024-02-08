@@ -76,7 +76,7 @@ impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
 	///
 	/// # Panics
 	///
-	/// See [`spawn()`](super::spawn).
+	/// See [`spawn()`](super::spawn()).
 	pub fn spawn<F, T>(
 		&'scope self,
 		#[allow(clippy::min_ident_chars)] f: F,

@@ -8,20 +8,16 @@ mod builder;
 mod global;
 mod js;
 mod scope;
+mod spawn;
 #[cfg(not(target_feature = "atomics"))]
 mod unsupported;
 mod yield_now;
 
 use std::cell::OnceCell;
-use std::fmt::{self, Debug, Formatter};
-use std::future::Future;
 use std::io::{self, Error, ErrorKind};
 use std::num::{NonZeroU64, NonZeroUsize};
-use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
-use std::task::{Context, Poll};
-use std::thread;
 use std::time::Duration;
 
 use r#impl::Parker;
@@ -32,70 +28,12 @@ pub use self::builder::Builder;
 use self::global::{Global, GLOBAL};
 pub use self::scope::{scope, Scope, ScopedJoinHandle};
 pub(crate) use self::scope::{scope_async, ScopeFuture};
+pub(crate) use self::spawn::spawn_async;
+pub use self::spawn::{spawn, JoinHandle};
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;
 pub use self::yield_now::yield_now;
 pub(crate) use self::yield_now::YieldNowFuture;
-
-/// See [`std::thread::JoinHandle`].
-pub struct JoinHandle<T>(r#impl::JoinHandle<T>);
-
-impl<T> Debug for JoinHandle<T> {
-	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
-		formatter.debug_tuple("JoinHandle").field(&self.0).finish()
-	}
-}
-
-impl<T> JoinHandle<T> {
-	/// See [`std::thread::JoinHandle::is_finished()`].
-	///
-	/// # Notes
-	///
-	/// When this returns [`true`] it guarantees [`JoinHandle::join()`] not to
-	/// block.
-	#[allow(clippy::must_use_candidate)]
-	pub fn is_finished(&self) -> bool {
-		self.0.is_finished()
-	}
-
-	/// See [`std::thread::JoinHandle::join()`].
-	///
-	/// # Notes
-	///
-	/// When compiling with [`panic = "abort"`], which is the only option
-	/// without enabling the Wasm exception-handling proposal, this can never
-	/// return [`Err`].
-	///
-	/// # Panics
-	///
-	/// - If the calling thread doesn't support blocking, see
-	///   [`web::has_block_support()`](crate::web::has_block_support). Though it
-	///   is guaranteed to not block if [`JoinHandle::is_finished()`] returns
-	///   [`true`]. Alternatively consider using
-	///   [`web::JoinHandleExt::join_async()`].
-	/// - If called on the thread to join.
-	/// - If it was already polled to completion through
-	///   [`web::JoinHandleExt::join_async()`].
-	///
-	/// [`panic = "abort"`]: https://doc.rust-lang.org/1.75.0/cargo/reference/profiles.html#panic
-	/// [`web::JoinHandleExt::join_async()`]: crate::web::JoinHandleExt::join_async
-	#[allow(clippy::missing_errors_doc)]
-	pub fn join(self) -> thread::Result<T> {
-		self.0.join()
-	}
-
-	/// See [`std::thread::JoinHandle::thread()`].
-	#[must_use]
-	pub fn thread(&self) -> &Thread {
-		self.0.thread()
-	}
-
-	/// Implementation for
-	/// [`JoinHandleFuture::poll()`](crate::web::JoinHandleFuture).
-	pub(crate) fn poll(&mut self, cx: &mut Context<'_>) -> Poll<thread::Result<T>> {
-		Pin::new(&mut self.0).poll(cx)
-	}
-}
 
 /// See [`std::thread::Thread`].
 #[derive(Clone, Debug)]
@@ -328,34 +266,6 @@ pub fn sleep(dur: Duration) {
 #[deprecated(note = "replaced by `web_thread::sleep`")]
 pub fn sleep_ms(ms: u32) {
 	sleep(Duration::from_millis(ms.into()));
-}
-
-/// See [`std::thread::spawn()`].
-///
-/// # Panics
-///
-/// If the main thread does not support spawning threads, see
-/// [`web::has_spawn_support()`](crate::web::has_spawn_support).
-#[allow(clippy::min_ident_chars, clippy::type_repetition_in_bounds)]
-pub fn spawn<F, T>(f: F) -> JoinHandle<T>
-where
-	F: FnOnce() -> T,
-	F: Send + 'static,
-	T: Send + 'static,
-{
-	Builder::new().spawn(f).expect("failed to spawn thread")
-}
-
-/// Implementation for [`crate::web::spawn_async()`].
-pub(crate) fn spawn_async<F1, F2, T>(task: F1) -> JoinHandle<T>
-where
-	F1: 'static + FnOnce() -> F2 + Send,
-	F2: 'static + Future<Output = T>,
-	T: 'static + Send,
-{
-	Builder::new()
-		.spawn_async_internal(task)
-		.expect("failed to spawn thread")
 }
 
 /// Implementation for [`crate::web::has_block_support()`].
