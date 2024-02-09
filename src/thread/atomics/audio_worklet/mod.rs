@@ -281,21 +281,16 @@ impl RegisterThreadFuture {
 					// should have been freed. See <https://webaudio.github.io/web-audio-api/#dom-audiocontextstate-closed>.
 					unsafe { data.memory.destroy() };
 
-					// Remove the event listener and drop the associated `Closure`.
-					// This has to be done carefully to not drop the `Closure` while the `Closure`
-					// is being called.
+					// Remove the event listener.
+					data.context
+						.remove_event_listener_with_callback(
+							"statechange",
+							data.closure.as_ref().unchecked_ref(),
+						)
+						.expect("`EventTarget.removeEventListener()` is not expected to fail");
+					// Don't drop the closure while it is being run.
 					js::queue_microtask(
-						&Closure::once_into_js(move || {
-							data.context
-								.remove_event_listener_with_callback(
-									"statechange",
-									data.closure.as_ref().unchecked_ref(),
-								)
-								.expect(
-									"`EventTarget.removeEventListener()` is not expected to fail",
-								);
-						})
-						.unchecked_into(),
+						&Closure::once_into_js(move || drop(data.closure)).unchecked_into(),
 					);
 				} else {
 					*data_rc.borrow_mut() = Some(data);
