@@ -5,7 +5,7 @@ use std::future::{Future, Ready};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
-use std::{mem, thread};
+use std::{any, mem, thread};
 
 use pin_project::{pin_project, pinned_drop};
 
@@ -222,12 +222,14 @@ impl<F, T> Debug for State<'_, '_, F, T> {
 		match self {
 			Self::Task { scope, .. } => formatter
 				.debug_struct("Task")
+				.field("task", &any::type_name::<F>())
 				.field("scope", &scope)
-				.finish_non_exhaustive(),
+				.finish(),
 			Self::Wait { scope, .. } => formatter
 				.debug_struct("Wait")
+				.field("result", &any::type_name::<T>())
 				.field("scope", &scope)
-				.finish_non_exhaustive(),
+				.finish(),
 			Self::None => formatter.write_str("None"),
 		}
 	}

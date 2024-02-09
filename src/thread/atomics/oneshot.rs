@@ -2,11 +2,11 @@
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
-use std::mem;
 use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, PoisonError, TryLockError, Weak};
 use std::task::{Context, Poll};
+use std::{any, mem};
 
 use atomic_waker::AtomicWaker;
 
@@ -51,9 +51,10 @@ impl<T> Debug for Shared<T> {
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		formatter
 			.debug_struct("Shared")
+			.field("value", &any::type_name_of_val(&self.value))
 			.field("cvar", &self.cvar)
 			.field("waker", &self.waker)
-			.finish_non_exhaustive()
+			.finish()
 	}
 }
 

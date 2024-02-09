@@ -2,6 +2,7 @@
 
 mod js;
 
+use std::any;
 use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
@@ -136,14 +137,15 @@ impl Debug for State {
 			Self::Module {
 				context,
 				promise,
+				task,
 				receiver,
-				..
 			} => formatter
 				.debug_struct("Module")
 				.field("context", context)
 				.field("promise", promise)
+				.field("task", &any::type_name_of_val(task))
 				.field("receiver", receiver)
-				.finish_non_exhaustive(),
+				.finish(),
 			Self::Package { context, receiver } => formatter
 				.debug_struct("Module")
 				.field("context", context)
