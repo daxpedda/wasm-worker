@@ -2,6 +2,7 @@
 
 use std::cell::{Cell, RefCell};
 use std::future;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Poll, Waker};
 
@@ -23,15 +24,13 @@ pub(super) struct WaitAsync;
 
 impl WaitAsync {
 	/// Mimics the interface we need from [`Atomics::wait_async`].
-	pub(super) async fn wait(value: &i32, check: i32) {
+	pub(super) async fn wait(value: Pin<&i32>, check: i32) {
 		thread_local! {
 			static HAS_WAIT_ASYNC: bool = !js::HAS_WAIT_ASYNC.is_undefined();
 		}
 
 		if HAS_WAIT_ASYNC.with(bool::clone) {
-			let index: *const i32 = value;
-			#[allow(clippy::as_conversions)]
-			let index = index as u32 / 4;
+			let index = super::i32_to_buffer_index(&value);
 
 			let result: WaitAsyncResult = MEMORY_ARRAY
 				.with(|array| Atomics::wait_async(array, index, check))
@@ -50,7 +49,7 @@ impl WaitAsync {
 }
 
 /// Polyfills [`Atomics::wait_async`] if not available.
-async fn wait(value: &i32, check: i32) {
+async fn wait(value: Pin<&i32>, check: i32) {
 	thread_local! {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(include_str!("wait_async.js"));
@@ -91,9 +90,7 @@ async fn wait(value: &i32, check: i32) {
 	});
 	worker.set_onmessage(Some(onmessage_callback.unchecked_ref()));
 
-	let index: *const i32 = value;
-	#[allow(clippy::as_conversions)]
-	let index = index as u32 / 4;
+	let index = super::i32_to_buffer_index(&value);
 
 	let message =
 		MEMORY.with(|memory| Array::of3(memory, &JsValue::from(index), &JsValue::from(check)));

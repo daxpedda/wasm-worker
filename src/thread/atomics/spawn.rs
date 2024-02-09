@@ -6,7 +6,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, OnceLock};
-use std::{io, mem, ptr};
+use std::{io, mem};
 
 use js_sys::Array;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -73,7 +73,7 @@ fn init_main() {
 					}
 					Command::Terminate { id, value, memory } => {
 						wasm_bindgen_futures::spawn_local(async move {
-							WaitAsync::wait(&value, 0).await;
+							WaitAsync::wait(value, 0).await;
 
 							WORKERS
 								.with(|workers| {
@@ -140,9 +140,7 @@ where
 				}
 
 				let value = Pin::new(&0);
-				let index: *const i32 = ptr::addr_of!(*value);
-				#[allow(clippy::as_conversions)]
-				let index = index as u32 / 4;
+				let index = super::i32_to_buffer_index(&value);
 
 				let memory = ThreadMemory::new();
 

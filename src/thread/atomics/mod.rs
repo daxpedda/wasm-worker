@@ -35,6 +35,15 @@ use super::{ScopedJoinHandle, Thread, ThreadId, THREAD};
 /// before spawning any threads.
 static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
 
+thread_local! {
+	/// [`Memory`] of the Wasm module.
+	pub(super) static MEMORY: Memory = wasm_bindgen::memory().unchecked_into();
+	/// [`Memory`] of the Wasm module as a [`Int32Array`].
+	pub(super) static MEMORY_ARRAY: Int32Array = Int32Array::new(&MEMORY.with(Memory::buffer));
+	/// Wasm [`Module`].
+	pub(super) static MODULE: Module = wasm_bindgen::module().unchecked_into();
+}
+
 /// Implementation of [`std::thread::Builder`].
 #[derive(Debug)]
 pub(super) struct Builder {
@@ -254,10 +263,8 @@ pub(super) fn sleep(dur: Duration) {
 
 /// Tests is blocking is supported.
 pub(super) fn test_block_support() -> bool {
-	let value = 0;
-	let index: *const i32 = ptr::addr_of!(value);
-	#[allow(clippy::as_conversions)]
-	let index = index as u32 / 4;
+	let value = Pin::new(&0);
+	let index = i32_to_buffer_index(&value);
 
 	MEMORY_ARRAY
 		.with(|array| Atomics::wait_with_timeout(array, index, 0, 0.))
@@ -285,11 +292,11 @@ fn current_id() -> ThreadId {
 	THREAD.with(|cell| cell.get_or_init(Thread::new).id())
 }
 
-thread_local! {
-	/// [`Memory`] of the Wasm module.
-	pub(super) static MEMORY: Memory = wasm_bindgen::memory().unchecked_into();
-	/// [`Memory`] of the Wasm module as a [`Int32Array`].
-	pub(super) static MEMORY_ARRAY: Int32Array = Int32Array::new(&MEMORY.with(Memory::buffer));
-	/// Wasm [`Module`].
-	pub(super) static MODULE: Module = wasm_bindgen::module().unchecked_into();
+/// Converts a reference to a [`i32`] to an index into the internal
+/// [`ArrayBuffer`](js_sys::ArrayBuffer) usable by methods of [`Atomics`].
+fn i32_to_buffer_index(value: &Pin<&i32>) -> u32 {
+	let index: *const i32 = ptr::from_ref(value);
+	#[allow(clippy::as_conversions)]
+	let index = index as u32 / 4;
+	index
 }
