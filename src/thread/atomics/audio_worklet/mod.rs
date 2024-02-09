@@ -2,7 +2,7 @@
 
 mod js;
 
-use std::any;
+use std::any::{self, Any, TypeId};
 use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 
-use js_sys::{Array, Object};
+use js_sys::{Array, JsString, Object, Reflect};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::{JsCast, JsValue};
@@ -21,13 +21,14 @@ use web_sys::{
 	AudioContextState, AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, DomException,
 };
 
-use self::js::BaseAudioContextExt;
+use self::js::{AudioWorkletNodeOptionsExt, BaseAudioContextExt, ProcessorOptions};
+use super::super::js::GlobalExt;
 use super::js::META;
 use super::memory::ThreadMemory;
 use super::oneshot::Receiver;
 use super::url::ScriptUrl;
 use super::{oneshot, Thread, MAIN_THREAD};
-use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
+use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -315,12 +316,12 @@ pub(in super::super) fn is_main_thread() -> bool {
 
 /// Implementation for
 /// [`crate::web::audio_worklet::AudioWorkletGlobalScopeExt::register_processor_ext()`].
-pub(in super::super) fn register_processor<T: 'static + ExtendAudioWorkletProcessor>(
+pub(in super::super) fn register_processor<P: 'static + ExtendAudioWorkletProcessor>(
 	name: &str,
 ) -> Result<(), Error> {
 	__web_thread_register_processor(
 		name,
-		__WebThreadProcessorConstructor(Box::new(ProcessorConstructorWrapper::<T>(PhantomData))),
+		__WebThreadProcessorConstructor(Box::new(ProcessorConstructorWrapper::<P>(PhantomData))),
 	)
 	.map_err(|error| error_from_exception(error.into()))
 }
@@ -353,7 +354,7 @@ impl __WebThreadProcessorConstructor {
 }
 
 /// Wrapper for the user-supplied [`ExtendAudioWorkletProcessor`].
-struct ProcessorConstructorWrapper<T: 'static + ExtendAudioWorkletProcessor>(PhantomData<T>);
+struct ProcessorConstructorWrapper<P: 'static + ExtendAudioWorkletProcessor>(PhantomData<P>);
 
 /// Object-safe version of [`ExtendAudioWorkletProcessor`].
 trait ProcessorConstructor {
@@ -369,26 +370,90 @@ trait ProcessorConstructor {
 	fn parameter_descriptors(&self) -> Array;
 }
 
-impl<T: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
-	for ProcessorConstructorWrapper<T>
+impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
+	for ProcessorConstructorWrapper<P>
 {
 	fn instantiate(
 		&mut self,
 		this: web_sys::AudioWorkletProcessor,
-		options: AudioWorkletNodeOptions,
+		mut options: AudioWorkletNodeOptions,
 	) -> __WebThreadProcessor {
-		__WebThreadProcessor(Box::new(T::new(this, options)))
+		let mut processor_data = None;
+
+		if let Some(processor_options) = options
+			.unchecked_ref::<AudioWorkletNodeOptionsExt>()
+			.get_processor_options()
+		{
+			let processor_options: ProcessorOptions = processor_options.unchecked_into();
+
+			let data = processor_options.data();
+
+			if !data.is_null() {
+				// SAFETY: We only store `*const Data` at `__web_thread_data`.
+				let data = unsafe { Box::<Data>::from_raw(data.cast_mut().cast()) };
+
+				assert!(
+					data.type_id == TypeId::of::<P>(),
+					"`ExtendAudioWorkletProcessor::Data` sent to audio worklet was sent to the \
+					 wrong processor"
+				);
+
+				processor_data =
+					Some(*data.data.downcast::<P::Data>().expect("wrong type encoded"));
+
+				if Object::keys(&processor_options).length() == 1 {
+					options.processor_options(None);
+				} else {
+					thread_local! {
+						static DATA_PROPERTY_NAME: JsString = if js_sys::global()
+							.unchecked_into::<GlobalExt>()
+							.text_encoder()
+							.is_undefined()
+						{
+							JsString::from_code_point(
+								"__web_thread_data"
+									.chars()
+									.map(u32::from)
+									.collect::<Vec<_>>()
+									.as_slice(),
+							)
+							.expect("found invalid Unicode")
+						} else {
+							JsString::from("__web_thread_data")
+						};
+					}
+
+					DATA_PROPERTY_NAME
+						.with(|name| Reflect::delete_property(&processor_options, name))
+						.expect("expected `processor_options` to be an `Object`");
+				}
+			}
+		}
+
+		__WebThreadProcessor(Box::new(P::new(this, processor_data, options)))
 	}
 
 	fn parameter_descriptors(&self) -> Array {
-		T::parameter_descriptors()
+		P::parameter_descriptors()
 	}
 }
 
 /// Holds the user-supplied [`ExtendAudioWorkletProcessor`] while type-erasing
 /// it.
 #[wasm_bindgen]
-struct __WebThreadProcessor(Box<dyn ExtendAudioWorkletProcessor>);
+struct __WebThreadProcessor(Box<dyn Processor>);
+
+/// Object-safe version of [`ExtendAudioWorkletProcessor`].
+trait Processor {
+	/// Calls the underlying [`ExtendAudioWorkletProcessor::process`].
+	fn process(&mut self, inputs: Array, outputs: Array, parameters: Object) -> bool;
+}
+
+impl<P: ExtendAudioWorkletProcessor> Processor for P {
+	fn process(&mut self, inputs: Array, outputs: Array, parameters: Object) -> bool {
+		ExtendAudioWorkletProcessor::process(self, inputs, outputs, parameters)
+	}
+}
 
 #[wasm_bindgen]
 impl __WebThreadProcessor {
@@ -398,6 +463,67 @@ impl __WebThreadProcessor {
 	pub fn process(&mut self, inputs: Array, outputs: Array, parameters: Object) -> bool {
 		self.0.process(inputs, outputs, parameters)
 	}
+}
+
+/// Returns [`true`] if this context has a registered thread.
+pub(in super::super) fn is_registered(context: &BaseAudioContext) -> bool {
+	matches!(
+		context.unchecked_ref::<BaseAudioContextExt>().registered(),
+		Some(true)
+	)
+}
+
+/// Implementation for
+/// [`crate::web::audio_worklet::BaseAudioContextExt::audio_worklet_node()`].
+pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProcessor>(
+	context: &BaseAudioContext,
+	name: &str,
+	data: P::Data,
+	options: Option<AudioWorkletNodeOptions>,
+) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
+	let data = Box::new(Data {
+		type_id: TypeId::of::<P>(),
+		data: Box::new(data),
+	});
+
+	let options: AudioWorkletNodeOptionsExt = options.map_or_else(
+		|| Object::new().unchecked_into(),
+		AudioWorkletNodeOptions::unchecked_into,
+	);
+	let processor_options = options.get_processor_options();
+	let has_processor_options = processor_options.is_some();
+	let processor_options: ProcessorOptions =
+		processor_options.unwrap_or_default().unchecked_into();
+	let data = Box::into_raw(data);
+	processor_options.set_data(data);
+	let mut options = AudioWorkletNodeOptions::from(options);
+
+	if !has_processor_options {
+		options.processor_options(Some(&processor_options));
+	}
+
+	match AudioWorkletNode::new_with_options(context, name, &options) {
+		Ok(node) => Ok(node),
+		Err(error) => Err(AudioWorkletNodeError {
+			// SAFETY: We just made this pointer above.
+			data: *unsafe { Box::from_raw(data) }
+				.data
+				.downcast()
+				.expect("wrong type encoded"),
+			error: error_from_exception(error),
+		}),
+	}
+}
+
+/// Data stored in [`AudioWorkletNodeOptions.processorOptions`] to transport
+/// [`ExtendAudioWorkletProcessor::Data`].
+///
+/// [`AudioWorkletNodeOptions.processorOptions`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions
+struct Data {
+	/// [`TypeId`] to compare to the type when arriving at the constructor.
+	type_id: TypeId,
+	/// [`ExtendAudioWorkletProcessor::Data`].
+	data: Box<dyn Any>,
 }
 
 /// Convert a [`JsValue`] to an [`DomException`] and then to an [`Error`].

@@ -6,9 +6,10 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use web_sys::BaseAudioContext;
+use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
 use super::super::Thread;
+use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -54,6 +55,23 @@ pub(in super::super) fn is_main_thread() -> bool {
 /// Implementation for
 /// [`crate::web::audio_worklet::AudioWorkletGlobalScopeExt::register_processor_ext()`].
 #[allow(clippy::extra_unused_type_parameters)]
-pub(in super::super) fn register_processor<T>(_: &str) -> Result<(), Error> {
+pub(in super::super) fn register_processor<P>(_: &str) -> Result<(), Error> {
 	unreachable!("reached `register_processor()` on the main thread")
+}
+
+/// Returns [`true`] if this context has a registered thread.
+#[allow(clippy::missing_const_for_fn)]
+pub(in super::super) fn is_registered(_: &BaseAudioContext) -> bool {
+	false
+}
+
+/// Implementation for
+/// [`crate::web::audio_worklet::BaseAudioContextExt::audio_worklet_node()`].
+pub(in super::super) fn audio_worklet_node<P: ExtendAudioWorkletProcessor>(
+	_: &BaseAudioContext,
+	_: &str,
+	_: P::Data,
+	_: Option<AudioWorkletNodeOptions>,
+) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
+	unreachable!("reached despite not being able to register a thread")
 }

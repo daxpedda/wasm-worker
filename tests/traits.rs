@@ -69,11 +69,32 @@ const fn web() {
 
 	#[cfg(feature = "audio-worklet")]
 	{
-		use web_thread::web::audio_worklet::{ExtendAudioWorkletProcessor, RegisterThreadFuture};
+		use std::error::Error;
+		use std::fmt::Display;
+
+		use web_sys::{AudioWorkletNodeOptions, AudioWorkletProcessor};
+		use web_thread::web::audio_worklet::{
+			AudioWorkletNodeError, ExtendAudioWorkletProcessor, RegisterThreadFuture,
+		};
+
+		struct TestProcessor;
+
+		impl ExtendAudioWorkletProcessor for TestProcessor {
+			type Data = ();
+
+			fn new(
+				_: AudioWorkletProcessor,
+				_: Option<Self::Data>,
+				_: AudioWorkletNodeOptions,
+			) -> Self {
+				Self
+			}
+		}
 
 		assert_impl_all!(RegisterThreadFuture: Debug, Unpin, RefUnwindSafe);
 		assert_not_impl_any!(RegisterThreadFuture: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, Send, Sync, UnwindSafe);
 
-		assert_obj_safe!(ExtendAudioWorkletProcessor);
+		assert_impl_all!(AudioWorkletNodeError<TestProcessor>: Debug, Display, Error, Send, Sync, Unpin);
+		assert_not_impl_any!(AudioWorkletNodeError<TestProcessor>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, RefUnwindSafe, UnwindSafe);
 	}
 }

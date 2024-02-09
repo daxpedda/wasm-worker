@@ -5,14 +5,14 @@ use std::io::{self, Error, ErrorKind};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
-use web_sys::BaseAudioContext;
+use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
 #[cfg(target_feature = "atomics")]
 use super::atomics::audio_worklet;
 #[cfg(not(target_feature = "atomics"))]
 use super::unsupported::audio_worklet;
 use super::Thread;
-use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
+use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -45,7 +45,7 @@ impl Future for RegisterThreadFuture {
 
 /// Implementation for
 /// [`crate::web::audio_worklet::AudioWorkletGlobalScopeExt::register_processor_ext()`].
-pub(crate) fn register_processor<T: 'static + ExtendAudioWorkletProcessor>(
+pub(crate) fn register_processor<P: 'static + ExtendAudioWorkletProcessor>(
 	name: &str,
 ) -> Result<(), Error> {
 	if audio_worklet::is_main_thread() {
@@ -54,6 +54,27 @@ pub(crate) fn register_processor<T: 'static + ExtendAudioWorkletProcessor>(
 			"thread was not spawned by `web-thread`",
 		))
 	} else {
-		audio_worklet::register_processor::<T>(name)
+		audio_worklet::register_processor::<P>(name)
+	}
+}
+
+/// Implementation for
+/// [`crate::web::audio_worklet::BaseAudioContextExt::audio_worklet_node()`].
+pub(crate) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProcessor>(
+	context: &BaseAudioContext,
+	name: &str,
+	data: P::Data,
+	options: Option<AudioWorkletNodeOptions>,
+) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
+	if audio_worklet::is_registered(context) {
+		audio_worklet::audio_worklet_node(context, name, data, options)
+	} else {
+		Err(AudioWorkletNodeError {
+			data,
+			error: Error::new(
+				ErrorKind::Other,
+				"`register_thread()` has to be called on this context first",
+			),
+		})
 	}
 }

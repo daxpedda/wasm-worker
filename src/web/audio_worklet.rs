@@ -1,10 +1,11 @@
 //! Audio worklet extensions.
 
+use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
-use std::io::{self, Error};
 use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::{any, error, fmt, io};
 
 use js_sys::{Array, Object};
 #[cfg(all(
@@ -13,7 +14,7 @@ use js_sys::{Array, Object};
 	feature = "audio-worklet"
 ))]
 use web_sys::{AudioWorkletGlobalScope, BaseAudioContext};
-use web_sys::{AudioWorkletNodeOptions, AudioWorkletProcessor};
+use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, AudioWorkletProcessor};
 
 #[cfg(all(
 	target_family = "wasm",
@@ -39,6 +40,7 @@ mod audio_worklet {
 mod web_sys {
 	pub(super) struct AudioWorkletNodeOptions;
 	pub(super) struct AudioWorkletProcessor;
+	pub(super) struct AudioWorkletNode;
 }
 #[cfg(not(all(
 	target_family = "wasm",
@@ -92,6 +94,26 @@ pub trait BaseAudioContextExt {
 	fn register_thread<F>(self, f: F) -> RegisterThreadFuture
 	where
 		F: 'static + FnOnce() + Send;
+
+	/// Creates a [`AudioWorkletProcessor`]. This will panic in the
+	/// constructor of `P` if `name` didn't correspond to `P` registered with
+	/// [`AudioWorkletGlobalScopeExt::register_processor_ext()`].
+	///
+	/// # Errors
+	///
+	/// - If [`Self::register_thread()`] was not called on this context yet.
+	/// - If [`new AudioWorkletNode`] throws.
+	///
+	/// [`new AudioWorkletNode`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode
+	/// [`AudioWorkletProcessor`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor
+	fn audio_worklet_node<P>(
+		&self,
+		name: &str,
+		data: P::Data,
+		options: Option<AudioWorkletNodeOptions>,
+	) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>>
+	where
+		P: 'static + ExtendAudioWorkletProcessor;
 }
 
 #[cfg(all(
@@ -102,12 +124,69 @@ pub trait BaseAudioContextExt {
 impl<T> BaseAudioContextExt for T
 where
 	BaseAudioContext: From<T>,
+	T: AsRef<BaseAudioContext>,
 {
 	fn register_thread<F>(self, #[allow(clippy::min_ident_chars)] f: F) -> RegisterThreadFuture
 	where
 		F: 'static + FnOnce() + Send,
 	{
 		RegisterThreadFuture(audio_worklet::register_thread(self.into(), f))
+	}
+
+	fn audio_worklet_node<P>(
+		&self,
+		name: &str,
+		data: P::Data,
+		options: Option<AudioWorkletNodeOptions>,
+	) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>>
+	where
+		P: 'static + ExtendAudioWorkletProcessor,
+	{
+		audio_worklet::audio_worklet_node(self.as_ref(), name, data, options)
+	}
+}
+
+/// Error returned by [`BaseAudioContextExt::audio_worklet_node()`].
+pub struct AudioWorkletNodeError<P>
+where
+	P: ExtendAudioWorkletProcessor,
+{
+	/// The passed [`ExtendAudioWorkletProcessor::Data`].
+	pub data: P::Data,
+	/// The error thrown by [`new AudioWorkletNode`].
+	///
+	/// [`new AudioWorkletNode`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode
+	pub error: io::Error,
+}
+
+impl<P> Debug for AudioWorkletNodeError<P>
+where
+	P: ExtendAudioWorkletProcessor,
+{
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter
+			.debug_struct("AudioWorkletNodeError")
+			.field("data", &any::type_name::<P::Data>())
+			.field("error", &self.error)
+			.finish()
+	}
+}
+
+impl<P> Display for AudioWorkletNodeError<P>
+where
+	P: ExtendAudioWorkletProcessor,
+{
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		Display::fmt(&self.error, formatter)
+	}
+}
+
+impl<P> error::Error for AudioWorkletNodeError<P>
+where
+	P: ExtendAudioWorkletProcessor,
+{
+	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+		Some(&self.error)
 	}
 }
 
@@ -185,9 +264,9 @@ pub trait AudioWorkletGlobalScopeExt {
 		not(all(target_family = "wasm", target_os = "unknown")),
 		doc = "[`wasm-bindgen`]: https://docs.rs/wasm-bindgen/0.2.91"
 	)]
-	fn register_processor_ext<T>(&self, name: &str) -> Result<(), Error>
+	fn register_processor_ext<P>(&self, name: &str) -> Result<(), io::Error>
 	where
-		T: 'static + ExtendAudioWorkletProcessor;
+		P: 'static + ExtendAudioWorkletProcessor;
 }
 
 #[cfg(all(
@@ -196,11 +275,11 @@ pub trait AudioWorkletGlobalScopeExt {
 	feature = "audio-worklet"
 ))]
 impl AudioWorkletGlobalScopeExt for AudioWorkletGlobalScope {
-	fn register_processor_ext<T>(&self, name: &str) -> Result<(), Error>
+	fn register_processor_ext<P>(&self, name: &str) -> Result<(), io::Error>
 	where
-		T: 'static + ExtendAudioWorkletProcessor,
+		P: 'static + ExtendAudioWorkletProcessor,
 	{
-		audio_worklet::register_processor::<T>(name)
+		audio_worklet::register_processor::<P>(name)
 	}
 }
 
@@ -208,10 +287,16 @@ impl AudioWorkletGlobalScopeExt for AudioWorkletGlobalScope {
 ///
 /// [`AudioWorkletProcessor`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor
 pub trait ExtendAudioWorkletProcessor {
+	/// Data passed into [`Self::new()`] when using
+	/// [`BaseAudioContextExt::audio_worklet_node()`].
+	type Data: 'static + Send;
+
 	/// Equivalent to constructor.
-	fn new(this: AudioWorkletProcessor, options: AudioWorkletNodeOptions) -> Self
-	where
-		Self: Sized;
+	fn new(
+		this: AudioWorkletProcessor,
+		data: Option<Self::Data>,
+		options: AudioWorkletNodeOptions,
+	) -> Self;
 
 	/// Equivalent to [`AudioWorkletProcessor.process()`].
 	///
@@ -225,10 +310,7 @@ pub trait ExtendAudioWorkletProcessor {
 	///
 	/// [`AudioWorkletProcessor.parameterDescriptors`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor/parameterDescriptors
 	#[allow(clippy::must_use_candidate)]
-	fn parameter_descriptors() -> Array
-	where
-		Self: Sized,
-	{
+	fn parameter_descriptors() -> Array {
 		Array::new()
 	}
 }

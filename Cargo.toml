@@ -67,6 +67,11 @@ web-sys = { version = "0.3", features = [
 	"Blob",
 	"BlobPropertyBag",
 	"console",
+	"CssStyleDeclaration",
+	"Document",
+	"HtmlButtonElement",
+	"HtmlElement",
+	"HtmlHtmlElement",
 	"Url",
 ] }
 web-time = "1"
