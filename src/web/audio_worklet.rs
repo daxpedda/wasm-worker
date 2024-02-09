@@ -65,13 +65,11 @@ pub trait BaseAudioContextExt {
 	///
 	/// # Notes
 	///
-	/// This will automatically clean up thread-local resources when
-	/// [`BaseAudioContext`] reaches the [`closed`] [state]. Unfortunately some
-	/// browsers are not fully spec-compliant and don't fully shut-down the
-	/// thread when the [`closed`] [state] is reached. If any calls into the
-	/// Wasm module are made at that point, it could lead to undefined behavior.
-	/// To avoid this make sure to clean up any resources before [shutting down
-	/// the audio worklet].
+	/// Unfortunately some browsers are not fully spec-compliant and don't fully
+	/// shut-down the thread when the [`closed`] [state] is reached. This may
+	/// not only cause memory leaks, but any calls into the Wasm module may lead
+	/// to undefined behavior. To avoid this make sure to clean up any resources
+	/// before [shutting down the audio worklet].
 	///
 	/// # Errors
 	///
