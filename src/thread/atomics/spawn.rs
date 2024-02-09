@@ -190,7 +190,7 @@ fn spawn_internal(id: ThreadId, task: TaskStatic, name: Option<&str>) {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(&{
 			format!(
-				"import {{initSync, __web_thread_worker_entry}} from '{}';\n\n{}",
+				"import {{initSync, __web_thread_worker_entry}} from '{}'\n\n{}",
 				META.url(),
 				include_str!("worker.js")
 			)

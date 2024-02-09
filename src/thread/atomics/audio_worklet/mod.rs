@@ -42,7 +42,7 @@ where
 		/// Object URL to the worklet script.
 		static URL: ScriptUrl = ScriptUrl::new(&{
 			format!(
-				"import {{initSync, __web_thread_worklet_entry}} from '{}';\n\n{}",
+				"import {{initSync, __web_thread_worklet_entry}} from '{}'\n\n{}",
 				META.url(),
 				include_str!("worklet.js")
 			)
