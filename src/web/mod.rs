@@ -674,7 +674,7 @@ pub fn yield_now_async(time: YieldTime) -> YieldNowFuture {
 }
 
 /// How long it should yield execution to the event loop.
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum YieldTime {
 	/// Shortest execution yield to the event loop. Translates to
 	/// [`TaskPriority."user-blocking"`].
@@ -688,23 +688,26 @@ pub enum YieldTime {
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
 	/// [`TaskPriority."user-blocking"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#user-blocking
 	UserBlocking,
-	/// Translates to [`TaskPriority."user-visible"`].
+	/// Default. Translates to [`TaskPriority."user-visible"`].
 	///
 	/// # Notes
 	///
 	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
-	/// not supported.
+	/// not supported, which is equivalent to
+	/// [`UserBlocking`](Self::UserBlocking).
 	///
 	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
 	/// [`TaskPriority."user-visible"`]: https://developer.mozilla.org/en-US/docs/Web/API/Prioritized_Task_Scheduling_API#user-visible
+	#[default]
 	UserVisible,
-	/// Default. Translates to [`TaskPriority."background"`].
+	/// Translates to [`TaskPriority."background"`].
 	///
 	/// # Notes
 	///
 	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
-	/// not supported.
+	/// not supported, which is equivalent to
+	/// [`UserBlocking`](Self::UserBlocking).
 	///
 	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
@@ -716,11 +719,11 @@ pub enum YieldTime {
 	/// # Notes
 	///
 	/// Will fall back to [`MessagePort.postMessage()`] when
-	/// [`Window.requestIdleCallback()`] is not supported.
+	/// [`Window.requestIdleCallback()`] is not supported, which is equivalent
+	/// to [`UserBlocking`](Self::UserBlocking).
 	///
 	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
 	/// [`Window.requestIdleCallback()`]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback
-	#[default]
 	Idle,
 }
 
