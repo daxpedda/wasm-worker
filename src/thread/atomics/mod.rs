@@ -1,5 +1,8 @@
 //! Implementation when the atomics target feature is enabled.
 
+// This part of the code requires the nightly toolchain.
+#![allow(clippy::incompatible_msrv)]
+
 #[cfg(feature = "audio-worklet")]
 pub(super) mod audio_worklet;
 mod channel;
