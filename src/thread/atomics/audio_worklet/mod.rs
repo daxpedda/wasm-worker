@@ -30,6 +30,13 @@ use super::url::ScriptUrl;
 use super::{oneshot, Thread, MAIN_THREAD};
 use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
 
+thread_local! {
+	static HAS_TEXT_ENCODER: bool = !js_sys::global()
+		.unchecked_into::<GlobalExt>()
+		.text_encoder()
+		.is_undefined();
+}
+
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
 pub(in super::super) fn register_thread<F>(
@@ -319,6 +326,13 @@ pub(in super::super) fn is_main_thread() -> bool {
 pub(in super::super) fn register_processor<P: 'static + ExtendAudioWorkletProcessor>(
 	name: &str,
 ) -> Result<(), Error> {
+	let name = if HAS_TEXT_ENCODER.with(bool::clone) {
+		JsString::from(name)
+	} else {
+		JsString::from_code_point(name.chars().map(u32::from).collect::<Vec<_>>().as_slice())
+			.expect("found invalid Unicode")
+	};
+
 	__web_thread_register_processor(
 		name,
 		__WebThreadProcessorConstructor(Box::new(ProcessorConstructorWrapper::<P>(PhantomData))),
@@ -400,22 +414,19 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 						options.processor_options(None);
 					} else {
 						thread_local! {
-							static DATA_PROPERTY_NAME: JsString = if js_sys::global()
-								.unchecked_into::<GlobalExt>()
-								.text_encoder()
-								.is_undefined()
-							{
-								JsString::from_code_point(
-									"__web_thread_data"
-										.chars()
-										.map(u32::from)
-										.collect::<Vec<_>>()
-										.as_slice(),
-								)
-								.expect("found invalid Unicode")
-							} else {
-								JsString::from("__web_thread_data")
-							};
+							static DATA_PROPERTY_NAME: JsString =
+								if HAS_TEXT_ENCODER.with(bool::clone) {
+									JsString::from("__web_thread_data")
+								} else {
+									JsString::from_code_point(
+										"__web_thread_data"
+											.chars()
+											.map(u32::from)
+											.collect::<Vec<_>>()
+											.as_slice(),
+									)
+									.expect("found invalid Unicode")
+								};
 						}
 
 						DATA_PROPERTY_NAME
@@ -546,7 +557,7 @@ pub unsafe fn __web_thread_worklet_entry(task: *mut Box<dyn FnOnce() + Send>) {
 extern "C" {
 	#[wasm_bindgen(catch)]
 	fn __web_thread_register_processor(
-		name: &str,
+		name: JsString,
 		processor: __WebThreadProcessorConstructor,
 	) -> Result<(), DomException>;
 }
