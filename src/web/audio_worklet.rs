@@ -80,6 +80,23 @@ pub trait BaseAudioContextExt {
 	/// - If the main thread does not support spawning threads, see
 	///   [`has_spawn_support()`](super::has_spawn_support).
 	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// use web_sys::AudioContext;
+	/// use web_thread::web::audio_worklet::BaseAudioContextExt;
+	///
+	/// let context = AudioContext::new().unwrap();
+	/// context.clone().register_thread(|| {
+	/// 	// Do work.
+	/// }).await.unwrap();
+	/// # }
+	/// ```
+	///
 	/// [`closed`]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#closed
 	/// [state]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state
 	/// [shutting down the audio worklet]: https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/close
@@ -106,6 +123,52 @@ pub trait BaseAudioContextExt {
 	///
 	/// - If [`Self::register_thread()`] was not called on this context yet.
 	/// - If [`new AudioWorkletNode`] throws.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// # use wasm_bindgen::JsCast;
+	/// use web_sys::{AudioContext, AudioWorkletGlobalScope, AudioWorkletNodeOptions, AudioWorkletProcessor};
+	/// use web_thread::web::{self, YieldTime};
+	/// use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContextExt, ExtendAudioWorkletProcessor};
+	///
+	/// /// Example [`AudioWorkletProcessor`].
+	/// struct TestProcessor;
+	///
+	/// impl ExtendAudioWorkletProcessor for TestProcessor {
+	/// 	type Data = String;
+	///
+	/// 	fn new(
+	/// 		_: AudioWorkletProcessor,
+	/// 		data: Option<Self::Data>,
+	/// 		_: AudioWorkletNodeOptions,
+	/// 	) -> Self {
+	/// 		assert_eq!(data.as_deref(), Some("test"));
+	/// 		Self
+	/// 	}
+	/// }
+	///
+	/// let context = AudioContext::new().unwrap();
+	/// let (sender, receiver) = async_channel::bounded(1);
+	/// context.clone().register_thread(move || {
+	/// 	let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+	/// 	global
+	/// 		.register_processor_ext::<TestProcessor>("test")
+	/// 		.unwrap();
+	/// 	sender.try_send(()).unwrap();
+	/// }).await.unwrap();
+	///
+	/// // Wait until processor is registered.
+	/// receiver.recv().await.unwrap();
+	/// web::yield_now_async(YieldTime::UserBlocking).await;
+	///
+	/// let node = context.audio_worklet_node::<TestProcessor>("test", String::from("test"), None).unwrap();
+	/// # }
+	/// ```
 	///
 	/// [`new AudioWorkletNode`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode
 	/// [`AudioWorkletProcessor`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor
@@ -237,6 +300,50 @@ pub trait AudioWorkletGlobalScopeExt {
 	/// - If the `name` is empty.
 	/// - If a processor with this `name` is already registered.
 	/// - If this thread was not spawned by [`web-thread`](crate).
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// # use wasm_bindgen::JsCast;
+	/// use web_sys::{AudioContext, AudioWorkletGlobalScope, AudioWorkletNode};
+	/// # use web_sys::{AudioWorkletNodeOptions, AudioWorkletProcessor};
+	/// use web_thread::web::{self, YieldTime};
+	/// use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContextExt};
+	/// # use web_thread::web::audio_worklet::ExtendAudioWorkletProcessor;
+	///
+	/// # struct TestProcessor;
+	/// # impl ExtendAudioWorkletProcessor for TestProcessor {
+	/// # 	type Data = ();
+	/// # 	fn new(
+	/// # 		_: AudioWorkletProcessor,
+	/// # 		_: Option<Self::Data>,
+	/// # 		_: AudioWorkletNodeOptions,
+	/// # 	) -> Self {
+	/// # 		Self
+	/// # 	}
+	/// # }
+	/// #
+	/// let context = AudioContext::new().unwrap();
+	/// let (sender, receiver) = async_channel::bounded(1);
+	/// context.clone().register_thread(move || {
+	/// 	let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+	/// 	global
+	/// 		.register_processor_ext::<TestProcessor>("test")
+	/// 		.unwrap();
+	/// 	sender.try_send(()).unwrap();
+	/// }).await.unwrap();
+	///
+	/// // Wait until processor is registered.
+	/// receiver.recv().await.unwrap();
+	/// web::yield_now_async(YieldTime::UserBlocking).await;
+	///
+	/// let node = AudioWorkletNode::new(&context, "test").unwrap();
+	/// # }
+	/// ```
 	///
 	/// [`AudioWorkletGlobalScope.registerProcessor()`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletGlobalScope/registerProcessor
 	/// [`AudioWorkletProcessor`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor

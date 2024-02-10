@@ -659,10 +659,11 @@ where
 /// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 /// # #[wasm_bindgen_test::wasm_bindgen_test]
 /// # async fn test() {
-/// # use web_thread::web::{yield_now_async, YieldTime};
+/// use web_thread::web::{self, YieldTime};
+///
 /// # fn long_running_task() -> bool { false }
 /// while long_running_task() {
-/// 	yield_now_async(YieldTime::default()).await
+/// 	web::yield_now_async(YieldTime::default()).await
 /// }
 /// # }
 /// ```
