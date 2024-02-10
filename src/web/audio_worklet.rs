@@ -7,7 +7,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{any, error, fmt, io};
 
-use js_sys::{Array, Object};
+use js_sys::{Array, Iterator, Object};
 #[cfg(all(
 	target_family = "wasm",
 	target_os = "unknown",
@@ -49,6 +49,7 @@ mod web_sys {
 )))]
 mod js_sys {
 	pub(super) struct Array;
+	pub(super) struct Iterator;
 	pub(super) struct Object;
 }
 
@@ -420,7 +421,7 @@ pub trait ExtendAudioWorkletProcessor {
 	///
 	/// [`AudioWorkletProcessor.parameterDescriptors`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor/parameterDescriptors
 	#[allow(clippy::must_use_candidate)]
-	fn parameter_descriptors() -> Array {
-		Array::new()
+	fn parameter_descriptors() -> Iterator {
+		Array::new().entries()
 	}
 }

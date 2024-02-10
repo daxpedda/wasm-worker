@@ -6,7 +6,7 @@ use std::any::TypeId;
 use std::io::Error;
 use std::marker::PhantomData;
 
-use js_sys::{Array, JsString, Object, Reflect};
+use js_sys::{Array, Iterator, JsString, Object, Reflect};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNodeOptions, DomException};
@@ -69,7 +69,7 @@ impl __WebThreadProcessorConstructor {
 	/// [`ExtendAudioWorkletProcessor::parameter_descriptors`].
 	#[wasm_bindgen(js_name = parameterDescriptors)]
 	#[allow(unreachable_pub)]
-	pub fn parameter_descriptors(&self) -> Array {
+	pub fn parameter_descriptors(&self) -> Iterator {
 		self.0.parameter_descriptors()
 	}
 }
@@ -88,7 +88,7 @@ trait ProcessorConstructor {
 
 	/// Calls the underlying
 	/// [`ExtendAudioWorkletProcessor::parameter_descriptors`].
-	fn parameter_descriptors(&self) -> Array;
+	fn parameter_descriptors(&self) -> Iterator;
 }
 
 impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
@@ -147,7 +147,7 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 		__WebThreadProcessor(Box::new(P::new(this, processor_data, options)))
 	}
 
-	fn parameter_descriptors(&self) -> Array {
+	fn parameter_descriptors(&self) -> Iterator {
 		P::parameter_descriptors()
 	}
 }
