@@ -392,40 +392,36 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 				// SAFETY: We only store `*const Data` at `__web_thread_data`.
 				let data = unsafe { Box::<Data>::from_raw(data.cast_mut().cast()) };
 
-				assert!(
-					data.type_id == TypeId::of::<P>(),
-					"`ExtendAudioWorkletProcessor::Data` sent to audio worklet was sent to the \
-					 wrong processor"
-				);
+				if data.type_id == TypeId::of::<P>() {
+					processor_data =
+						Some(*data.data.downcast::<P::Data>().expect("wrong type encoded"));
 
-				processor_data =
-					Some(*data.data.downcast::<P::Data>().expect("wrong type encoded"));
+					if Object::keys(&processor_options).length() == 1 {
+						options.processor_options(None);
+					} else {
+						thread_local! {
+							static DATA_PROPERTY_NAME: JsString = if js_sys::global()
+								.unchecked_into::<GlobalExt>()
+								.text_encoder()
+								.is_undefined()
+							{
+								JsString::from_code_point(
+									"__web_thread_data"
+										.chars()
+										.map(u32::from)
+										.collect::<Vec<_>>()
+										.as_slice(),
+								)
+								.expect("found invalid Unicode")
+							} else {
+								JsString::from("__web_thread_data")
+							};
+						}
 
-				if Object::keys(&processor_options).length() == 1 {
-					options.processor_options(None);
-				} else {
-					thread_local! {
-						static DATA_PROPERTY_NAME: JsString = if js_sys::global()
-							.unchecked_into::<GlobalExt>()
-							.text_encoder()
-							.is_undefined()
-						{
-							JsString::from_code_point(
-								"__web_thread_data"
-									.chars()
-									.map(u32::from)
-									.collect::<Vec<_>>()
-									.as_slice(),
-							)
-							.expect("found invalid Unicode")
-						} else {
-							JsString::from("__web_thread_data")
-						};
+						DATA_PROPERTY_NAME
+							.with(|name| Reflect::delete_property(&processor_options, name))
+							.expect("expected `processor_options` to be an `Object`");
 					}
-
-					DATA_PROPERTY_NAME
-						.with(|name| Reflect::delete_property(&processor_options, name))
-						.expect("expected `processor_options` to be an `Object`");
 				}
 			}
 		}

@@ -95,9 +95,12 @@ pub trait BaseAudioContextExt {
 	where
 		F: 'static + FnOnce() + Send;
 
-	/// Creates a [`AudioWorkletProcessor`]. This will panic in the
-	/// constructor of `P` if `name` didn't correspond to `P` registered with
-	/// [`AudioWorkletGlobalScopeExt::register_processor_ext()`].
+	/// Creates a [`AudioWorkletProcessor`]. No `data` will be delivered if
+	/// `name` corresponds to a different type registered with
+	/// [`AudioWorkletGlobalScopeExt::register_processor_ext()`]. If `name`
+	/// corresponds to a [`AudioWorkletProcessor`] not registered through
+	/// [`AudioWorkletGlobalScopeExt::register_processor_ext()`], it will leak
+	/// `data`.
 	///
 	/// # Errors
 	///
