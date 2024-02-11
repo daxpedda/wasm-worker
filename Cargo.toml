@@ -60,18 +60,32 @@ ui_test = { git = "https://github.com/daxpedda/ui_test", branch = "web-thread" }
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
 async-channel = { version = "2", default-features = false }
 console_error_panic_hook = "0.1"
+itertools = { version = "0.12", default-features = false }
 wasm-bindgen-futures = "0.4"
 wasm-bindgen-test = "0.3"
 web-sys = { version = "0.3", features = [
 	"AudioContext",
+	"AudioDestinationNode",
+	"AudioParam",
 	"Blob",
 	"BlobPropertyBag",
+	"ChannelMergerNode",
+	"ChannelMergerOptions",
+	"ChannelSplitterNode",
+	"ChannelSplitterOptions",
 	"console",
 	"CssStyleDeclaration",
 	"Document",
+	"Event",
+	"GainNode",
+	"GainOptions",
 	"HtmlButtonElement",
 	"HtmlElement",
 	"HtmlHtmlElement",
+	"HtmlInputElement",
+	"HtmlLabelElement",
+	"HtmlTableElement",
+	"HtmlTableRowElement",
 	"Url",
 ] }
 web-time = "1"
