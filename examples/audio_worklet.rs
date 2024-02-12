@@ -390,15 +390,46 @@ mod web {
 		start_stop_button.set_onclick(Some(
 			Closure::once_into_js({
 				let container = container.clone();
+				let start_stop_button = start_stop_button.clone();
 				move || {
-					container.remove();
-					drop(master_slider_callback);
-					drop(master_mute_callback);
+					// Disable button after stopping.
+					start_stop_button.set_disabled(true);
+					start_stop_button.set_inner_text("Stopping ...");
+					suspend_resume_button.set_disabled(true);
 					drop(suspend_resume_callback);
 
-					drop(Rc::into_inner(volumes).unwrap());
+					wasm_bindgen_futures::future_to_promise(async move {
+						JsFuture::from(context.close().unwrap()).await.unwrap();
 
-					context.close().unwrap()
+						table.remove();
+						suspend_resume_button.remove();
+						drop(master_slider_callback);
+						drop(master_mute_callback);
+						drop(Rc::into_inner(volumes).unwrap());
+
+						start_stop_button.set_onclick({
+							let start_stop_button = start_stop_button.clone();
+							Some(
+								Closure::once_into_js(move || {
+									// Disable button after starting.
+									start_stop_button.set_disabled(true);
+									start_stop_button.set_inner_text("Starting ...");
+									start_stop_button.set_onclick(None);
+
+									wasm_bindgen_futures::future_to_promise(async {
+										start(document, container, start_stop_button).await;
+										Ok(JsValue::UNDEFINED)
+									})
+								})
+								.as_ref()
+								.unchecked_ref(),
+							)
+						});
+						start_stop_button.set_disabled(false);
+						start_stop_button.set_inner_text("Start");
+
+						Ok(JsValue::UNDEFINED)
+					})
 				}
 			})
 			.as_ref()
