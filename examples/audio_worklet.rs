@@ -24,11 +24,11 @@ mod web {
 	use wasm_bindgen::{JsCast, JsValue};
 	use wasm_bindgen_futures::JsFuture;
 	use web_sys::{
-		console, AudioContext, AudioWorkletGlobalScope, AudioWorkletNode, AudioWorkletNodeOptions,
-		AudioWorkletProcessor, Blob, BlobPropertyBag, ChannelMergerNode, ChannelMergerOptions,
-		ChannelSplitterNode, ChannelSplitterOptions, Document, Event, GainNode, GainOptions,
-		HtmlButtonElement, HtmlElement, HtmlHtmlElement, HtmlInputElement, HtmlTableElement,
-		HtmlTableRowElement, Url,
+		console, AudioContext, AudioParam, AudioWorkletGlobalScope, AudioWorkletNode,
+		AudioWorkletNodeOptions, AudioWorkletProcessor, BaseAudioContext, Blob, BlobPropertyBag,
+		ChannelMergerNode, ChannelMergerOptions, ChannelSplitterNode, ChannelSplitterOptions,
+		Document, GainNode, GainOptions, HtmlButtonElement, HtmlElement, HtmlHtmlElement,
+		HtmlInputElement, HtmlTableElement, HtmlTableRowElement, Url,
 	};
 	use web_thread::web::audio_worklet::{
 		AudioWorkletGlobalScopeExt, BaseAudioContextExt, ExtendAudioWorkletProcessor,
@@ -150,13 +150,16 @@ mod web {
 		let name_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
 		let input_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
 		let value_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
+		let mute_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
 
-		// Create master volume control.
-		let (master_control, master_control_value) =
-			volume_control(&document, &name_row, "Master", &input_row, &value_row);
+		// Create master volume control elements.
+		let (master_slider, master_label, master_mute) = volume_control(
+			&document, &name_row, "Master", &input_row, &value_row, &mute_row,
+		);
 		let master_value = Rc::new(Cell::new(1.));
+		let master_mute_value = Rc::new(Cell::new(false));
 
-		// Create volume control for every channel.
+		// Create volume control elements for every channel.
 		let volumes: Rc<Vec<_>> = Rc::new(
 			(0..channel_count)
 				.map(|index| {
@@ -173,74 +176,164 @@ mod web {
 						.unwrap();
 
 					// Create HTML control elements.
-					let (control, control_value) = volume_control(
+					let (slider, label, mute) = volume_control(
 						&document,
 						&name_row,
 						&format!("Channel {index}"),
 						&input_row,
 						&value_row,
+						&mute_row,
 					);
 
-					// Create callback for channel volume.
-					let callback = Closure::<dyn FnMut()>::new({
-						let master_control = master_control.clone();
-						let master_control_value = master_control_value.clone();
+					// Create callback for controlling volume.
+					let slider_value = Rc::new(Cell::new(0.));
+					let mute_value = Rc::new(Cell::new(false));
+					let slider_callback = Closure::<dyn Fn()>::new({
+						let master_slider = master_slider.clone();
+						let master_label = master_label.clone();
 						let master_value = Rc::clone(&master_value);
-						let control = control.clone();
+						let master_mute_value = Rc::clone(&master_mute_value);
+						let slider = slider.clone();
+						let label = label.clone();
+						let slider_value = Rc::clone(&slider_value);
+						let mute_value = Rc::clone(&mute_value);
 						let context = context.clone();
+						let gain_param = gain_param.clone();
 						move || {
-							let value_string = control.value();
-							control_value.set_text_content(Some(&value_string));
+							let value_string = slider.value();
+							label.set_text_content(Some(&value_string));
 							let mut value = value_string.parse().unwrap();
+							slider_value.set(value);
 
 							if master_value.get() < value {
 								master_value.set(value);
-								master_control.set_value(&value_string);
-								master_control_value.set_text_content(Some(&value_string));
+								master_slider.set_value(&value_string);
+								master_label.set_text_content(Some(&value_string));
+							}
+
+							if master_mute_value.get() || mute_value.get() {
+								return;
 							}
 
 							value /= 100.;
 
-							if value == 0. {
-								let end_time = context.current_time() + 0.1;
-								gain_param
-									.exponential_ramp_to_value_at_time(0.001, end_time)
-									.unwrap();
-								gain_param.set_value_at_time(0., end_time).unwrap();
+							set_gain(&context, &gain_param, value);
+						}
+					});
+					slider.set_oninput(Some(slider_callback.as_ref().unchecked_ref()));
+					// Create callback for mute button.
+					let mute_callback = Closure::<dyn Fn()>::new({
+						let master_mute_value = Rc::clone(&master_mute_value);
+						let slider_value = Rc::clone(&slider_value);
+						let mute = mute.clone();
+						let mute_value = Rc::clone(&mute_value);
+						let context = context.clone();
+						let gain_param = gain_param.clone();
+						move || {
+							if mute_value.get() {
+								#[allow(clippy::non_ascii_literal)]
+								mute.set_text_content(Some("🔊"));
+								mute_value.set(false);
+
+								if !master_mute_value.get() {
+									set_gain(&context, &gain_param, slider_value.get() / 100.);
+								}
 							} else {
-								gain_param
-									.exponential_ramp_to_value_at_time(
-										value,
-										context.current_time() + 0.1,
-									)
-									.unwrap();
+								#[allow(clippy::non_ascii_literal)]
+								mute.set_text_content(Some("🔇"));
+								mute_value.set(true);
+
+								set_gain(&context, &gain_param, 0.);
 							}
 						}
 					});
-					control.set_oninput(Some(callback.as_ref().unchecked_ref()));
+					mute.set_onclick(Some(mute_callback.as_ref().unchecked_ref()));
 
-					(control, callback)
+					VolumeControl {
+						gain_param,
+						slider,
+						_slider_callback: slider_callback,
+						slider_value,
+						label,
+						_mute_callback: mute_callback,
+						mute_value,
+					}
 				})
 				.collect(),
 		);
 
-		// Setup master control callback.
-		let event = Event::new("input").unwrap();
-		let master_callback = Closure::<dyn FnMut()>::new({
-			let master_control = master_control.clone();
+		// Setup master slider callback.
+		let master_slider_callback = Closure::<dyn FnMut()>::new({
+			let master_slider = master_slider.clone();
+			let master_mute_value = Rc::clone(&master_mute_value);
 			let volumes = Rc::clone(&volumes);
+			let context = context.clone();
 			move || {
-				let value = master_control.value();
-				master_value.set(value.parse().unwrap());
-				master_control_value.set_text_content(Some(&value));
+				let value_string = master_slider.value();
+				master_label.set_text_content(Some(&value_string));
+				let value = value_string.parse().unwrap();
+				master_value.set(value);
 
-				for (control, _) in volumes.iter() {
-					control.set_value(&value);
-					control.dispatch_event(&event).unwrap();
+				for VolumeControl {
+					gain_param,
+					slider,
+					slider_value,
+					label,
+					mute_value,
+					..
+				} in volumes.iter()
+				{
+					slider.set_value(&value_string);
+					label.set_text_content(Some(&value_string));
+					slider_value.set(value);
+
+					if master_mute_value.get() || mute_value.get() {
+						continue;
+					}
+
+					set_gain(&context, gain_param, value / 100.);
 				}
 			}
 		});
-		master_control.set_oninput(Some(master_callback.as_ref().unchecked_ref()));
+		master_slider.set_oninput(Some(master_slider_callback.as_ref().unchecked_ref()));
+		// Setup master mute callback.
+		// Create callback for mute button.
+		let master_mute_callback = Closure::<dyn Fn()>::new({
+			let master_mute = master_mute.clone();
+			let master_mute_value = Rc::clone(&master_mute_value);
+			let volumes = Rc::clone(&volumes);
+			let context = context.clone();
+			move || {
+				if master_mute_value.get() {
+					#[allow(clippy::non_ascii_literal)]
+					master_mute.set_text_content(Some("🔊"));
+					master_mute_value.set(false);
+
+					for VolumeControl {
+						gain_param,
+						slider_value,
+						mute_value,
+						..
+					} in volumes.iter()
+					{
+						if mute_value.get() {
+							continue;
+						}
+
+						set_gain(&context, gain_param, slider_value.get() / 100.);
+					}
+				} else {
+					#[allow(clippy::non_ascii_literal)]
+					master_mute.set_text_content(Some("🔇"));
+					master_mute_value.set(true);
+
+					for VolumeControl { gain_param, .. } in volumes.iter() {
+						set_gain(&context, gain_param, 0.);
+					}
+				}
+			}
+		});
+		master_mute.set_onclick(Some(master_mute_callback.as_ref().unchecked_ref()));
 
 		// Setup stop button.
 		button.set_onclick(Some(
@@ -249,13 +342,10 @@ mod web {
 				move || {
 					button.remove();
 					table.remove();
-					master_control.set_oninput(None);
-					drop(master_callback);
+					drop(master_slider_callback);
+					drop(master_mute_callback);
 
-					for (control, callback) in Rc::into_inner(volumes).unwrap() {
-						control.set_oninput(None);
-						drop(callback);
-					}
+					drop(Rc::into_inner(volumes).unwrap());
 
 					context.close().unwrap()
 				}
@@ -270,55 +360,93 @@ mod web {
 		container.append_child(&button).unwrap();
 	}
 
-	/// Create an object URL from a JS script.
-	fn url(script: &str) -> String {
-		let sequence = Array::of1(&script.into());
-		let mut property = BlobPropertyBag::new();
-		property.type_("text/javascript");
-		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property)
-			.expect("`new Blob()` should never throw");
-
-		Url::create_object_url_with_blob(&blob).expect("`URL.createObjectURL()` should never throw")
+	/// Stores volume control elements.
+	struct VolumeControl {
+		/// Gain [`AudioParam`] of [`GainNode`].
+		gain_param: AudioParam,
+		/// The volume slider.
+		slider: HtmlInputElement,
+		/// Callback handling slider input.
+		_slider_callback: Closure<dyn Fn()>,
+		/// Stores the value of the slider.
+		slider_value: Rc<Cell<f32>>,
+		/// Label showing the current value.
+		label: HtmlElement,
+		/// Callback handling mute button.
+		_mute_callback: Closure<dyn Fn()>,
+		/// Stores the value of the mute button.
+		mute_value: Rc<Cell<bool>>,
 	}
 
-	/// Create table column for volume control.
+	/// Create table column for volume control elements.
 	fn volume_control(
 		document: &Document,
 		name_row: &HtmlTableRowElement,
 		name: &str,
 		input_row: &HtmlTableRowElement,
 		value_row: &HtmlTableRowElement,
-	) -> (HtmlInputElement, HtmlElement) {
+		mute_row: &HtmlTableRowElement,
+	) -> (HtmlInputElement, HtmlElement, HtmlButtonElement) {
+		// Name.
 		let cell = name_row.insert_cell().unwrap();
 		cell.set_text_content(Some(name));
 		cell.style().set_property("border", "1px solid").unwrap();
+		// Slider.
+		let slider: HtmlInputElement = document.create_element("input").unwrap().unchecked_into();
+		slider.set_value("1");
+		{
+			// Make slider vertical.
+			let style = slider.style();
+			// Chrome.
+			style
+				.set_property("-webkit-writing-mode", "vertical-lr")
+				.unwrap();
+			// Firefox.
+			slider.set_attribute("orient", "vertical").unwrap();
+			// Safari.
+			style
+				.set_property("-webkit-appearance", "slider-vertical")
+				.unwrap();
+		}
+		slider.set_type("range");
+		let cell = input_row.insert_cell().unwrap();
+		cell.style()
+			.set_property("border-right", "1px solid")
+			.unwrap();
+		cell.append_child(&slider).unwrap();
+		// Value label.
 		let value = value_row.insert_cell().unwrap();
 		value
 			.style()
 			.set_property("border-right", "1px solid")
 			.unwrap();
 		value.set_text_content(Some("1"));
-		let control: HtmlInputElement = document.create_element("input").unwrap().unchecked_into();
-		control.set_value("1");
-		let style = control.style();
-		// Chrome.
-		style
-			.set_property("-webkit-writing-mode", "vertical-lr")
-			.unwrap();
-		// Firefox.
-		control.set_attribute("orient", "vertical").unwrap();
-		// Safari.
-		style
-			.set_property("-webkit-appearance", "slider-vertical")
-			.unwrap();
-		control.set_type("range");
-		let cell = input_row.insert_cell().unwrap();
-		cell.style()
-			.set_property("border-right", "1px solid")
-			.unwrap();
-		cell.append_child(&control).unwrap();
+		// Mute button.
+		let mute: HtmlButtonElement = document.create_element("button").unwrap().unchecked_into();
+		#[allow(clippy::non_ascii_literal)]
+		mute.set_text_content(Some("🔊"));
+		let cell = mute_row.insert_cell().unwrap();
+		let style = cell.style();
+		style.set_property("border-top", "1px solid").unwrap();
+		style.set_property("border-right", "1px solid").unwrap();
+		cell.append_child(&mute).unwrap();
 
-		(control, value)
+		(slider, value, mute)
+	}
+
+	/// Correct way to set gain without causing crackling.
+	fn set_gain(context: &BaseAudioContext, param: &AudioParam, value: f32) {
+		if value == 0. {
+			let end_time = context.current_time() + 0.1;
+			param
+				.exponential_ramp_to_value_at_time(0.001, end_time)
+				.unwrap();
+			param.set_value_at_time(0., end_time).unwrap();
+		} else {
+			param
+				.exponential_ramp_to_value_at_time(value, context.current_time() + 0.1)
+				.unwrap();
+		}
 	}
 
 	/// Example [`AudioWorkletProcessor`].
@@ -391,5 +519,16 @@ mod web {
 
 			true
 		}
+	}
+
+	/// Create an object URL from a JS script.
+	fn url(script: &str) -> String {
+		let sequence = Array::of1(&script.into());
+		let mut property = BlobPropertyBag::new();
+		property.type_("text/javascript");
+		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property)
+			.expect("`new Blob()` should never throw");
+
+		Url::create_object_url_with_blob(&blob).expect("`URL.createObjectURL()` should never throw")
 	}
 }
