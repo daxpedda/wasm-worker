@@ -19,7 +19,7 @@ mod web {
 	use std::rc::Rc;
 
 	use itertools::Itertools;
-	use js_sys::{Array, Float32Array, Object};
+	use js_sys::{Array, Float32Array, Object, Promise};
 	use wasm_bindgen::closure::Closure;
 	use wasm_bindgen::{JsCast, JsValue};
 	use wasm_bindgen_futures::JsFuture;
@@ -69,8 +69,9 @@ mod web {
 		// Let button start the audio worklet.
 		button.clone().set_onclick(Some(
 			Closure::once_into_js(|| {
-				// Remove button after starting.
-				button.remove();
+				// Disable button after starting.
+				button.set_disabled(true);
+				button.set_inner_text("Starting ...");
 				button.set_onclick(None);
 
 				wasm_bindgen_futures::future_to_promise(async {
@@ -85,7 +86,11 @@ mod web {
 
 	/// We can only start an [`AudioContext`] after a user-interaction.
 	#[allow(clippy::too_many_lines)]
-	async fn start(document: Document, container: HtmlElement, button: HtmlButtonElement) {
+	async fn start(
+		document: Document,
+		container: HtmlElement,
+		start_stop_button: HtmlButtonElement,
+	) {
 		let context = AudioContext::new().unwrap();
 
 		// Firefox requires a polyfill for `TextDecoder`/`TextEncoder`: <https://bugzilla.mozilla.org/show_bug.cgi?id=1826432>
@@ -119,6 +124,9 @@ mod web {
 		// Wait until processor is registered.
 		receiver.recv().await.unwrap();
 		web::yield_now_async(YieldTime::UserBlocking).await;
+
+		// Remove start button in preperation of adding new content.
+		start_stop_button.remove();
 
 		let channel_count = context.destination().channel_count();
 
@@ -201,14 +209,14 @@ mod web {
 						let gain_param = gain_param.clone();
 						move || {
 							let value_string = slider.value();
-							label.set_text_content(Some(&value_string));
+							label.set_inner_text(&value_string);
 							let mut value = value_string.parse().unwrap();
 							slider_value.set(value);
 
 							if master_value.get() < value {
 								master_value.set(value);
 								master_slider.set_value(&value_string);
-								master_label.set_text_content(Some(&value_string));
+								master_label.set_inner_text(&value_string);
 							}
 
 							if master_mute_value.get() || mute_value.get() {
@@ -232,7 +240,7 @@ mod web {
 						move || {
 							if mute_value.get() {
 								#[allow(clippy::non_ascii_literal)]
-								mute.set_text_content(Some("🔊"));
+								mute.set_inner_text("🔊");
 								mute_value.set(false);
 
 								if !master_mute_value.get() {
@@ -240,7 +248,7 @@ mod web {
 								}
 							} else {
 								#[allow(clippy::non_ascii_literal)]
-								mute.set_text_content(Some("🔇"));
+								mute.set_inner_text("🔇");
 								mute_value.set(true);
 
 								set_gain(&context, &gain_param, 0.);
@@ -270,7 +278,7 @@ mod web {
 			let context = context.clone();
 			move || {
 				let value_string = master_slider.value();
-				master_label.set_text_content(Some(&value_string));
+				master_label.set_inner_text(&value_string);
 				let value = value_string.parse().unwrap();
 				master_value.set(value);
 
@@ -284,7 +292,7 @@ mod web {
 				} in volumes.iter()
 				{
 					slider.set_value(&value_string);
-					label.set_text_content(Some(&value_string));
+					label.set_inner_text(&value_string);
 					slider_value.set(value);
 
 					if master_mute_value.get() || mute_value.get() {
@@ -306,7 +314,7 @@ mod web {
 			move || {
 				if master_mute_value.get() {
 					#[allow(clippy::non_ascii_literal)]
-					master_mute.set_text_content(Some("🔊"));
+					master_mute.set_inner_text("🔊");
 					master_mute_value.set(false);
 
 					for VolumeControl {
@@ -324,7 +332,7 @@ mod web {
 					}
 				} else {
 					#[allow(clippy::non_ascii_literal)]
-					master_mute.set_text_content(Some("🔇"));
+					master_mute.set_inner_text("🔇");
 					master_mute_value.set(true);
 
 					for VolumeControl { gain_param, .. } in volumes.iter() {
@@ -335,15 +343,58 @@ mod web {
 		});
 		master_mute.set_onclick(Some(master_mute_callback.as_ref().unchecked_ref()));
 
-		// Setup stop button.
-		button.set_onclick(Some(
-			Closure::once_into_js({
+		// Setup space before control buttons.
+		container
+			.append_child(&document.create_element("br").unwrap())
+			.unwrap();
+
+		// Setup suspend/resume button.
+		let suspend_resume_button: HtmlButtonElement =
+			document.create_element("button").unwrap().unchecked_into();
+		suspend_resume_button.set_inner_text("Suspend");
+		let suspended = Rc::new(Cell::new(false));
+		let suspend_resume_callback = Closure::<dyn Fn() -> Promise>::new({
+			let button = suspend_resume_button.clone();
+			let context = context.clone();
+			move || {
+				// Disable button after suspending or resuming.
+				button.set_disabled(true);
+
 				let button = button.clone();
+				let context = context.clone();
+				let suspended = Rc::clone(&suspended);
+				wasm_bindgen_futures::future_to_promise(async move {
+					if suspended.get() {
+						button.set_inner_text("Resuming ...");
+						JsFuture::from(context.resume().unwrap()).await.unwrap();
+						button.set_inner_text("Suspend");
+						suspended.set(false);
+					} else {
+						button.set_inner_text("Suspending ...");
+						JsFuture::from(context.suspend().unwrap()).await.unwrap();
+						button.set_inner_text("Resume");
+						suspended.set(true);
+					}
+
+					button.set_disabled(false);
+
+					Ok(JsValue::UNDEFINED)
+				})
+			}
+		});
+		suspend_resume_button.set_onclick(Some(suspend_resume_callback.as_ref().unchecked_ref()));
+		container.append_child(&suspend_resume_button).unwrap();
+
+		// Setup stop button.
+		start_stop_button.set_inner_text("Stop");
+		start_stop_button.set_onclick(Some(
+			Closure::once_into_js({
+				let container = container.clone();
 				move || {
-					button.remove();
-					table.remove();
+					container.remove();
 					drop(master_slider_callback);
 					drop(master_mute_callback);
+					drop(suspend_resume_callback);
 
 					drop(Rc::into_inner(volumes).unwrap());
 
@@ -353,11 +404,8 @@ mod web {
 			.as_ref()
 			.unchecked_ref(),
 		));
-		container
-			.append_child(&document.create_element("br").unwrap())
-			.unwrap();
-		button.set_inner_text("Stop");
-		container.append_child(&button).unwrap();
+		start_stop_button.set_disabled(false);
+		container.append_child(&start_stop_button).unwrap();
 	}
 
 	/// Stores volume control elements.
@@ -389,7 +437,7 @@ mod web {
 	) -> (HtmlInputElement, HtmlElement, HtmlButtonElement) {
 		// Name.
 		let cell = name_row.insert_cell().unwrap();
-		cell.set_text_content(Some(name));
+		cell.set_inner_text(name);
 		cell.style().set_property("border", "1px solid").unwrap();
 		// Slider.
 		let slider: HtmlInputElement = document.create_element("input").unwrap().unchecked_into();
@@ -420,11 +468,11 @@ mod web {
 			.style()
 			.set_property("border-right", "1px solid")
 			.unwrap();
-		value.set_text_content(Some("1"));
+		value.set_inner_text("1");
 		// Mute button.
 		let mute: HtmlButtonElement = document.create_element("button").unwrap().unchecked_into();
 		#[allow(clippy::non_ascii_literal)]
-		mute.set_text_content(Some("🔊"));
+		mute.set_inner_text("🔊");
 		let cell = mute_row.insert_cell().unwrap();
 		let style = cell.style();
 		style.set_property("border-top", "1px solid").unwrap();
