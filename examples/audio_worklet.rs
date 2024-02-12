@@ -39,7 +39,7 @@ mod web {
 	pub(crate) fn main() {
 		console_error_panic_hook::set_once();
 
-		// Make it possible center elements on the screen.
+		// Make it possible center elements on the screen by using a CSS grid.
 		let window = web_sys::window().unwrap();
 		let document = window.document().unwrap();
 		let body = document.body().unwrap();
@@ -61,15 +61,16 @@ mod web {
 		style.set_property("text-align", "center").unwrap();
 		body.append_child(&container).unwrap();
 
-		// Create start/end button.
+		// Create start/stop button.
 		let button: HtmlButtonElement = document.create_element("button").unwrap().unchecked_into();
 		button.set_inner_text("Start");
 		container.append_child(&button).unwrap();
 
-		// Let button start the audio worklet.
+		// Let button start the audio worklet because an [`AudioContext`] can only start
+		// after a user-interaction
 		button.clone().set_onclick(Some(
 			Closure::once_into_js(|| {
-				// Disable button after starting.
+				// Disable button during starting.
 				button.set_disabled(true);
 				button.set_inner_text("Starting ...");
 				button.set_onclick(None);
@@ -84,16 +85,18 @@ mod web {
 		));
 	}
 
-	/// We can only start an [`AudioContext`] after a user-interaction.
+	/// Start the example.
 	#[allow(clippy::too_many_lines)]
 	async fn start(
 		document: Document,
 		container: HtmlElement,
 		start_stop_button: HtmlButtonElement,
 	) {
+		// Create audio context.
 		let context = AudioContext::new().unwrap();
 
-		// Firefox requires a polyfill for `TextDecoder`/`TextEncoder`: <https://bugzilla.mozilla.org/show_bug.cgi?id=1826432>
+		// Firefox requires a polyfill for `TextDecoder`/`TextEncoder`:
+		// <https://bugzilla.mozilla.org/show_bug.cgi?id=1826432>
 		JsFuture::from(
 			context
 				.audio_worklet()
@@ -125,7 +128,7 @@ mod web {
 		receiver.recv().await.unwrap();
 		web::yield_now_async(YieldTime::UserBlocking).await;
 
-		// Remove start button in preperation of adding new content.
+		// Remove start button in preparation of adding new content.
 		start_stop_button.remove();
 
 		let channel_count = context.destination().channel_count();
@@ -183,7 +186,7 @@ mod web {
 					gain.connect_with_audio_node_and_output_and_input(&channel_merger, 0, index)
 						.unwrap();
 
-					// Create HTML control elements.
+					// Create control elements.
 					let (slider, label, mute) = volume_control(
 						&document,
 						&name_row,
@@ -210,22 +213,21 @@ mod web {
 						move || {
 							let value_string = slider.value();
 							label.set_inner_text(&value_string);
-							let mut value = value_string.parse().unwrap();
+							let value = value_string.parse().unwrap();
 							slider_value.set(value);
 
+							// If the master volume is lower, we increase it, otherwise its weird
+							// that master volume is lower then the highest volume.
 							if master_value.get() < value {
 								master_value.set(value);
 								master_slider.set_value(&value_string);
 								master_label.set_inner_text(&value_string);
 							}
 
-							if master_mute_value.get() || mute_value.get() {
-								return;
+							// Only change gain if master and this channel is not muted.
+							if !master_mute_value.get() && !mute_value.get() {
+								set_gain(&context, &gain_param, value / 100.);
 							}
-
-							value /= 100.;
-
-							set_gain(&context, &gain_param, value);
 						}
 					});
 					slider.set_oninput(Some(slider_callback.as_ref().unchecked_ref()));
@@ -238,6 +240,7 @@ mod web {
 						let context = context.clone();
 						let gain_param = gain_param.clone();
 						move || {
+							// If we are muted, unmute.
 							if mute_value.get() {
 								#[allow(clippy::non_ascii_literal)]
 								mute.set_inner_text("🔊");
@@ -246,7 +249,9 @@ mod web {
 								if !master_mute_value.get() {
 									set_gain(&context, &gain_param, slider_value.get() / 100.);
 								}
-							} else {
+							}
+							// If we are not muted, mute.
+							else {
 								#[allow(clippy::non_ascii_literal)]
 								mute.set_inner_text("🔇");
 								mute_value.set(true);
@@ -291,15 +296,15 @@ mod web {
 					..
 				} in volumes.iter()
 				{
+					// Update values for all channels (even if we are muted).
 					slider.set_value(&value_string);
 					label.set_inner_text(&value_string);
 					slider_value.set(value);
 
-					if master_mute_value.get() || mute_value.get() {
-						continue;
+					// Only change gain if master and this channel is not muted.
+					if !master_mute_value.get() && !mute_value.get() {
+						set_gain(&context, gain_param, value / 100.);
 					}
-
-					set_gain(&context, gain_param, value / 100.);
 				}
 			}
 		});
@@ -312,6 +317,7 @@ mod web {
 			let volumes = Rc::clone(&volumes);
 			let context = context.clone();
 			move || {
+				// If we are muted, unmute all channels.
 				if master_mute_value.get() {
 					#[allow(clippy::non_ascii_literal)]
 					master_mute.set_inner_text("🔊");
@@ -324,13 +330,14 @@ mod web {
 						..
 					} in volumes.iter()
 					{
-						if mute_value.get() {
-							continue;
+						// Only unmute if this channel is not muted.
+						if !mute_value.get() {
+							set_gain(&context, gain_param, slider_value.get() / 100.);
 						}
-
-						set_gain(&context, gain_param, slider_value.get() / 100.);
 					}
-				} else {
+				}
+				// If we are not muted, mute all channels.
+				else {
 					#[allow(clippy::non_ascii_literal)]
 					master_mute.set_inner_text("🔇");
 					master_mute_value.set(true);
@@ -357,25 +364,29 @@ mod web {
 			let button = suspend_resume_button.clone();
 			let context = context.clone();
 			move || {
-				// Disable button after suspending or resuming.
+				// Disable button during suspending or resuming.
 				button.set_disabled(true);
 
 				let button = button.clone();
 				let context = context.clone();
 				let suspended = Rc::clone(&suspended);
 				wasm_bindgen_futures::future_to_promise(async move {
+					// If context is suspended, resume.
 					if suspended.get() {
 						button.set_inner_text("Resuming ...");
 						JsFuture::from(context.resume().unwrap()).await.unwrap();
 						button.set_inner_text("Suspend");
 						suspended.set(false);
-					} else {
+					}
+					// If context is running, suspend.
+					else {
 						button.set_inner_text("Suspending ...");
 						JsFuture::from(context.suspend().unwrap()).await.unwrap();
 						button.set_inner_text("Resume");
 						suspended.set(true);
 					}
 
+					// Re-enable button after we finished suspending or resuming.
 					button.set_disabled(false);
 
 					Ok(JsValue::UNDEFINED)
@@ -392,26 +403,30 @@ mod web {
 				let container = container.clone();
 				let start_stop_button = start_stop_button.clone();
 				move || {
-					// Disable button after stopping.
+					// Disable button during stopping.
 					start_stop_button.set_disabled(true);
 					start_stop_button.set_inner_text("Stopping ...");
+					// Disable resume button as well.
 					suspend_resume_button.set_disabled(true);
 					drop(suspend_resume_callback);
 
 					wasm_bindgen_futures::future_to_promise(async move {
+						// Closure audio context.
 						JsFuture::from(context.close().unwrap()).await.unwrap();
 
+						// Remove all control elements.
 						table.remove();
 						suspend_resume_button.remove();
 						drop(master_slider_callback);
 						drop(master_mute_callback);
 						drop(Rc::into_inner(volumes).unwrap());
 
+						// Setup restart button.
 						start_stop_button.set_onclick({
 							let start_stop_button = start_stop_button.clone();
 							Some(
 								Closure::once_into_js(move || {
-									// Disable button after starting.
+									// Disable button during restarting.
 									start_stop_button.set_disabled(true);
 									start_stop_button.set_inner_text("Starting ...");
 									start_stop_button.set_onclick(None);
@@ -425,6 +440,7 @@ mod web {
 								.unchecked_ref(),
 							)
 						});
+						// Re-enable button after restarting.
 						start_stop_button.set_disabled(false);
 						start_stop_button.set_inner_text("Start");
 
@@ -472,7 +488,7 @@ mod web {
 		cell.style().set_property("border", "1px solid").unwrap();
 		// Slider.
 		let slider: HtmlInputElement = document.create_element("input").unwrap().unchecked_into();
-		slider.set_value("1");
+		slider.set_value("1"); // Default value.
 		{
 			// Make slider vertical.
 			let style = slider.style();
@@ -515,15 +531,18 @@ mod web {
 
 	/// Correct way to set gain without causing crackling.
 	fn set_gain(context: &BaseAudioContext, param: &AudioParam, value: f32) {
+		let end_time = context.current_time() + 0.1;
+
+		// Ramping gain to `0` is not allowed, so we ramp it close to zero and schedule
+		// setting to zero then.
 		if value == 0. {
-			let end_time = context.current_time() + 0.1;
 			param
 				.exponential_ramp_to_value_at_time(0.001, end_time)
 				.unwrap();
 			param.set_value_at_time(0., end_time).unwrap();
 		} else {
 			param
-				.exponential_ramp_to_value_at_time(value, context.current_time() + 0.1)
+				.exponential_ramp_to_value_at_time(value, end_time)
 				.unwrap();
 		}
 	}
@@ -548,9 +567,7 @@ mod web {
 			_: AudioWorkletNodeOptions,
 		) -> Self {
 			console::log_1(&"`ExampleProcessor` initialized!".into());
-			Self {
-				buffer: Vec::with_capacity(128),
-			}
+			Self { buffer: Vec::new() }
 		}
 
 		#[allow(
