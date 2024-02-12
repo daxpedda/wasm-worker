@@ -27,8 +27,8 @@ mod web {
 		console, AudioContext, AudioWorkletGlobalScope, AudioWorkletNode, AudioWorkletNodeOptions,
 		AudioWorkletProcessor, Blob, BlobPropertyBag, ChannelMergerNode, ChannelMergerOptions,
 		ChannelSplitterNode, ChannelSplitterOptions, Document, Event, GainNode, GainOptions,
-		HtmlButtonElement, HtmlElement, HtmlHtmlElement, HtmlInputElement, HtmlLabelElement,
-		HtmlTableElement, HtmlTableRowElement, Url,
+		HtmlButtonElement, HtmlElement, HtmlHtmlElement, HtmlInputElement, HtmlTableElement,
+		HtmlTableRowElement, Url,
 	};
 	use web_thread::web::audio_worklet::{
 		AudioWorkletGlobalScopeExt, BaseAudioContextExt, ExtendAudioWorkletProcessor,
@@ -149,17 +149,11 @@ mod web {
 		style.set_property("border-collapse", "collapse").unwrap();
 		let name_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
 		let input_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
-		let label_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
+		let value_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
 
 		// Create master volume control.
-		let (master_control, master_label) = volume_control(
-			&document,
-			"volume-channel-master",
-			&name_row,
-			"Master",
-			&input_row,
-			&label_row,
-		);
+		let (master_control, master_control_value) =
+			volume_control(&document, &name_row, "Master", &input_row, &value_row);
 		let master_value = Rc::new(Cell::new(1.));
 
 		// Create volume control for every channel.
@@ -179,31 +173,30 @@ mod web {
 						.unwrap();
 
 					// Create HTML control elements.
-					let (control, label) = volume_control(
+					let (control, control_value) = volume_control(
 						&document,
-						&format!("volume-channel-{index}"),
 						&name_row,
 						&format!("Channel {index}"),
 						&input_row,
-						&label_row,
+						&value_row,
 					);
 
 					// Create callback for channel volume.
 					let callback = Closure::<dyn FnMut()>::new({
 						let master_control = master_control.clone();
-						let master_label = master_label.clone();
+						let master_control_value = master_control_value.clone();
 						let master_value = Rc::clone(&master_value);
 						let control = control.clone();
 						let context = context.clone();
 						move || {
 							let value_string = control.value();
-							label.set_text_content(Some(&value_string));
+							control_value.set_text_content(Some(&value_string));
 							let mut value = value_string.parse().unwrap();
 
 							if master_value.get() < value {
 								master_value.set(value);
 								master_control.set_value(&value_string);
-								master_label.set_text_content(Some(&value_string));
+								master_control_value.set_text_content(Some(&value_string));
 							}
 
 							value /= 100.;
@@ -239,7 +232,7 @@ mod web {
 			move || {
 				let value = master_control.value();
 				master_value.set(value.parse().unwrap());
-				master_label.set_text_content(Some(&value));
+				master_control_value.set_text_content(Some(&value));
 
 				for (control, _) in volumes.iter() {
 					control.set_value(&value);
@@ -291,25 +284,21 @@ mod web {
 	/// Create table column for volume control.
 	fn volume_control(
 		document: &Document,
-		id: &str,
 		name_row: &HtmlTableRowElement,
 		name: &str,
 		input_row: &HtmlTableRowElement,
-		label_row: &HtmlTableRowElement,
-	) -> (HtmlInputElement, HtmlLabelElement) {
+		value_row: &HtmlTableRowElement,
+	) -> (HtmlInputElement, HtmlElement) {
 		let cell = name_row.insert_cell().unwrap();
 		cell.set_text_content(Some(name));
 		cell.style().set_property("border", "1px solid").unwrap();
-		let label: HtmlLabelElement = document.create_element("label").unwrap().unchecked_into();
-		label.set_text_content(Some("1"));
-		label.set_html_for(id);
-		let cell = label_row.insert_cell().unwrap();
-		cell.style()
+		let value = value_row.insert_cell().unwrap();
+		value
+			.style()
 			.set_property("border-right", "1px solid")
 			.unwrap();
-		cell.append_child(&label).unwrap();
+		value.set_text_content(Some("1"));
 		let control: HtmlInputElement = document.create_element("input").unwrap().unchecked_into();
-		control.set_id(id);
 		control.set_value("1");
 		let style = control.style();
 		// Chrome.
@@ -329,7 +318,7 @@ mod web {
 			.unwrap();
 		cell.append_child(&control).unwrap();
 
-		(control, label)
+		(control, value)
 	}
 
 	/// Example [`AudioWorkletProcessor`].
