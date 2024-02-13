@@ -27,8 +27,8 @@ mod web {
 		console, AudioContext, AudioParam, AudioWorkletGlobalScope, AudioWorkletNode,
 		AudioWorkletNodeOptions, AudioWorkletProcessor, BaseAudioContext, Blob, BlobPropertyBag,
 		ChannelMergerNode, ChannelMergerOptions, ChannelSplitterNode, ChannelSplitterOptions,
-		Document, GainNode, GainOptions, HtmlButtonElement, HtmlElement, HtmlHtmlElement,
-		HtmlInputElement, HtmlTableElement, HtmlTableRowElement, Url,
+		Document, GainNode, GainOptions, HtmlButtonElement, HtmlElement, HtmlInputElement,
+		HtmlTableElement, HtmlTableRowElement, Url,
 	};
 	use web_thread::web::audio_worklet::{
 		AudioWorkletGlobalScopeExt, BaseAudioContextExt, ExtendAudioWorkletProcessor,
@@ -39,27 +39,11 @@ mod web {
 	pub(crate) fn main() {
 		console_error_panic_hook::set_once();
 
-		// Make it possible center elements on the screen by using a CSS grid.
-		let window = web_sys::window().unwrap();
-		let document = window.document().unwrap();
+		let document = web_sys::window().unwrap().document().unwrap();
 		let body = document.body().unwrap();
-		document
-			.document_element()
-			.unwrap()
-			.unchecked_into::<HtmlHtmlElement>()
-			.style()
-			.set_property("height", "100%")
-			.unwrap();
-		let style = body.style();
-		style.set_property("height", "100%").unwrap();
-		style.set_property("display", "grid").unwrap();
 
-		// Create centered container.
-		let container: HtmlElement = document.create_element("div").unwrap().unchecked_into();
-		let style = container.style();
-		style.set_property("margin", "auto").unwrap();
-		style.set_property("text-align", "center").unwrap();
-		body.append_child(&container).unwrap();
+		// Create a centered container.
+		let container = create_centered_container(&document, &body);
 
 		// Create start/stop button.
 		let button: HtmlButtonElement = document.create_element("button").unwrap().unchecked_into();
@@ -153,20 +137,10 @@ mod web {
 			.unwrap();
 
 		// Create table to present slider for each channel.
-		let table: HtmlTableElement = document.create_element("table").unwrap().unchecked_into();
-		container.append_child(&table).unwrap();
-		let style = table.style();
-		style.set_property("border", "1px solid").unwrap();
-		style.set_property("border-collapse", "collapse").unwrap();
-		let name_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
-		let input_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
-		let value_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
-		let mute_row: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
+		let table = VolumeControlTable::new(document.clone(), &container);
 
 		// Create master volume control elements.
-		let (master_slider, master_label, master_mute) = volume_control(
-			&document, &name_row, "Master", &input_row, &value_row, &mute_row,
-		);
+		let (master_slider, master_label, master_mute) = table.volume_control("Master");
 		let master_value = Rc::new(Cell::new(10.));
 		let master_mute_value = Rc::new(Cell::new(false));
 
@@ -187,14 +161,7 @@ mod web {
 						.unwrap();
 
 					// Create control elements.
-					let (slider, label, mute) = volume_control(
-						&document,
-						&name_row,
-						&format!("Channel {index}"),
-						&input_row,
-						&value_row,
-						&mute_row,
-					);
+					let (slider, label, mute) = table.volume_control(&format!("Channel {index}"));
 
 					// Create callback for controlling volume.
 					let slider_value = Rc::new(Cell::new(0.));
@@ -455,98 +422,6 @@ mod web {
 		container.append_child(&start_stop_button).unwrap();
 	}
 
-	/// Stores volume control elements.
-	struct VolumeControl {
-		/// Gain [`AudioParam`] of [`GainNode`].
-		gain_param: AudioParam,
-		/// The volume slider.
-		slider: HtmlInputElement,
-		/// Callback handling slider input.
-		_slider_callback: Closure<dyn Fn()>,
-		/// Stores the value of the slider.
-		slider_value: Rc<Cell<f32>>,
-		/// Label showing the current value.
-		label: HtmlElement,
-		/// Callback handling mute button.
-		_mute_callback: Closure<dyn Fn()>,
-		/// Stores the value of the mute button.
-		mute_value: Rc<Cell<bool>>,
-	}
-
-	/// Create table column for volume control elements.
-	fn volume_control(
-		document: &Document,
-		name_row: &HtmlTableRowElement,
-		name: &str,
-		input_row: &HtmlTableRowElement,
-		value_row: &HtmlTableRowElement,
-		mute_row: &HtmlTableRowElement,
-	) -> (HtmlInputElement, HtmlElement, HtmlButtonElement) {
-		// Name.
-		let cell = name_row.insert_cell().unwrap();
-		cell.set_inner_text(name);
-		cell.style().set_property("border", "1px solid").unwrap();
-		// Slider.
-		let slider: HtmlInputElement = document.create_element("input").unwrap().unchecked_into();
-		slider.set_value("10"); // Default value.
-		{
-			// Make slider vertical.
-			let style = slider.style();
-			// Chrome.
-			style
-				.set_property("-webkit-writing-mode", "vertical-lr")
-				.unwrap();
-			// Firefox.
-			slider.set_attribute("orient", "vertical").unwrap();
-			// Safari.
-			style
-				.set_property("-webkit-appearance", "slider-vertical")
-				.unwrap();
-		}
-		slider.set_type("range");
-		let cell = input_row.insert_cell().unwrap();
-		cell.style()
-			.set_property("border-right", "1px solid")
-			.unwrap();
-		cell.append_child(&slider).unwrap();
-		// Value label.
-		let value = value_row.insert_cell().unwrap();
-		value
-			.style()
-			.set_property("border-right", "1px solid")
-			.unwrap();
-		value.set_inner_text("10");
-		// Mute button.
-		let mute: HtmlButtonElement = document.create_element("button").unwrap().unchecked_into();
-		#[allow(clippy::non_ascii_literal)]
-		mute.set_inner_text("🔊");
-		let cell = mute_row.insert_cell().unwrap();
-		let style = cell.style();
-		style.set_property("border-top", "1px solid").unwrap();
-		style.set_property("border-right", "1px solid").unwrap();
-		cell.append_child(&mute).unwrap();
-
-		(slider, value, mute)
-	}
-
-	/// Correct way to set gain without causing crackling.
-	fn set_gain(context: &BaseAudioContext, param: &AudioParam, value: f32) {
-		let end_time = context.current_time() + 0.1;
-
-		// Ramping gain to `0` is not allowed, so we ramp it close to zero and schedule
-		// setting to zero then.
-		if value == 0. {
-			param
-				.exponential_ramp_to_value_at_time(0.001, end_time)
-				.unwrap();
-			param.set_value_at_time(0., end_time).unwrap();
-		} else {
-			param
-				.exponential_ramp_to_value_at_time(value, end_time)
-				.unwrap();
-		}
-	}
-
 	/// Example [`AudioWorkletProcessor`].
 	struct ExampleProcessor {
 		/// Buffer used to fill outputs.
@@ -614,6 +489,168 @@ mod web {
 			}
 
 			true
+		}
+	}
+
+	/// Create centered container by making the body a CSS grid.
+	fn create_centered_container(document: &Document, body: &HtmlElement) -> HtmlElement {
+		document
+			.document_element()
+			.unwrap()
+			.unchecked_into::<HtmlElement>()
+			.style()
+			.set_property("height", "100%")
+			.unwrap();
+		let style = body.style();
+		style.set_property("height", "100%").unwrap();
+		style.set_property("display", "grid").unwrap();
+
+		// Create centered container.
+		let container: HtmlElement = document.create_element("div").unwrap().unchecked_into();
+		let style = container.style();
+		style.set_property("margin", "auto").unwrap();
+		style.set_property("text-align", "center").unwrap();
+		body.append_child(&container).unwrap();
+
+		container
+	}
+
+	/// Table for all volume control elements.
+	struct VolumeControlTable {
+		/// Hold [`Document`] to create columns.
+		document: Document,
+		/// The table itself.
+		table: HtmlTableElement,
+		/// Name of each channel.
+		name: HtmlTableRowElement,
+		/// Volume slider.
+		slider: HtmlTableRowElement,
+		/// Volume value labbel.
+		value: HtmlTableRowElement,
+		/// Mute button.
+		mute: HtmlTableRowElement,
+	}
+
+	impl VolumeControlTable {
+		/// Creates a new [`VolumeControlTable`].
+		fn new(document: Document, container: &HtmlElement) -> Self {
+			let table: HtmlTableElement =
+				document.create_element("table").unwrap().unchecked_into();
+			container.append_child(&table).unwrap();
+			let style = table.style();
+			style.set_property("border", "1px solid").unwrap();
+			style.set_property("border-collapse", "collapse").unwrap();
+			let name: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
+			let slider: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
+			let value: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
+			let mute: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
+
+			Self {
+				document,
+				table,
+				name,
+				slider,
+				value,
+				mute,
+			}
+		}
+
+		/// Create table column for volume control elements.
+		fn volume_control(&self, name: &str) -> (HtmlInputElement, HtmlElement, HtmlButtonElement) {
+			// Name.
+			let cell = self.name.insert_cell().unwrap();
+			cell.set_inner_text(name);
+			cell.style().set_property("border", "1px solid").unwrap();
+			// Slider.
+			let slider: HtmlInputElement = self
+				.document
+				.create_element("input")
+				.unwrap()
+				.unchecked_into();
+			slider.set_value("10"); // Default value.
+			{
+				// Make slider vertical.
+				let style = slider.style();
+				// Chrome.
+				style
+					.set_property("-webkit-writing-mode", "vertical-lr")
+					.unwrap();
+				// Firefox.
+				slider.set_attribute("orient", "vertical").unwrap();
+				// Safari.
+				style
+					.set_property("-webkit-appearance", "slider-vertical")
+					.unwrap();
+			}
+			slider.set_type("range");
+			let cell = self.slider.insert_cell().unwrap();
+			cell.style()
+				.set_property("border-right", "1px solid")
+				.unwrap();
+			cell.append_child(&slider).unwrap();
+			// Value label.
+			let value = self.value.insert_cell().unwrap();
+			value
+				.style()
+				.set_property("border-right", "1px solid")
+				.unwrap();
+			value.set_inner_text("10");
+			// Mute button.
+			let mute: HtmlButtonElement = self
+				.document
+				.create_element("button")
+				.unwrap()
+				.unchecked_into();
+			#[allow(clippy::non_ascii_literal)]
+			mute.set_inner_text("🔊");
+			let cell = self.mute.insert_cell().unwrap();
+			let style = cell.style();
+			style.set_property("border-top", "1px solid").unwrap();
+			style.set_property("border-right", "1px solid").unwrap();
+			cell.append_child(&mute).unwrap();
+
+			(slider, value, mute)
+		}
+
+		/// Remove the table from the document.
+		fn remove(self) {
+			self.table.remove();
+		}
+	}
+
+	/// Stores volume control elements.
+	struct VolumeControl {
+		/// Gain [`AudioParam`] of [`GainNode`].
+		gain_param: AudioParam,
+		/// The volume slider.
+		slider: HtmlInputElement,
+		/// Callback handling slider input.
+		_slider_callback: Closure<dyn Fn()>,
+		/// Stores the value of the slider.
+		slider_value: Rc<Cell<f32>>,
+		/// Label showing the current value.
+		label: HtmlElement,
+		/// Callback handling mute button.
+		_mute_callback: Closure<dyn Fn()>,
+		/// Stores the value of the mute button.
+		mute_value: Rc<Cell<bool>>,
+	}
+
+	/// Correct way to set gain without causing crackling.
+	fn set_gain(context: &BaseAudioContext, param: &AudioParam, value: f32) {
+		let end_time = context.current_time() + 0.1;
+
+		// Ramping gain to `0` is not allowed, so we ramp it close to zero and schedule
+		// setting to zero then.
+		if value == 0. {
+			param
+				.exponential_ramp_to_value_at_time(0.001, end_time)
+				.unwrap();
+			param.set_value_at_time(0., end_time).unwrap();
+		} else {
+			param
+				.exponential_ramp_to_value_at_time(value, end_time)
+				.unwrap();
 		}
 	}
 
