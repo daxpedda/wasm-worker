@@ -167,7 +167,7 @@ mod web {
 		let (master_slider, master_label, master_mute) = volume_control(
 			&document, &name_row, "Master", &input_row, &value_row, &mute_row,
 		);
-		let master_value = Rc::new(Cell::new(1.));
+		let master_value = Rc::new(Cell::new(10.));
 		let master_mute_value = Rc::new(Cell::new(false));
 
 		// Create volume control elements for every channel.
@@ -226,7 +226,7 @@ mod web {
 
 							// Only change gain if master and this channel is not muted.
 							if !master_mute_value.get() && !mute_value.get() {
-								set_gain(&context, &gain_param, value / 100.);
+								set_gain(&context, &gain_param, value / 1000.);
 							}
 						}
 					});
@@ -247,7 +247,7 @@ mod web {
 								mute_value.set(false);
 
 								if !master_mute_value.get() {
-									set_gain(&context, &gain_param, slider_value.get() / 100.);
+									set_gain(&context, &gain_param, slider_value.get() / 1000.);
 								}
 							}
 							// If we are not muted, mute.
@@ -303,7 +303,7 @@ mod web {
 
 					// Only change gain if master and this channel is not muted.
 					if !master_mute_value.get() && !mute_value.get() {
-						set_gain(&context, gain_param, value / 100.);
+						set_gain(&context, gain_param, value / 1000.);
 					}
 				}
 			}
@@ -332,7 +332,7 @@ mod web {
 					{
 						// Only unmute if this channel is not muted.
 						if !mute_value.get() {
-							set_gain(&context, gain_param, slider_value.get() / 100.);
+							set_gain(&context, gain_param, slider_value.get() / 1000.);
 						}
 					}
 				}
@@ -488,7 +488,7 @@ mod web {
 		cell.style().set_property("border", "1px solid").unwrap();
 		// Slider.
 		let slider: HtmlInputElement = document.create_element("input").unwrap().unchecked_into();
-		slider.set_value("1"); // Default value.
+		slider.set_value("10"); // Default value.
 		{
 			// Make slider vertical.
 			let style = slider.style();
@@ -515,7 +515,7 @@ mod web {
 			.style()
 			.set_property("border-right", "1px solid")
 			.unwrap();
-		value.set_inner_text("1");
+		value.set_inner_text("10");
 		// Mute button.
 		let mute: HtmlButtonElement = document.create_element("button").unwrap().unchecked_into();
 		#[allow(clippy::non_ascii_literal)]
