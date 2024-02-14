@@ -140,9 +140,7 @@ mod web {
 		let table = VolumeControlTable::new(document.clone(), &container);
 
 		// Create master volume control elements.
-		let (master_slider, master_label, master_mute) = table.volume_control("Master");
-		let master_value = Rc::new(Cell::new(10.));
-		let master_mute_value = Rc::new(Cell::new(false));
+		let master_builder = table.volume_control("Master");
 
 		// Create volume control elements for every channel.
 		let volumes: Rc<Vec<_>> = Rc::new(
@@ -161,82 +159,80 @@ mod web {
 						.unwrap();
 
 					// Create control elements.
-					let (slider, label, mute) = table.volume_control(&format!("Channel {index}"));
+					let builder = table.volume_control(&format!("Channel {index}"));
 
 					// Create callback for controlling volume.
-					let slider_value = Rc::new(Cell::new(0.));
-					let mute_value = Rc::new(Cell::new(false));
 					let slider_callback = Closure::<dyn Fn()>::new({
-						let master_slider = master_slider.clone();
-						let master_label = master_label.clone();
-						let master_value = Rc::clone(&master_value);
-						let master_mute_value = Rc::clone(&master_mute_value);
-						let slider = slider.clone();
-						let label = label.clone();
-						let slider_value = Rc::clone(&slider_value);
-						let mute_value = Rc::clone(&mute_value);
+						let master_builder = master_builder.clone();
+						let builder = builder.clone();
 						let context = context.clone();
 						let gain_param = gain_param.clone();
 						move || {
-							let value_string = slider.value();
-							label.set_inner_text(&value_string);
+							let value_string = builder.slider.value();
+							builder.label.set_inner_text(&value_string);
 							let value = value_string.parse().unwrap();
-							slider_value.set(value);
+							builder.slider_value.set(value);
 
 							// If the master volume is lower, we increase it, otherwise its weird
 							// that master volume is lower then the highest volume.
-							if master_value.get() < value {
-								master_value.set(value);
-								master_slider.set_value(&value_string);
-								master_label.set_inner_text(&value_string);
+							if master_builder.slider_value.get() < value {
+								master_builder.slider_value.set(value);
+								master_builder.slider.set_value(&value_string);
+								master_builder.label.set_inner_text(&value_string);
 							}
 
 							// Only change gain if master and this channel is not muted.
-							if !master_mute_value.get() && !mute_value.get() {
+							if !master_builder.mute_value.get() && !builder.mute_value.get() {
 								set_gain(&context, &gain_param, value / 1000.);
 							}
 						}
 					});
-					slider.set_oninput(Some(slider_callback.as_ref().unchecked_ref()));
+					builder
+						.slider
+						.set_oninput(Some(slider_callback.as_ref().unchecked_ref()));
 					// Create callback for mute button.
 					let mute_callback = Closure::<dyn Fn()>::new({
-						let master_mute_value = Rc::clone(&master_mute_value);
-						let slider_value = Rc::clone(&slider_value);
-						let mute = mute.clone();
-						let mute_value = Rc::clone(&mute_value);
+						let master_builder = master_builder.clone();
+						let builder = builder.clone();
 						let context = context.clone();
 						let gain_param = gain_param.clone();
 						move || {
 							// If we are muted, unmute.
-							if mute_value.get() {
+							if builder.mute_value.get() {
 								#[allow(clippy::non_ascii_literal)]
-								mute.set_inner_text("🔊");
-								mute_value.set(false);
+								builder.mute.set_inner_text("🔊");
+								builder.mute_value.set(false);
 
-								if !master_mute_value.get() {
-									set_gain(&context, &gain_param, slider_value.get() / 1000.);
+								if !master_builder.mute_value.get() {
+									set_gain(
+										&context,
+										&gain_param,
+										builder.slider_value.get() / 1000.,
+									);
 								}
 							}
 							// If we are not muted, mute.
 							else {
 								#[allow(clippy::non_ascii_literal)]
-								mute.set_inner_text("🔇");
-								mute_value.set(true);
+								builder.mute.set_inner_text("🔇");
+								builder.mute_value.set(true);
 
 								set_gain(&context, &gain_param, 0.);
 							}
 						}
 					});
-					mute.set_onclick(Some(mute_callback.as_ref().unchecked_ref()));
+					builder
+						.mute
+						.set_onclick(Some(mute_callback.as_ref().unchecked_ref()));
 
 					VolumeControl {
 						gain_param,
-						slider,
+						slider: builder.slider,
 						_slider_callback: slider_callback,
-						slider_value,
-						label,
+						slider_value: builder.slider_value,
+						label: builder.label,
 						_mute_callback: mute_callback,
-						mute_value,
+						mute_value: builder.mute_value,
 					}
 				})
 				.collect(),
@@ -244,15 +240,14 @@ mod web {
 
 		// Setup master slider callback.
 		let master_slider_callback = Closure::<dyn FnMut()>::new({
-			let master_slider = master_slider.clone();
-			let master_mute_value = Rc::clone(&master_mute_value);
+			let builder = master_builder.clone();
 			let volumes = Rc::clone(&volumes);
 			let context = context.clone();
 			move || {
-				let value_string = master_slider.value();
-				master_label.set_inner_text(&value_string);
+				let value_string = builder.slider.value();
+				builder.label.set_inner_text(&value_string);
 				let value = value_string.parse().unwrap();
-				master_value.set(value);
+				builder.slider_value.set(value);
 
 				for VolumeControl {
 					gain_param,
@@ -269,26 +264,27 @@ mod web {
 					slider_value.set(value);
 
 					// Only change gain if master and this channel is not muted.
-					if !master_mute_value.get() && !mute_value.get() {
+					if !builder.mute_value.get() && !mute_value.get() {
 						set_gain(&context, gain_param, value / 1000.);
 					}
 				}
 			}
 		});
-		master_slider.set_oninput(Some(master_slider_callback.as_ref().unchecked_ref()));
+		master_builder
+			.slider
+			.set_oninput(Some(master_slider_callback.as_ref().unchecked_ref()));
 		// Setup master mute callback.
 		// Create callback for mute button.
 		let master_mute_callback = Closure::<dyn Fn()>::new({
-			let master_mute = master_mute.clone();
-			let master_mute_value = Rc::clone(&master_mute_value);
+			let builder = master_builder.clone();
 			let volumes = Rc::clone(&volumes);
 			let context = context.clone();
 			move || {
 				// If we are muted, unmute all channels.
-				if master_mute_value.get() {
+				if builder.mute_value.get() {
 					#[allow(clippy::non_ascii_literal)]
-					master_mute.set_inner_text("🔊");
-					master_mute_value.set(false);
+					builder.mute.set_inner_text("🔊");
+					builder.mute_value.set(false);
 
 					for VolumeControl {
 						gain_param,
@@ -306,8 +302,8 @@ mod web {
 				// If we are not muted, mute all channels.
 				else {
 					#[allow(clippy::non_ascii_literal)]
-					master_mute.set_inner_text("🔇");
-					master_mute_value.set(true);
+					builder.mute.set_inner_text("🔇");
+					builder.mute_value.set(true);
 
 					for VolumeControl { gain_param, .. } in volumes.iter() {
 						set_gain(&context, gain_param, 0.);
@@ -315,7 +311,9 @@ mod web {
 				}
 			}
 		});
-		master_mute.set_onclick(Some(master_mute_callback.as_ref().unchecked_ref()));
+		master_builder
+			.mute
+			.set_onclick(Some(master_mute_callback.as_ref().unchecked_ref()));
 
 		// Setup space before control buttons.
 		container
@@ -556,7 +554,7 @@ mod web {
 		}
 
 		/// Create table column for volume control elements.
-		fn volume_control(&self, name: &str) -> (HtmlInputElement, HtmlElement, HtmlButtonElement) {
+		fn volume_control(&self, name: &str) -> VolumeControlBuilder {
 			// Name.
 			let cell = self.name.insert_cell().unwrap();
 			cell.set_inner_text(name);
@@ -589,12 +587,12 @@ mod web {
 				.unwrap();
 			cell.append_child(&slider).unwrap();
 			// Value label.
-			let value = self.value.insert_cell().unwrap();
-			value
+			let label = self.value.insert_cell().unwrap();
+			label
 				.style()
 				.set_property("border-right", "1px solid")
 				.unwrap();
-			value.set_inner_text("10");
+			label.set_inner_text("10");
 			// Mute button.
 			let mute: HtmlButtonElement = self
 				.document
@@ -609,13 +607,37 @@ mod web {
 			style.set_property("border-right", "1px solid").unwrap();
 			cell.append_child(&mute).unwrap();
 
-			(slider, value, mute)
+			let slider_value = Rc::new(Cell::new(10.));
+			let mute_value = Rc::new(Cell::new(false));
+
+			VolumeControlBuilder {
+				slider,
+				slider_value,
+				label,
+				mute,
+				mute_value,
+			}
 		}
 
 		/// Remove the table from the document.
 		fn remove(self) {
 			self.table.remove();
 		}
+	}
+
+	/// Elements to build a [`VolumControl`].
+	#[derive(Clone)]
+	struct VolumeControlBuilder {
+		/// The volume slider.
+		slider: HtmlInputElement,
+		/// Stores the value of the slider.
+		slider_value: Rc<Cell<f32>>,
+		/// Label showing the current value.
+		label: HtmlElement,
+		/// Mute button.
+		mute: HtmlButtonElement,
+		/// Stores the value of the mute button.
+		mute_value: Rc<Cell<bool>>,
 	}
 
 	/// Stores volume control elements.
