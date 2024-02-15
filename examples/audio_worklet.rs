@@ -213,9 +213,8 @@ mod web {
 			.unwrap();
 
 		// Setup space before control buttons.
-		container
-			.append_child(&document.create_element("br").unwrap())
-			.unwrap();
+		let br = document.create_element("br").unwrap();
+		container.append_child(&br).unwrap();
 
 		// Setup suspend/resume button.
 		let suspend_resume_button: HtmlButtonElement =
@@ -278,6 +277,7 @@ mod web {
 
 						// Remove all control elements.
 						table.remove();
+						br.remove();
 						suspend_resume_button.remove();
 						drop(master_slider_callback);
 						drop(master_mute_callback);
