@@ -18,7 +18,7 @@ mod web {
 	use std::cell::Cell;
 	use std::iter;
 	use std::rc::Rc;
-	use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+	use std::sync::atomic::{AtomicBool, AtomicI8, AtomicU8, Ordering};
 	use std::sync::Arc;
 
 	use itertools::Itertools;
@@ -120,10 +120,10 @@ mod web {
 		let channel_count = context.destination().channel_count();
 
 		// Create table to present slider for each channel.
-		let table = VolumeControlTable::new(document.clone(), &container);
+		let volume_table = VolumeControlTable::new(document.clone(), &container);
 
 		// Create master volume control elements.
-		let (master_builder, master_mute_callback) = table.volume_control("Master");
+		let (master_builder, master_mute_callback) = volume_table.volume_control("Master");
 
 		// Create volume control elements for every channel.
 		let volumes: Rc<Vec<_>> = Rc::new(
@@ -131,7 +131,7 @@ mod web {
 				.map(|index| {
 					// Create control elements.
 					let (builder, mute_callback) =
-						table.volume_control(&format!("Channel {index}"));
+						volume_table.volume_control(&format!("Channel {index}"));
 
 					// Create callback for controlling volume.
 					let slider_callback = Closure::<dyn Fn()>::new({
@@ -195,6 +195,13 @@ mod web {
 			.slider
 			.set_oninput(Some(master_slider_callback.as_ref().unchecked_ref()));
 
+		// Setup space before frequency control.
+		let br_1 = document.create_element("br").unwrap();
+		container.append_child(&br_1).unwrap();
+
+		// Frequency control elements.
+		let piano = PianoControl::new(&document, &container);
+
 		// Initialize `ExampleProcessor`.
 		let data = Data {
 			master: master_builder.shared,
@@ -202,6 +209,7 @@ mod web {
 				.iter()
 				.map(|volume| Arc::clone(&volume.shared))
 				.collect(),
+			piano: Arc::clone(&piano.value),
 		};
 		let mut options = AudioWorkletNodeOptions::new();
 		options.output_channel_count(&Array::of1(&channel_count.into()));
@@ -213,8 +221,8 @@ mod web {
 			.unwrap();
 
 		// Setup space before control buttons.
-		let br = document.create_element("br").unwrap();
-		container.append_child(&br).unwrap();
+		let br_2 = document.create_element("br").unwrap();
+		container.append_child(&br_2).unwrap();
 
 		// Setup suspend/resume button.
 		let suspend_resume_button: HtmlButtonElement =
@@ -276,8 +284,11 @@ mod web {
 						JsFuture::from(context.close().unwrap()).await.unwrap();
 
 						// Remove all control elements.
-						table.remove();
-						br.remove();
+						volume_table.remove();
+						br_1.remove();
+						piano.table.remove();
+						drop(piano);
+						br_2.remove();
 						suspend_resume_button.remove();
 						drop(master_slider_callback);
 						drop(master_mute_callback);
@@ -317,6 +328,24 @@ mod web {
 		container.append_child(&start_stop_button).unwrap();
 	}
 
+	/// Data shared between the window and [`ExampleProcessor`].
+	struct Data {
+		/// Master shared data..
+		master: Arc<SharedData>,
+		/// Shared data for each channel.
+		channels: Vec<Arc<SharedData>>,
+		/// Piano key.
+		piano: Arc<AtomicI8>,
+	}
+
+	/// Data shared between the window and [`ExampleProcessor`].
+	struct SharedData {
+		/// Volume for this channel.
+		volume: AtomicU8,
+		/// If this channel is muted.
+		mute: AtomicBool,
+	}
+
 	/// Example [`AudioWorkletProcessor`].
 	struct ExampleProcessor {
 		/// Buffer used to calculate each sample.
@@ -327,11 +356,16 @@ mod web {
 		shared: Data,
 		/// Current volume of each channel.
 		volumes: Vec<f32>,
+		/// Current frequency.
+		frequency: f32,
 	}
 
 	impl ExampleProcessor {
 		/// <https://en.wikipedia.org/wiki/A440_(pitch_standard)>
 		const BASE_FREQUENCY: f32 = 440.;
+		/// Transform frequency into an oscillating frequency.
+		#[allow(clippy::absolute_paths)]
+		const TRANSFORM: f32 = 2. * std::f32::consts::PI;
 	}
 
 	impl ExtendAudioWorkletProcessor for ExampleProcessor {
@@ -357,6 +391,7 @@ mod web {
 				buffer: Vec::new(),
 				shared: data.unwrap(),
 				volumes: vec![0.01; channel_count],
+				frequency: Self::BASE_FREQUENCY,
 			}
 		}
 
@@ -367,10 +402,6 @@ mod web {
 			clippy::cast_sign_loss
 		)]
 		fn process(&mut self, _: Array, outputs: Array, _: Object) -> bool {
-			/// Transform into an oscillating frequency.
-			#[allow(clippy::absolute_paths)]
-			const TRANSFORM: f32 = 2. * std::f32::consts::PI;
-
 			let master_muted = self.shared.master.mute.load(Ordering::Relaxed);
 
 			// Do nothing if master is muted and all channels have reached zero volume.
@@ -390,7 +421,7 @@ mod web {
 			let first_channel: Float32Array = output.next().unwrap().unchecked_into();
 			let sample_size = first_channel.length() as usize;
 			self.samples.reserve_exact(sample_size);
-			self.buffer.resize(sample_size, 0.);
+			self.buffer.reserve_exact(sample_size);
 
 			let mut sampled = false;
 
@@ -415,9 +446,28 @@ mod web {
 
 				// Calculate base samples for all channels only if we plan to do actual work.
 				if !sampled {
+					// <https://en.wikipedia.org/wiki/Piano_key_frequencies>.
+					let key = f32::from(self.shared.piano.load(Ordering::Relaxed));
+					let target = ((key - 49.) / 12.).exp2() * Self::BASE_FREQUENCY;
+
+					// TODO: Should implement exponential ramp up like described in the spec:
+					// <https://webaudio.github.io/web-audio-api/#dom-audioparam-exponentialramptovalueattime>
 					for index in 0..sample_size {
+						#[allow(clippy::float_cmp)]
+						if self.frequency != target {
+							if (self.frequency.abs() - target.abs()).abs() > 0.5 {
+								if self.frequency < target {
+									self.frequency += 0.5;
+								} else {
+									self.frequency -= 0.5;
+								}
+							} else {
+								self.frequency = target;
+							}
+						}
+
 						let sample = f32::sin(
-							Self::BASE_FREQUENCY * TRANSFORM * (time + index as f32 / sample_rate),
+							self.frequency * Self::TRANSFORM * (time + index as f32 / sample_rate),
 						);
 
 						if let Some(entry) = self.samples.get_mut(index) {
@@ -430,9 +480,8 @@ mod web {
 					sampled = true;
 				};
 
-				for (base_sample, out_sample) in self.samples.iter().zip(&mut self.buffer) {
-					*out_sample = *base_sample * *current;
-
+				// Copy data into each channel after adjusting for volume.
+				for (index, base_sample) in self.samples.iter().enumerate() {
 					#[allow(clippy::float_cmp)]
 					if *current != target {
 						if (current.abs() - target.abs()).abs() > 0.0001 {
@@ -444,6 +493,14 @@ mod web {
 						} else {
 							*current = target;
 						}
+					}
+
+					let sample = *base_sample * *current;
+
+					if let Some(entry) = self.buffer.get_mut(index) {
+						*entry = sample;
+					} else {
+						self.buffer.push(sample);
 					}
 				}
 
@@ -502,6 +559,7 @@ mod web {
 			let style = table.style();
 			style.set_property("border", "1px solid").unwrap();
 			style.set_property("border-collapse", "collapse").unwrap();
+			style.set_property("margin", "auto").unwrap();
 			let name: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
 			let slider: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
 			let value: HtmlTableRowElement = table.insert_row().unwrap().unchecked_into();
@@ -624,14 +682,6 @@ mod web {
 		shared: Arc<SharedData>,
 	}
 
-	/// Data shared between the window and [`ExampleProcessor`].
-	struct SharedData {
-		/// Volume for this channel.
-		volume: AtomicU8,
-		/// If this channel is muted.
-		mute: AtomicBool,
-	}
-
 	/// Stores volume control elements.
 	struct VolumeControl {
 		/// The volume slider.
@@ -646,12 +696,80 @@ mod web {
 		shared: Arc<SharedData>,
 	}
 
-	/// Data shared between the window and [`ExampleProcessor`].
-	struct Data {
-		/// Master shared data..
-		master: Arc<SharedData>,
-		/// Shared data for each channel.
-		channels: Vec<Arc<SharedData>>,
+	/// Stores piano key control elements.
+	struct PianoControl {
+		/// Table holding all elements.
+		table: HtmlTableElement,
+		/// Shared value with [`ExampleProcessor`].
+		value: Arc<AtomicI8>,
+		/// Callback updating shared value.
+		_callback: Closure<dyn Fn()>,
+	}
+
+	impl PianoControl {
+		/// Creates a new [`PianoControl`].
+		fn new(document: &Document, container: &HtmlElement) -> Self {
+			/// Name of each paino note in an octave.
+			const NOTE: [&str; 12] = [
+				"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
+			];
+
+			// Table.
+			let table: HtmlTableElement =
+				document.create_element("table").unwrap().unchecked_into();
+			let style = table.style();
+			style.set_property("border", "1px solid").unwrap();
+			style.set_property("border-collapse", "collapse").unwrap();
+			style.set_property("margin", "auto").unwrap();
+
+			// Header.
+			let cell = table.insert_row().unwrap();
+			cell.set_text_content(Some("Piano Key"));
+			cell.style()
+				.set_property("border-bottom", "1px solid")
+				.unwrap();
+
+			// Piano key slider.
+			let slider: HtmlInputElement =
+				document.create_element("input").unwrap().unchecked_into();
+			slider.set_value("49"); // Default value.
+			slider.set_min("-8");
+			slider.set_max("99");
+			slider.set_type("range");
+			table.insert_row().unwrap().append_child(&slider).unwrap();
+
+			// Piano key label.
+			let label = table.insert_row().unwrap();
+			label.set_text_content(Some("A4"));
+
+			// Insert table.
+			container.append_child(&table).unwrap();
+
+			// Setup callback.
+			let value = Arc::new(AtomicI8::new(49));
+			let callback = Closure::new({
+				let slider = slider.clone();
+				let value = Arc::clone(&value);
+				move || {
+					let key = slider.value().parse().unwrap();
+					value.store(key, Ordering::Relaxed);
+					let octave = (key + 8) / 12;
+					let note = (key + 8) % 12;
+					#[allow(clippy::indexing_slicing)]
+					label.set_text_content(Some(&format!(
+						"{}{octave}",
+						NOTE[usize::try_from(note).unwrap()]
+					)));
+				}
+			});
+			slider.set_oninput(Some(callback.as_ref().unchecked_ref()));
+
+			Self {
+				table,
+				value,
+				_callback: callback,
+			}
+		}
 	}
 
 	/// Create an object URL from a JS script.
