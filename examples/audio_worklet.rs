@@ -16,19 +16,20 @@ fn main() {
 #[cfg(target_family = "wasm")]
 mod web {
 	use std::cell::Cell;
+	use std::iter;
 	use std::rc::Rc;
+	use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+	use std::sync::Arc;
 
 	use itertools::Itertools;
-	use js_sys::{Array, Float32Array, Object, Promise};
+	use js_sys::{Array, Float32Array, Object, Promise, Reflect};
 	use wasm_bindgen::closure::Closure;
 	use wasm_bindgen::{JsCast, JsValue};
 	use wasm_bindgen_futures::JsFuture;
 	use web_sys::{
-		console, AudioContext, AudioParam, AudioWorkletGlobalScope, AudioWorkletNode,
-		AudioWorkletNodeOptions, AudioWorkletProcessor, BaseAudioContext, Blob, BlobPropertyBag,
-		ChannelMergerNode, ChannelMergerOptions, ChannelSplitterNode, ChannelSplitterOptions,
-		Document, GainNode, GainOptions, HtmlButtonElement, HtmlElement, HtmlInputElement,
-		HtmlTableElement, HtmlTableRowElement, Url,
+		console, AudioContext, AudioWorkletGlobalScope, AudioWorkletNodeOptions,
+		AudioWorkletProcessor, Blob, BlobPropertyBag, Document, HtmlButtonElement, HtmlElement,
+		HtmlInputElement, HtmlTableElement, HtmlTableRowElement, Url,
 	};
 	use web_thread::web::audio_worklet::{
 		AudioWorkletGlobalScopeExt, BaseAudioContextExt, ExtendAudioWorkletProcessor,
@@ -115,124 +116,52 @@ mod web {
 		// Remove start button in preparation of adding new content.
 		start_stop_button.remove();
 
+		// Get output channel count.
 		let channel_count = context.destination().channel_count();
-
-		// Initialize `ExampleProcessor`.
-		let mut options = AudioWorkletNodeOptions::new();
-		options.output_channel_count(&Array::of1(&channel_count.into()));
-		let worklet = AudioWorkletNode::new_with_options(&context, "example", &options).unwrap();
-
-		// Create channel splitter node.
-		let mut options = ChannelSplitterOptions::new();
-		options.number_of_outputs(channel_count);
-		let channel_splitter = ChannelSplitterNode::new_with_options(&context, &options).unwrap();
-		worklet.connect_with_audio_node(&channel_splitter).unwrap();
-
-		// Create channel merger node.
-		let mut options = ChannelMergerOptions::new();
-		options.number_of_inputs(channel_count);
-		let channel_merger = ChannelMergerNode::new_with_options(&context, &options).unwrap();
-		channel_merger
-			.connect_with_audio_node(&context.destination())
-			.unwrap();
 
 		// Create table to present slider for each channel.
 		let table = VolumeControlTable::new(document.clone(), &container);
 
 		// Create master volume control elements.
-		let master_builder = table.volume_control("Master");
+		let (master_builder, master_mute_callback) = table.volume_control("Master");
 
 		// Create volume control elements for every channel.
 		let volumes: Rc<Vec<_>> = Rc::new(
 			(0..channel_count)
 				.map(|index| {
-					// Create gain node.
-					let mut options = GainOptions::new();
-					options.channel_count(channel_count);
-					let gain = GainNode::new_with_options(&context, &options).unwrap();
-					let gain_param = gain.gain();
-					gain_param.set_value(0.01);
-					channel_splitter
-						.connect_with_audio_node_and_output(&gain, index)
-						.unwrap();
-					gain.connect_with_audio_node_and_output_and_input(&channel_merger, 0, index)
-						.unwrap();
-
 					// Create control elements.
-					let builder = table.volume_control(&format!("Channel {index}"));
+					let (builder, mute_callback) =
+						table.volume_control(&format!("Channel {index}"));
 
 					// Create callback for controlling volume.
 					let slider_callback = Closure::<dyn Fn()>::new({
 						let master_builder = master_builder.clone();
 						let builder = builder.clone();
-						let context = context.clone();
-						let gain_param = gain_param.clone();
 						move || {
 							let value_string = builder.slider.value();
 							builder.label.set_inner_text(&value_string);
 							let value = value_string.parse().unwrap();
-							builder.slider_value.set(value);
+							builder.shared.volume.store(value, Ordering::Relaxed);
 
 							// If the master volume is lower, we increase it, otherwise its weird
 							// that master volume is lower then the highest volume.
-							if master_builder.slider_value.get() < value {
-								master_builder.slider_value.set(value);
+							if master_builder.shared.volume.load(Ordering::Relaxed) < value {
+								master_builder.shared.volume.store(value, Ordering::Relaxed);
 								master_builder.slider.set_value(&value_string);
 								master_builder.label.set_inner_text(&value_string);
-							}
-
-							// Only change gain if master and this channel is not muted.
-							if !master_builder.mute_value.get() && !builder.mute_value.get() {
-								set_gain(&context, &gain_param, value / 1000.);
 							}
 						}
 					});
 					builder
 						.slider
 						.set_oninput(Some(slider_callback.as_ref().unchecked_ref()));
-					// Create callback for mute button.
-					let mute_callback = Closure::<dyn Fn()>::new({
-						let master_builder = master_builder.clone();
-						let builder = builder.clone();
-						let context = context.clone();
-						let gain_param = gain_param.clone();
-						move || {
-							// If we are muted, unmute.
-							if builder.mute_value.get() {
-								#[allow(clippy::non_ascii_literal)]
-								builder.mute.set_inner_text("🔊");
-								builder.mute_value.set(false);
-
-								if !master_builder.mute_value.get() {
-									set_gain(
-										&context,
-										&gain_param,
-										builder.slider_value.get() / 1000.,
-									);
-								}
-							}
-							// If we are not muted, mute.
-							else {
-								#[allow(clippy::non_ascii_literal)]
-								builder.mute.set_inner_text("🔇");
-								builder.mute_value.set(true);
-
-								set_gain(&context, &gain_param, 0.);
-							}
-						}
-					});
-					builder
-						.mute
-						.set_onclick(Some(mute_callback.as_ref().unchecked_ref()));
 
 					VolumeControl {
-						gain_param,
 						slider: builder.slider,
 						_slider_callback: slider_callback,
-						slider_value: builder.slider_value,
 						label: builder.label,
 						_mute_callback: mute_callback,
-						mute_value: builder.mute_value,
+						shared: builder.shared,
 					}
 				})
 				.collect(),
@@ -242,78 +171,46 @@ mod web {
 		let master_slider_callback = Closure::<dyn FnMut()>::new({
 			let builder = master_builder.clone();
 			let volumes = Rc::clone(&volumes);
-			let context = context.clone();
 			move || {
 				let value_string = builder.slider.value();
 				builder.label.set_inner_text(&value_string);
 				let value = value_string.parse().unwrap();
-				builder.slider_value.set(value);
+				builder.shared.volume.store(value, Ordering::Relaxed);
 
 				for VolumeControl {
-					gain_param,
 					slider,
-					slider_value,
 					label,
-					mute_value,
+					shared,
 					..
 				} in volumes.iter()
 				{
 					// Update values for all channels (even if we are muted).
 					slider.set_value(&value_string);
 					label.set_inner_text(&value_string);
-					slider_value.set(value);
-
-					// Only change gain if master and this channel is not muted.
-					if !builder.mute_value.get() && !mute_value.get() {
-						set_gain(&context, gain_param, value / 1000.);
-					}
+					shared.volume.store(value, Ordering::Relaxed);
 				}
 			}
 		});
 		master_builder
 			.slider
 			.set_oninput(Some(master_slider_callback.as_ref().unchecked_ref()));
-		// Setup master mute callback.
-		// Create callback for mute button.
-		let master_mute_callback = Closure::<dyn Fn()>::new({
-			let builder = master_builder.clone();
-			let volumes = Rc::clone(&volumes);
-			let context = context.clone();
-			move || {
-				// If we are muted, unmute all channels.
-				if builder.mute_value.get() {
-					#[allow(clippy::non_ascii_literal)]
-					builder.mute.set_inner_text("🔊");
-					builder.mute_value.set(false);
 
-					for VolumeControl {
-						gain_param,
-						slider_value,
-						mute_value,
-						..
-					} in volumes.iter()
-					{
-						// Only unmute if this channel is not muted.
-						if !mute_value.get() {
-							set_gain(&context, gain_param, slider_value.get() / 1000.);
-						}
-					}
-				}
-				// If we are not muted, mute all channels.
-				else {
-					#[allow(clippy::non_ascii_literal)]
-					builder.mute.set_inner_text("🔇");
-					builder.mute_value.set(true);
-
-					for VolumeControl { gain_param, .. } in volumes.iter() {
-						set_gain(&context, gain_param, 0.);
-					}
-				}
-			}
-		});
-		master_builder
-			.mute
-			.set_onclick(Some(master_mute_callback.as_ref().unchecked_ref()));
+		// Initialize `ExampleProcessor`.
+		let data = Data {
+			master: master_builder.shared,
+			channels: volumes
+				.iter()
+				.map(|volume| Arc::clone(&volume.shared))
+				.collect(),
+		};
+		let mut options = AudioWorkletNodeOptions::new();
+		options.output_channel_count(&Array::of1(&channel_count.into()));
+		let worklet = context
+			.audio_worklet_node::<ExampleProcessor>("example", data, Some(options))
+			.unwrap();
+		worklet
+			.connect_with_audio_node(&context.destination())
+			.unwrap();
 
 		// Setup space before control buttons.
 		container
@@ -422,8 +319,14 @@ mod web {
 
 	/// Example [`AudioWorkletProcessor`].
 	struct ExampleProcessor {
-		/// Buffer used to fill outputs.
+		/// Buffer used to calculate each sample.
+		samples: Vec<f32>,
+		/// Buffer used to adjust output for each channel.
 		buffer: Vec<f32>,
+		/// Data shared between the window and [`ExampleProcessor`].
+		shared: Data,
+		/// Current volume of each channel.
+		volumes: Vec<f32>,
 	}
 
 	impl ExampleProcessor {
@@ -432,15 +335,29 @@ mod web {
 	}
 
 	impl ExtendAudioWorkletProcessor for ExampleProcessor {
-		type Data = ();
+		type Data = Data;
 
 		fn new(
 			_: AudioWorkletProcessor,
-			_: Option<Self::Data>,
-			_: AudioWorkletNodeOptions,
+			data: Option<Self::Data>,
+			options: AudioWorkletNodeOptions,
 		) -> Self {
 			console::log_1(&"`ExampleProcessor` initialized!".into());
-			Self { buffer: Vec::new() }
+			let output_channel_count: Array = Reflect::get(&options, &"outputChannelCount".into())
+				.unwrap()
+				.unchecked_into();
+			#[allow(
+				clippy::as_conversions,
+				clippy::cast_possible_truncation,
+				clippy::cast_sign_loss
+			)]
+			let channel_count = output_channel_count.get(0).as_f64().unwrap() as usize;
+			Self {
+				samples: Vec::new(),
+				buffer: Vec::new(),
+				shared: data.unwrap(),
+				volumes: vec![0.01; channel_count],
+			}
 		}
 
 		#[allow(
@@ -454,6 +371,13 @@ mod web {
 			#[allow(clippy::absolute_paths)]
 			const TRANSFORM: f32 = 2. * std::f32::consts::PI;
 
+			let master_muted = self.shared.master.mute.load(Ordering::Relaxed);
+
+			// Do nothing if master is muted and all channels have reached zero volume.
+			if master_muted && self.volumes.iter().all(|volume| *volume == 0.) {
+				return true;
+			}
+
 			let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
 
 			let sample_rate = global.sample_rate();
@@ -464,26 +388,66 @@ mod web {
 			let mut output = output.into_iter();
 
 			let first_channel: Float32Array = output.next().unwrap().unchecked_into();
-			let samples = first_channel.length() as usize;
-			self.buffer.reserve_exact(samples);
+			let sample_size = first_channel.length() as usize;
+			self.samples.reserve_exact(sample_size);
+			self.buffer.resize(sample_size, 0.);
 
-			for index in 0..samples {
-				let sample = f32::sin(
-					Self::BASE_FREQUENCY * TRANSFORM * (time + index as f32 / sample_rate),
-				);
+			let mut sampled = false;
 
-				if let Some(entry) = self.buffer.get_mut(index) {
-					*entry = sample;
+			for ((current, shared), channel) in self
+				.volumes
+				.iter_mut()
+				.zip(&self.shared.channels)
+				.zip(iter::once(first_channel).chain(output.map(JsValue::unchecked_into)))
+			{
+				// If we are muted always set target volume to zero.
+				let target = if master_muted || shared.mute.load(Ordering::Relaxed) {
+					0.
 				} else {
-					self.buffer.push(sample);
+					f32::from(shared.volume.load(Ordering::Relaxed)) / 1000.
+				};
+
+				// If this channels target volume is zero and we reached it do nothing.
+				#[allow(clippy::float_cmp)]
+				if target == 0. && *current == target {
+					continue;
 				}
-			}
 
-			first_channel.copy_from(&self.buffer);
+				// Calculate base samples for all channels only if we plan to do actual work.
+				if !sampled {
+					for index in 0..sample_size {
+						let sample = f32::sin(
+							Self::BASE_FREQUENCY * TRANSFORM * (time + index as f32 / sample_rate),
+						);
 
-			for channel in output {
-				let channel: Float32Array = channel.unchecked_into();
-				channel.set(&first_channel, 0);
+						if let Some(entry) = self.samples.get_mut(index) {
+							*entry = sample;
+						} else {
+							self.samples.push(sample);
+						}
+					}
+
+					sampled = true;
+				};
+
+				for (base_sample, out_sample) in self.samples.iter().zip(&mut self.buffer) {
+					*out_sample = *base_sample * *current;
+
+					#[allow(clippy::float_cmp)]
+					if *current != target {
+						if (current.abs() - target.abs()).abs() > 0.0001 {
+							if *current < target {
+								*current += 0.0001;
+							} else {
+								*current -= 0.0001;
+							}
+						} else {
+							*current = target;
+						}
+					}
+				}
+
+				channel.copy_from(&self.buffer);
 			}
 
 			true
@@ -523,7 +487,7 @@ mod web {
 		name: HtmlTableRowElement,
 		/// Volume slider.
 		slider: HtmlTableRowElement,
-		/// Volume value labbel.
+		/// Volume value label.
 		value: HtmlTableRowElement,
 		/// Mute button.
 		mute: HtmlTableRowElement,
@@ -554,7 +518,7 @@ mod web {
 		}
 
 		/// Create table column for volume control elements.
-		fn volume_control(&self, name: &str) -> VolumeControlBuilder {
+		fn volume_control(&self, name: &str) -> (VolumeControlBuilder, Closure<dyn Fn()>) {
 			// Name.
 			let cell = self.name.insert_cell().unwrap();
 			cell.set_inner_text(name);
@@ -607,16 +571,40 @@ mod web {
 			style.set_property("border-right", "1px solid").unwrap();
 			cell.append_child(&mute).unwrap();
 
-			let slider_value = Rc::new(Cell::new(10.));
-			let mute_value = Rc::new(Cell::new(false));
+			let shared = Arc::new(SharedData {
+				volume: AtomicU8::new(10),
+				mute: AtomicBool::new(false),
+			});
 
-			VolumeControlBuilder {
-				slider,
-				slider_value,
-				label,
-				mute,
-				mute_value,
-			}
+			// Create callback for mute button.
+			let mute_callback = Closure::<dyn Fn()>::new({
+				let mute = mute.clone();
+				let shared = Arc::clone(&shared);
+				move || {
+					// If we are muted, unmute.
+					if shared.mute.load(Ordering::Relaxed) {
+						#[allow(clippy::non_ascii_literal)]
+						mute.set_inner_text("🔊");
+						shared.mute.store(false, Ordering::Relaxed);
+					}
+					// If we are not muted, mute.
+					else {
+						#[allow(clippy::non_ascii_literal)]
+						mute.set_inner_text("🔇");
+						shared.mute.store(true, Ordering::Relaxed);
+					}
+				}
+			});
+			mute.set_onclick(Some(mute_callback.as_ref().unchecked_ref()));
+
+			(
+				VolumeControlBuilder {
+					slider,
+					label,
+					shared,
+				},
+				mute_callback,
+			)
 		}
 
 		/// Remove the table from the document.
@@ -625,55 +613,45 @@ mod web {
 		}
 	}
 
-	/// Elements to build a [`VolumControl`].
+	/// Elements to build a [`VolumeControl`].
 	#[derive(Clone)]
 	struct VolumeControlBuilder {
 		/// The volume slider.
 		slider: HtmlInputElement,
-		/// Stores the value of the slider.
-		slider_value: Rc<Cell<f32>>,
 		/// Label showing the current value.
 		label: HtmlElement,
-		/// Mute button.
-		mute: HtmlButtonElement,
-		/// Stores the value of the mute button.
-		mute_value: Rc<Cell<bool>>,
+		/// Data shared between the window and [`ExampleProcessor`].
+		shared: Arc<SharedData>,
+	}
+
+	/// Data shared between the window and [`ExampleProcessor`].
+	struct SharedData {
+		/// Volume for this channel.
+		volume: AtomicU8,
+		/// If this channel is muted.
+		mute: AtomicBool,
 	}
 
 	/// Stores volume control elements.
 	struct VolumeControl {
-		/// Gain [`AudioParam`] of [`GainNode`].
-		gain_param: AudioParam,
 		/// The volume slider.
 		slider: HtmlInputElement,
 		/// Callback handling slider input.
 		_slider_callback: Closure<dyn Fn()>,
-		/// Stores the value of the slider.
-		slider_value: Rc<Cell<f32>>,
 		/// Label showing the current value.
 		label: HtmlElement,
 		/// Callback handling mute button.
 		_mute_callback: Closure<dyn Fn()>,
-		/// Stores the value of the mute button.
-		mute_value: Rc<Cell<bool>>,
+		/// Data shared with [`ExampleProcessor`].
+		shared: Arc<SharedData>,
 	}
 
-	/// Correct way to set gain without causing crackling.
-	fn set_gain(context: &BaseAudioContext, param: &AudioParam, value: f32) {
-		let end_time = context.current_time() + 0.1;
-
-		// Ramping gain to `0` is not allowed, so we ramp it close to zero and schedule
-		// setting to zero then.
-		if value == 0. {
-			param
-				.exponential_ramp_to_value_at_time(0.001, end_time)
-				.unwrap();
-			param.set_value_at_time(0., end_time).unwrap();
-		} else {
-			param
-				.exponential_ramp_to_value_at_time(value, end_time)
-				.unwrap();
-		}
+	/// Data shared between the window and [`ExampleProcessor`].
+	struct Data {
+		/// Master shared data..
+		master: Arc<SharedData>,
+		/// Shared data for each channel.
+		channels: Vec<Arc<SharedData>>,
 	}
 
 	/// Create an object URL from a JS script.
