@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::{io, mem};
 
@@ -51,7 +51,7 @@ enum Command {
 		/// [`ThreadId`] of the thread to be terminated.
 		id: ThreadId,
 		/// Value to use `Atomics.waitAsync` on.
-		value: Pin<&'static i32>,
+		value: Pin<Box<AtomicI32>>,
 		/// Thread memory.
 		memory: ThreadMemory,
 	},
@@ -73,7 +73,7 @@ fn init_main() {
 					}
 					Command::Terminate { id, value, memory } => {
 						wasm_bindgen_futures::spawn_local(async move {
-							WaitAsync::wait(value, 0).await;
+							WaitAsync::wait(&value, 0).await;
 
 							WORKERS
 								.with(|workers| {
@@ -139,8 +139,8 @@ where
 					}
 				}
 
-				let value = Pin::new(&0);
-				let index = super::i32_to_buffer_index(&value);
+				let value = Box::pin(AtomicI32::new(0));
+				let index = super::i32_to_buffer_index(value.as_ptr());
 
 				let memory = ThreadMemory::new();
 

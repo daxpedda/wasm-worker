@@ -2,8 +2,8 @@
 
 use std::cell::{Cell, RefCell};
 use std::future;
-use std::pin::Pin;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::task::{Poll, Waker};
 
 use js_sys::{Array, Atomics};
@@ -24,14 +24,19 @@ pub(super) struct WaitAsync;
 
 impl WaitAsync {
 	/// Mimics the interface we need from [`Atomics::wait_async`].
-	pub(super) async fn wait(value: Pin<&i32>, check: i32) {
+	pub(super) async fn wait(value: &AtomicI32, check: i32) {
 		thread_local! {
 			static HAS_WAIT_ASYNC: bool = !js::HAS_WAIT_ASYNC.is_undefined();
 		}
 
-		if HAS_WAIT_ASYNC.with(bool::clone) {
-			let index = super::i32_to_buffer_index(&value);
+		// Short-circuit before having to go through FFI.
+		if value.load(Ordering::Relaxed) != check {
+			return;
+		}
 
+		let index = super::i32_to_buffer_index(value.as_ptr());
+
+		if HAS_WAIT_ASYNC.with(bool::clone) {
 			let result: WaitAsyncResult = MEMORY_ARRAY
 				.with(|array| Atomics::wait_async(array, index, check))
 				.expect("`Atomics.waitAsync` is not expected to fail")
@@ -43,13 +48,13 @@ impl WaitAsync {
 					.expect("`Promise` returned by `Atomics.waitAsync` should never throw");
 			}
 		} else {
-			wait(value, check).await;
+			wait(index, check).await;
 		}
 	}
 }
 
 /// Polyfills [`Atomics::wait_async`] if not available.
-async fn wait(value: Pin<&i32>, check: i32) {
+async fn wait(index: u32, check: i32) {
 	thread_local! {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(include_str!("wait_async.js"));
@@ -89,8 +94,6 @@ async fn wait(value: Pin<&i32>, check: i32) {
 		}
 	});
 	worker.set_onmessage(Some(onmessage_callback.unchecked_ref()));
-
-	let index = super::i32_to_buffer_index(&value);
 
 	let message =
 		MEMORY.with(|memory| Array::of3(memory, &JsValue::from(index), &JsValue::from(check)));

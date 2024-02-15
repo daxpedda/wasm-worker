@@ -1,7 +1,8 @@
-22
+23
 1MB
 Async
 atomics
+FFI
 futex
 Invariance
 JS

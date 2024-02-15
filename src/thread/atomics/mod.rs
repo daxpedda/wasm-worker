@@ -267,7 +267,7 @@ pub(super) fn sleep(dur: Duration) {
 /// Tests is blocking is supported.
 pub(super) fn test_block_support() -> bool {
 	let value = Pin::new(&0);
-	let index = i32_to_buffer_index(&value);
+	let index = i32_to_buffer_index(ptr::from_ref(&value));
 
 	MEMORY_ARRAY
 		.with(|array| Atomics::wait_with_timeout(array, index, 0, 0.))
@@ -295,11 +295,10 @@ fn current_id() -> ThreadId {
 	THREAD.with(|cell| cell.get_or_init(Thread::new).id())
 }
 
-/// Converts a reference to a [`i32`] to an index into the internal
+/// Converts a reference to a pointer to [`i32`] to an index into the internal
 /// [`ArrayBuffer`](js_sys::ArrayBuffer) usable by methods of [`Atomics`].
-fn i32_to_buffer_index(value: &Pin<&i32>) -> u32 {
-	let index: *const i32 = ptr::from_ref(value);
+fn i32_to_buffer_index(ptr: *const i32) -> u32 {
 	#[allow(clippy::as_conversions)]
-	let index = index as u32 / 4;
+	let index = ptr as u32 / 4;
 	index
 }
