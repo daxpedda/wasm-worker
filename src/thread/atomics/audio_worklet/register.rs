@@ -79,7 +79,7 @@ where
 				State::Module {
 					context,
 					promise,
-					task: Box::new(task),
+					task,
 					receiver,
 				}
 			}
