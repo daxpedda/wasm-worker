@@ -12,7 +12,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNodeOptions, DomException};
 
 use super::super::super::js::GlobalExt;
-use super::js::{AudioWorkletNodeOptionsExt, ProcessorOptions};
+use super::js::AudioWorkletNodeOptionsExt;
 use super::Data;
 use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
@@ -105,8 +105,6 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 			.unchecked_ref::<AudioWorkletNodeOptionsExt>()
 			.get_processor_options()
 		{
-			let processor_options: ProcessorOptions = processor_options.unchecked_into();
-
 			let data = processor_options.data();
 
 			if !data.is_null() {

@@ -28,9 +28,12 @@ extern "C" {
 	pub(super) type AudioWorkletNodeOptionsExt;
 
 	#[wasm_bindgen(method, getter, js_name = processorOptions)]
-	pub(super) fn get_processor_options(this: &AudioWorkletNodeOptionsExt) -> Option<Object>;
+	pub(super) fn get_processor_options(
+		this: &AudioWorkletNodeOptionsExt,
+	) -> Option<ProcessorOptions>;
 
 	#[wasm_bindgen(extends = Object)]
+	#[derive(Default)]
 	pub(super) type ProcessorOptions;
 
 	#[wasm_bindgen(method, getter, js_name = __web_thread_data)]

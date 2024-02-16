@@ -11,7 +11,7 @@ use js_sys::Object;
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, DomException};
 
-use self::js::{AudioWorkletNodeOptionsExt, BaseAudioContextExt, ProcessorOptions};
+use self::js::{AudioWorkletNodeOptionsExt, BaseAudioContextExt};
 pub(in super::super) use self::processor::register_processor;
 pub(in super::super) use self::register::{register_thread, RegisterThreadFuture};
 use super::MAIN_THREAD;
@@ -49,8 +49,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	);
 	let processor_options = options.get_processor_options();
 	let has_processor_options = processor_options.is_some();
-	let processor_options: ProcessorOptions =
-		processor_options.unwrap_or_default().unchecked_into();
+	let processor_options = processor_options.unwrap_or_default();
 	let data = Box::into_raw(data);
 	processor_options.set_data(data);
 	let mut options = AudioWorkletNodeOptions::from(options);
