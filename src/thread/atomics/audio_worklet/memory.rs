@@ -7,6 +7,7 @@ use wasm_bindgen::JsCast;
 use super::js::{Exports, GlobalDescriptor};
 
 /// Holds pointers to the memory of a thread.
+#[derive(Debug)]
 pub(super) struct ThreadMemory {
 	/// TLS memory.
 	tls_base: f64,

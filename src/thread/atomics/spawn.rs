@@ -14,7 +14,6 @@ use web_sys::{Worker, WorkerOptions, WorkerType};
 
 use super::channel::Sender;
 use super::js::META;
-use super::memory::ThreadMemory;
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
 use super::{
@@ -52,8 +51,6 @@ enum Command {
 		id: ThreadId,
 		/// Value to use `Atomics.waitAsync` on.
 		value: Pin<Box<AtomicI32>>,
-		/// Thread memory.
-		memory: ThreadMemory,
 	},
 }
 
@@ -71,7 +68,7 @@ fn init_main() {
 					Command::Spawn { id, task, name } => {
 						spawn_internal(id, task, name.as_deref());
 					}
-					Command::Terminate { id, value, memory } => {
+					Command::Terminate { id, value } => {
 						wasm_bindgen_futures::spawn_local(async move {
 							WaitAsync::wait(&value, 0).await;
 
@@ -83,16 +80,6 @@ fn init_main() {
 										.expect("`Worker` to be destroyed not found")
 								})
 								.terminate();
-
-							// SAFETY:
-							// - We don't get here until we are sure the thread is blocked and can't
-							//   be executing Rust code anymore.
-							// - This is only done once per thread.
-							// - The correct values are attained by the thread and sent when
-							//   finished.
-							unsafe {
-								memory.destroy();
-							}
 						});
 					}
 				}
@@ -142,15 +129,12 @@ where
 				let value = Box::pin(AtomicI32::new(0));
 				let index = super::i32_to_buffer_index(value.as_ptr());
 
-				let memory = ThreadMemory::new();
-
 				SENDER
 					.get()
 					.expect("closing thread without `SENDER` being initialized")
 					.send(Command::Terminate {
 						id: super::current_id(),
 						value,
-						memory,
 					})
 					.expect("`Receiver` was somehow dropped from the main thread");
 

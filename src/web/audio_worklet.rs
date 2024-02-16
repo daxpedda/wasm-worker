@@ -30,6 +30,7 @@ use crate::Thread;
 	feature = "audio-worklet"
 )))]
 mod audio_worklet {
+	pub(super) struct AudioWorkletHandle;
 	pub(super) struct RegisterThreadFuture;
 }
 #[cfg(not(all(
@@ -68,11 +69,9 @@ pub trait BaseAudioContextExt {
 	///
 	/// # Notes
 	///
-	/// Unfortunately some browsers are not fully spec-compliant and don't fully
-	/// shut-down the thread when the [`closed`] [state] is reached. This may
-	/// not only cause memory leaks, but any calls into the Wasm module may lead
-	/// to undefined behavior. To avoid this make sure to clean up any resources
-	/// before [shutting down the audio worklet].
+	/// Unfortunately there is currently no way to determine when the thread has
+	/// fully shutdown. So this will leak memory unless
+	/// [`AudioWorkletHandle::destroy()`] is called.
 	///
 	/// # Errors
 	///
@@ -99,8 +98,6 @@ pub trait BaseAudioContextExt {
 	/// ```
 	///
 	/// [`closed`]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#closed
-	/// [state]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state
-	/// [shutting down the audio worklet]: https://developer.mozilla.org/en-US/docs/Web/API/AudioContext/close
 	#[cfg_attr(
 		not(all(
 			target_family = "wasm",
@@ -263,14 +260,90 @@ where
 pub struct RegisterThreadFuture(audio_worklet::RegisterThreadFuture);
 
 impl Future for RegisterThreadFuture {
-	type Output = io::Result<Thread>;
+	type Output = io::Result<AudioWorkletHandle>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		Pin::new(&mut self.0).poll(cx)
+		Pin::new(&mut self.0).poll(cx).map_ok(AudioWorkletHandle)
 	}
 }
 
 impl RefUnwindSafe for RegisterThreadFuture {}
+
+/// Handle to the audio worklet. See [`BaseAudioContextExt::register_thread()`].
+#[derive(Debug)]
+pub struct AudioWorkletHandle(audio_worklet::AudioWorkletHandle);
+
+impl AudioWorkletHandle {
+	/// Extracts a handle to the underlying thread.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// use web_sys::{AudioContext, console};
+	/// use web_thread::web::audio_worklet::BaseAudioContextExt;
+	///
+	/// let context = AudioContext::new().unwrap();
+	/// let handle = context.clone().register_thread(|| {
+	/// 	// Do work.
+	/// }).await.unwrap();
+	///
+	/// console::log_1(&format!("thread id: {:?}", handle.thread().id()).into());
+	/// # }
+	/// ```
+	#[must_use]
+	pub const fn thread(&self) -> &Thread {
+		self.0.thread()
+	}
+
+	/// This cleans up memory allocated for the corresponding audio worklet
+	/// thread. This call *may* block.
+	///
+	/// # Panics
+	///
+	/// This call *may* panic the calling thread doesn't support blocking, see
+	/// [`web::has_block_support()`](crate::web::has_block_support).
+	///
+	/// # Safety
+	///
+	/// The corresponding thread must not currently or in the future be running
+	/// code of this Wasm module.
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// use wasm_bindgen_futures::JsFuture;
+	/// use web_sys::{AudioContext, console};
+	/// use web_thread::web::audio_worklet::BaseAudioContextExt;
+	///
+	/// let context = AudioContext::new().unwrap();
+	/// let (sender, receiver) = async_channel::bounded(1);
+	/// let handle = context.clone().register_thread(move || {
+	/// 	// Do work.
+	/// 	sender.try_send(()).unwrap();
+	/// }).await.unwrap();
+	///
+	/// // Wait until audio worklet is finished.
+	/// receiver.recv().await.unwrap();
+	/// JsFuture::from(context.close().unwrap()).await.unwrap();
+	/// // We are sure we are done with the audio worklet and didn't register any
+	/// // events or promises that could be called later.
+	/// unsafe { handle.destroy() };
+	/// # }
+	/// ```
+	pub unsafe fn destroy(self) {
+		// SAFETY: This is guaranteed to be called only once for the corresponding
+		// thread. Other safety guarantees have to be uphold by the user.
+		unsafe { self.0.destroy() };
+	}
+}
 
 /// Extension for [`AudioWorkletGlobalScope`].
 #[cfg_attr(

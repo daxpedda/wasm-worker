@@ -426,10 +426,10 @@ impl<T> ScopeJoinFuture<'_, '_, T> {
 	/// # Panics
 	///
 	/// - If the calling thread doesn't support blocking, see
-	///   [`web::has_block_support()`](crate::web::has_block_support). Though it
-	///   is guaranteed to not block if [`ScopeJoinFuture::is_finished()`]
-	///   returns [`true`]. Alternatively consider just polling this [`Future`]
-	///   to completion.
+	///   [`web::has_block_support()`](has_block_support). Though it is
+	///   guaranteed to not block if [`ScopeJoinFuture::is_finished()`] returns
+	///   [`true`]. Alternatively consider just polling this [`Future`] to
+	///   completion.
 	/// - If called after being polled to completion.
 	///
 	/// # Example

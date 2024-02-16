@@ -36,10 +36,30 @@ where
 pub(crate) struct RegisterThreadFuture(audio_worklet::RegisterThreadFuture);
 
 impl Future for RegisterThreadFuture {
-	type Output = io::Result<Thread>;
+	type Output = io::Result<AudioWorkletHandle>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-		Pin::new(&mut self.0).poll(cx)
+		Pin::new(&mut self.0).poll(cx).map_ok(AudioWorkletHandle)
+	}
+}
+
+/// Implementation for [`crate::web::audio_worklet::AudioWorkletHandle`].
+#[derive(Debug)]
+pub(crate) struct AudioWorkletHandle(audio_worklet::AudioWorkletHandle);
+
+impl AudioWorkletHandle {
+	/// Implementation for
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::thread()`].
+	pub(crate) const fn thread(&self) -> &Thread {
+		self.0.thread()
+	}
+
+	/// Implementation for
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	pub(crate) unsafe fn destroy(self) {
+		// SAFETY: This is guaranteed to be called only once for the corresponding
+		// thread. Other safety guarantees have to be uphold by the user.
+		unsafe { self.0.destroy() };
 	}
 }
 

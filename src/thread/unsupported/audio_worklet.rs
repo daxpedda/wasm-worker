@@ -27,7 +27,7 @@ pub(in super::super) struct RegisterThreadFuture {
 }
 
 impl Future for RegisterThreadFuture {
-	type Output = io::Result<Thread>;
+	type Output = io::Result<AudioWorkletHandle>;
 
 	fn poll(mut self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Self::Output> {
 		Poll::Ready(Err(self.error.take().expect("polled after completion")))
@@ -36,12 +36,33 @@ impl Future for RegisterThreadFuture {
 
 impl RegisterThreadFuture {
 	/// Create a [`RegisterThreadFuture`] that returns `error`.
-
 	pub(in super::super) const fn error(error: Error) -> Self {
 		Self {
 			error: Some(error),
 			_marker: PhantomData,
 		}
+	}
+}
+
+/// Implementation for [`crate::web::audio_worklet::AudioWorkletHandle`].
+#[derive(Debug)]
+pub(in super::super) struct AudioWorkletHandle;
+
+impl AudioWorkletHandle {
+	/// Implementation for
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::thread()`].
+	#[allow(clippy::unused_self)]
+	pub(crate) const fn thread(&self) -> &Thread {
+		// Reached `register_thread()` without atomics target feature.
+		// Text is not inserted in `unreachable!()` because method requires `const`.
+		unreachable!()
+	}
+
+	/// Implementation for
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	#[allow(clippy::unused_self)]
+	pub(crate) unsafe fn destroy(self) {
+		unreachable!("reached `register_thread()` without atomics target feature")
 	}
 }
 

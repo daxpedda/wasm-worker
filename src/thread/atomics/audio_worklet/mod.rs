@@ -1,6 +1,7 @@
 //! Audio worklet extension implementations.
 
 mod js;
+mod memory;
 mod processor;
 mod register;
 
@@ -13,7 +14,9 @@ use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, DomEx
 
 use self::js::{AudioWorkletNodeOptionsExt, BaseAudioContextExt};
 pub(in super::super) use self::processor::register_processor;
-pub(in super::super) use self::register::{register_thread, RegisterThreadFuture};
+pub(in super::super) use self::register::{
+	register_thread, AudioWorkletHandle, RegisterThreadFuture,
+};
 use super::MAIN_THREAD;
 use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
 

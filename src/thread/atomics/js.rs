@@ -1,7 +1,6 @@
 //! Bindings to the JS API.
 
-use js_sys::WebAssembly::Global;
-use js_sys::{Object, Promise};
+use js_sys::Promise;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 
@@ -44,27 +43,4 @@ extern "C" {
 	/// [`Atomics.waitAsync`s return value]: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/waitAsync#return_value
 	#[wasm_bindgen(method, getter)]
 	pub(super) fn value(this: &WaitAsyncResult) -> Promise;
-
-	/// Type of [`WebAssembly.Module.exports()`s return value](https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Module/exports_static).
-	pub(super) type Exports;
-
-	/// [`wasm-bindgen`](wasm_bindgen)s thread destruction function.
-	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
-	pub(super) unsafe fn thread_destroy(this: &Exports, tls_base: &Global, stack_alloc: &Global);
-
-	/// Base address of [`wasm-bindgen`](wasm_bindgen)s TLS memory.
-	#[wasm_bindgen(method, getter, js_name = __tls_base)]
-	pub(super) fn tls_base(this: &Exports) -> Global;
-
-	/// Base address of [`wasm-bindgen`](wasm_bindgen)s thread stack memory.
-	#[wasm_bindgen(method, getter, js_name = __stack_alloc)]
-	pub(super) fn stack_alloc(this: &Exports) -> Global;
-
-	/// Dictionary type of [`GlobalDescriptor`](https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Global/Global#descriptor).
-	#[wasm_bindgen(extends = Object)]
-	pub(super) type GlobalDescriptor;
-
-	/// Setter for [`GlobalDescriptor.value`](https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Global/Global#descriptor) property.
-	#[wasm_bindgen(method, setter, js_name = value)]
-	pub(super) fn set_value(this: &GlobalDescriptor, value: &str);
 }

@@ -1,27 +1,24 @@
 //! Registering an audio worklet thread on a [`BaseAudioContext`].
 
-use std::cell::RefCell;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io::{Error, ErrorKind};
 use std::pin::Pin;
-use std::rc::Rc;
 use std::task::{Context, Poll};
 use std::{any, io};
 
 use js_sys::Array;
-use wasm_bindgen::closure::Closure;
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{AudioContextState, AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
 use super::super::js::META;
-use super::super::memory::ThreadMemory;
 use super::super::oneshot::{self, Receiver};
 use super::super::url::ScriptUrl;
 use super::super::{Thread, MAIN_THREAD};
-use super::js::{self, BaseAudioContextExt};
+use super::js::BaseAudioContextExt;
+use super::memory::ThreadMemory;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -162,7 +159,7 @@ impl Drop for RegisterThreadFuture {
 }
 
 impl Future for RegisterThreadFuture {
-	type Output = io::Result<Thread>;
+	type Output = io::Result<AudioWorkletHandle>;
 
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		loop {
@@ -222,14 +219,7 @@ impl Future for RegisterThreadFuture {
 					mut receiver,
 				} => match Pin::new(&mut receiver).poll(cx) {
 					Poll::Ready(Some(Package { thread, memory })) => {
-						if let AudioContextState::Closed = context.state() {
-							// SAFETY: When reaching the `closed` state, all resources
-							// should have been freed. See <https://webaudio.github.io/web-audio-api/#dom-audiocontextstate-closed>.
-							unsafe { memory.destroy() };
-						} else {
-							Self::schedule_clean(context, memory);
-						}
-						return Poll::Ready(Ok(thread));
+						return Poll::Ready(Ok(AudioWorkletHandle { thread, memory }));
 					}
 					Poll::Pending => {
 						self.0 = Some(State::Package { context, receiver });
@@ -247,58 +237,30 @@ impl RegisterThreadFuture {
 	pub(in super::super::super) const fn error(error: Error) -> Self {
 		Self(Some(State::Error(error)))
 	}
+}
 
-	/// Schedule thread cleanup.
-	fn schedule_clean(context: BaseAudioContext, memory: ThreadMemory) {
-		/// Hold data necessary to schedule the cleanup.
-		struct Data {
-			/// The corresponding [`BaseAudioContext`].
-			context: BaseAudioContext,
-			/// The corresponding [`ThreadMemory`].
-			memory: ThreadMemory,
-			/// The [`Closure`] to clean up.
-			closure: Closure<dyn FnMut()>,
-		}
+/// Implementation for [`crate::web::audio_worklet::AudioWorkletHandle`].
+#[derive(Debug)]
+pub(in super::super::super) struct AudioWorkletHandle {
+	/// Corresponding [`Thread`].
+	thread: Thread,
+	/// Memory handle of the corresponding audio worklet thread.
+	memory: ThreadMemory,
+}
 
-		let data_rc = Rc::new(RefCell::new(None));
+impl AudioWorkletHandle {
+	/// Implementation for
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::thread()`].
+	pub(crate) const fn thread(&self) -> &Thread {
+		&self.thread
+	}
 
-		let closure = Closure::new({
-			let data_rc = Rc::clone(&data_rc);
-			move || {
-				let data: Data = data_rc
-					.borrow_mut()
-					.take()
-					.expect("`BaseAudioContext` reached `closed` state twice");
-
-				if let AudioContextState::Closed = data.context.state() {
-					// SAFETY: When reaching the `closed` state, all resources
-					// should have been freed. See <https://webaudio.github.io/web-audio-api/#dom-audiocontextstate-closed>.
-					unsafe { data.memory.destroy() };
-
-					// Remove the event listener.
-					data.context
-						.remove_event_listener_with_callback(
-							"statechange",
-							data.closure.as_ref().unchecked_ref(),
-						)
-						.expect("`EventTarget.removeEventListener()` is not expected to fail");
-					// Don't drop the closure while it is being run.
-					js::queue_microtask(
-						&Closure::once_into_js(move || drop(data.closure)).unchecked_into(),
-					);
-				} else {
-					*data_rc.borrow_mut() = Some(data);
-				}
-			}
-		});
-		context
-			.add_event_listener_with_callback("statechange", closure.as_ref().unchecked_ref())
-			.expect("`EventTarget.addEventListener()` is not expected to fail");
-		*data_rc.borrow_mut() = Some(Data {
-			context,
-			memory,
-			closure,
-		});
+	/// Implementation for
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	pub(crate) unsafe fn destroy(self) {
+		// SAFETY: This is guaranteed to be called only once for the corresponding
+		// thread. Other safety guarantees have to be uphold by the user.
+		unsafe { self.memory.destroy() };
 	}
 }
 
