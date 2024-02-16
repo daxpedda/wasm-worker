@@ -43,6 +43,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		data: Box::new(data),
 	});
 
+	// If `processor_options` is set already by the user, don't overwrite it!
 	let options: AudioWorkletNodeOptionsExt = options.map_or_else(
 		|| Object::new().unchecked_into(),
 		AudioWorkletNodeOptions::unchecked_into,

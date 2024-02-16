@@ -17,9 +17,9 @@ use super::Data;
 use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
 thread_local! {
-	/// Caches if this audio worklet supports [`TextEncoder`]. It is highly
-	/// likely that users will add a polyfill, so we don't want to assume that
-	/// all audio worklets have the same support.
+	/// Caches if this audio worklet supports [`TextEncoder`]. It is possible
+	/// that users will add a polyfill, so we don't want to assume that all
+	/// audio worklets have the same support.
 	///
 	/// [`TextEncoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder
 	static HAS_TEXT_ENCODER: bool = !js_sys::global()
@@ -115,9 +115,13 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 					processor_data =
 						Some(*data.data.downcast::<P::Data>().expect("wrong type encoded"));
 
+					// If our custom `data` property was the only things transported, delete
+					// `AudioWorkletNodeOptions.processorOptions` entirely.
 					if Object::keys(&processor_options).length() == 1 {
 						options.processor_options(None);
-					} else {
+					}
+					// Otherwise remove our `data` property so its not observable by the user.
+					else {
 						thread_local! {
 							static DATA_PROPERTY_NAME: JsString =
 								if HAS_TEXT_ENCODER.with(bool::clone) {
