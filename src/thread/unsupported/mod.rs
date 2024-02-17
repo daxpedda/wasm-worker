@@ -157,7 +157,7 @@ pub(super) fn sleep(dur: Duration) {
 	);
 }
 
-/// Tests is blocking is supported.
+/// Tests if blocking is supported.
 pub(super) fn test_block_support() -> bool {
 	ZERO_ARRAY.with(|array| Atomics::wait_with_timeout(array, 0, 0, 0.).is_ok())
 }

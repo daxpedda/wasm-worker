@@ -187,7 +187,15 @@ impl<T> Receiver<T> {
 	pub(super) fn receive(self) -> Option<T> {
 		let state = self.0.expect("value already taken by polling");
 
-		let mut value = state.value.lock().unwrap_or_else(PoisonError::into_inner);
+		let mut value = if super::super::has_block_support() {
+			state.value.lock().unwrap_or_else(PoisonError::into_inner)
+		} else {
+			match state.value.try_lock() {
+				Ok(value) => value,
+				Err(TryLockError::Poisoned(error)) => error.into_inner(),
+				Err(TryLockError::WouldBlock) => panic!("current thread type cannot be blocked"),
+			}
+		};
 
 		loop {
 			#[allow(clippy::significant_drop_in_scrutinee)]

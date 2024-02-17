@@ -302,15 +302,16 @@ impl AudioWorkletHandle {
 	/// This cleans up memory allocated for the corresponding audio worklet
 	/// thread. This call *may* block.
 	///
-	/// # Panics
+	/// # Exception
 	///
-	/// This call *may* panic the calling thread doesn't support blocking, see
+	/// This call *may* block and throw an exception if the calling thread
+	/// doesn't support blocking, see
 	/// [`web::has_block_support()`](crate::web::has_block_support).
 	///
 	/// # Safety
 	///
-	/// The corresponding thread must not currently or in the future be running
-	/// code of this Wasm module.
+	/// The corresponding thread must not currently or in the future access this
+	/// Wasm module.
 	///
 	/// # Example
 	///

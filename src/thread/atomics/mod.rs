@@ -263,7 +263,7 @@ pub(super) fn sleep(dur: Duration) {
 	std::thread::sleep(dur);
 }
 
-/// Tests is blocking is supported.
+/// Tests if blocking is supported.
 pub(super) fn test_block_support() -> bool {
 	let value = Pin::new(&0);
 	let index = i32_to_buffer_index(ptr::from_ref(&value));
