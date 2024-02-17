@@ -4,6 +4,7 @@ use std::pin::pin;
 
 use wasm_bindgen_test::wasm_bindgen_test;
 use web_thread::web;
+use web_thread::web::YieldTime;
 
 #[wasm_bindgen_test]
 #[should_panic = "`ScopeFuture` polled after completion"]
@@ -44,4 +45,12 @@ async fn scope_async_join() {
 	let mut handle = web::scope_async(|_| async {}).into_wait().await;
 	(&mut handle).await;
 	handle.join_all();
+}
+
+#[wasm_bindgen_test]
+#[should_panic = "`YieldNowFuture` polled after completion"]
+async fn yield_now() {
+	let mut future = web::yield_now_async(YieldTime::UserBlocking);
+	(&mut future).await;
+	future.await;
 }

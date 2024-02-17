@@ -76,6 +76,7 @@ web-sys = { version = "0.3", features = [
 	"HtmlInputElement",
 	"HtmlTableElement",
 	"HtmlTableRowElement",
+	"OfflineAudioContext",
 	"Url",
 ] }
 web-time = "1"
@@ -84,10 +85,27 @@ web-time = "1"
 atomic-waker = "1"
 futures-util = { version = "0.3", default-features = false }
 
+[patch.crates-io]
+js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen-test = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+
 [[example]]
 doc-scrape-examples = true
 name = "audio_worklet"
 required-features = ["audio-worklet"]
+
+[[test]]
+name = "audio_worklet_fail"
+path = "tests/audio_worklet_fail.rs"
+test = false
+
+[[test]]
+name = "audio_worklet_success"
+path = "tests/audio_worklet_success.rs"
+test = false
 
 [[test]]
 name = "basic_fail"

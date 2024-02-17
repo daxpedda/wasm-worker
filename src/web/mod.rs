@@ -683,7 +683,8 @@ pub enum YieldTime {
 	/// # Notes
 	///
 	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
-	/// not supported.
+	/// not supported, which is at least as short as
+	/// [`UserVisible`](Self::UserVisible).
 	///
 	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
@@ -694,8 +695,8 @@ pub enum YieldTime {
 	/// # Notes
 	///
 	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
-	/// not supported, which is equivalent to
-	/// [`UserBlocking`](Self::UserBlocking).
+	/// not supported, which is at least as short as
+	/// [`UserVisible`](Self::UserVisible).
 	///
 	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
@@ -707,8 +708,8 @@ pub enum YieldTime {
 	/// # Notes
 	///
 	/// Will fall back to [`MessagePort.postMessage()`] when [`Scheduler`] is
-	/// not supported, which is equivalent to
-	/// [`UserBlocking`](Self::UserBlocking).
+	/// not supported, which is at least as short as
+	/// [`UserVisible`](Self::UserVisible).
 	///
 	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
 	/// [`Scheduler`]: https://developer.mozilla.org/en-US/docs/Web/API/Scheduler
@@ -720,8 +721,8 @@ pub enum YieldTime {
 	/// # Notes
 	///
 	/// Will fall back to [`MessagePort.postMessage()`] when
-	/// [`Window.requestIdleCallback()`] is not supported, which is equivalent
-	/// to [`UserBlocking`](Self::UserBlocking).
+	/// [`Window.requestIdleCallback()`] is not supported, which is at least as
+	/// short as [`UserVisible`](Self::UserVisible).
 	///
 	/// [`MessagePort.postMessage()`]: https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage
 	/// [`Window.requestIdleCallback()`]: https://developer.mozilla.org/en-US/docs/Web/API/Window/requestIdleCallback

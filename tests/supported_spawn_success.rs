@@ -1,5 +1,5 @@
 #![cfg(test)]
-// FP: Should be fixed in Rust v1.77.
+// TODO: Should be fixed in Rust v1.77.
 #![cfg_attr(
 	not(target_family = "wasm"),
 	allow(clippy::semicolon_if_nothing_returned)

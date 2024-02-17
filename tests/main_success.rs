@@ -1,3 +1,10 @@
+#[cfg(all(
+	target_family = "wasm",
+	target_feature = "atomics",
+	feature = "audio-worklet",
+	not(unsupported_spawn)
+))]
+mod audio_worklet_success;
 mod basic_success;
 #[cfg(any(
 	not(target_family = "wasm"),
