@@ -673,7 +673,8 @@ pub fn yield_now_async(time: YieldTime) -> YieldNowFuture {
 	YieldNowFuture(thread::YieldNowFuture::new(time))
 }
 
-/// How long it should yield execution to the event loop.
+/// How long [`yield_now_async()`] should yield execution to the event loop. See
+/// [`yield_now_async()`] for more information.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum YieldTime {
 	/// Shortest execution yield to the event loop. Translates to

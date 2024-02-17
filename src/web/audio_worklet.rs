@@ -1,4 +1,6 @@
-//! Audio worklet extensions.
+//! Platform-specific extensions for [`web-thread`](crate) on the Web platform
+//! to spawn and use audio worklets. See
+//! [`BaseAudioContextExt::audio_worklet_node()`] for a usage example.
 
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
