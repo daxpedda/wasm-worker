@@ -2,10 +2,21 @@
 #![cfg(all(target_family = "wasm", feature = "audio-worklet"))]
 
 use wasm_bindgen_test::wasm_bindgen_test;
-use web_sys::{AudioContext, OfflineAudioContext};
-use web_thread::web::audio_worklet::BaseAudioContextExt;
+use web_sys::{AudioContext, AudioWorkletNodeOptions, AudioWorkletProcessor, OfflineAudioContext};
+use web_thread::web::audio_worklet::{BaseAudioContextExt, ExtendAudioWorkletProcessor};
+
+struct TestProcessor;
+
+impl ExtendAudioWorkletProcessor for TestProcessor {
+	type Data = ();
+
+	fn new(_: AudioWorkletProcessor, _: Option<Self::Data>, _: AudioWorkletNodeOptions) -> Self {
+		Self
+	}
+}
 
 #[wasm_bindgen_test]
+#[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
 #[should_panic = "operation not supported on this platform without the atomics target feature and \
                   cross-origin isolation"]
 async fn register() {
@@ -17,6 +28,7 @@ async fn register() {
 }
 
 #[wasm_bindgen_test]
+#[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
 #[should_panic = "operation not supported on this platform without the atomics target feature and \
                   cross-origin isolation"]
 async fn offline_register() {
@@ -28,7 +40,36 @@ async fn offline_register() {
 }
 
 #[wasm_bindgen_test]
-#[cfg(target_feature = "atomics")]
+#[should_panic = "`register_thread()` has to be called on this context first"]
+fn node() {
+	AudioContext::new()
+		.unwrap()
+		.audio_worklet_node::<TestProcessor>("test", (), None)
+		.unwrap();
+}
+
+#[wasm_bindgen_test]
+#[should_panic = "`register_thread()` has to be called on this context first"]
+fn offline_node() {
+	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+		.unwrap()
+		.audio_worklet_node::<TestProcessor>("test", (), None)
+		.unwrap();
+}
+
+#[wasm_bindgen_test]
+#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+#[should_panic = "name"]
+async fn not_registered_node() {
+	let context = AudioContext::new().unwrap();
+	context.clone().register_thread(|| ()).await.unwrap();
+	context
+		.audio_worklet_node::<TestProcessor>("test", (), None)
+		.unwrap();
+}
+
+#[wasm_bindgen_test]
+#[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
 async fn check_failing_spawn() {
 	use js_sys::Array;
 	use wasm_bindgen_futures::JsFuture;

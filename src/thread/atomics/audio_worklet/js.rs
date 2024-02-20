@@ -11,9 +11,9 @@ use super::Data;
 
 #[wasm_bindgen]
 extern "C" {
-	/// Returns the constructor of [`TextEncoder`](https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder).
-	#[wasm_bindgen(method, getter, js_name = TextEncoder)]
-	pub(super) fn text_encoder(this: &GlobalExt) -> JsValue;
+	/// Returns the constructor of [`TextDecoder`](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder).
+	#[wasm_bindgen(method, getter, js_name = TextDecoder)]
+	pub(super) fn text_decoder(this: &GlobalExt) -> JsValue;
 
 	/// Extension for [`BaseAudioContext`](web_sys::BaseAudioContext).
 	pub(super) type BaseAudioContextExt;

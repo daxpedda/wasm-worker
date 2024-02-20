@@ -80,7 +80,7 @@ mod web {
 		// Create audio context.
 		let context = AudioContext::new().unwrap();
 
-		// Firefox requires a polyfill for `TextDecoder`/`TextEncoder`:
+		// Some browsers don't support `TextDecoder`/`TextEncoder` in audio worklets:
 		// <https://bugzilla.mozilla.org/show_bug.cgi?id=1826432>
 		JsFuture::from(
 			context

@@ -17,15 +17,45 @@ use super::Data;
 use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
 thread_local! {
-	/// Caches if this audio worklet supports [`TextEncoder`]. It is possible
+	/// Caches if this audio worklet supports [`TextDecoder`]. It is possible
 	/// that users will add a polyfill, so we don't want to assume that all
 	/// audio worklets have the same support.
 	///
-	/// [`TextEncoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextEncoder
-	static HAS_TEXT_ENCODER: bool = !js_sys::global()
+	/// [`TextDecoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder
+	static HAS_TEXT_DECODER: bool = !js_sys::global()
 		.unchecked_into::<GlobalExt>()
-		.text_encoder()
+		.text_decoder()
 		.is_undefined();
+
+	/// Cache name to our custom `data` property to avoid `TextDecoder` and the overhead.
+	static DATA_PROPERTY_NAME: JsString =
+		if HAS_TEXT_DECODER.with(bool::clone) {
+			JsString::from("__web_thread_data")
+		} else {
+			JsString::from_code_point(
+				"__web_thread_data"
+					.chars()
+					.map(u32::from)
+					.collect::<Vec<_>>()
+					.as_slice(),
+			)
+			.expect("found invalid Unicode")
+		};
+
+	/// Cache name to the `processorOptions` property to avoid `TextDecoder` and the overhead.
+	static PROCESSOR_OPTIONS_PROPERTY_NAME: JsString =
+		if HAS_TEXT_DECODER.with(bool::clone) {
+			JsString::from("processorOptions")
+		} else {
+			JsString::from_code_point(
+				"processorOptions"
+					.chars()
+					.map(u32::from)
+					.collect::<Vec<_>>()
+					.as_slice(),
+			)
+			.expect("found invalid Unicode")
+		};
 }
 
 /// Implementation for
@@ -33,7 +63,7 @@ thread_local! {
 pub(in super::super::super) fn register_processor<P: 'static + ExtendAudioWorkletProcessor>(
 	name: &str,
 ) -> Result<(), Error> {
-	let name = if HAS_TEXT_ENCODER.with(bool::clone) {
+	let name = if HAS_TEXT_DECODER.with(bool::clone) {
 		JsString::from(name)
 	} else {
 		JsString::from_code_point(name.chars().map(u32::from).collect::<Vec<_>>().as_slice())
@@ -97,7 +127,7 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 	fn instantiate(
 		&mut self,
 		this: web_sys::AudioWorkletProcessor,
-		mut options: AudioWorkletNodeOptions,
+		options: AudioWorkletNodeOptions,
 	) -> __WebThreadProcessor {
 		let mut processor_data = None;
 
@@ -118,26 +148,12 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 					// If our custom `data` property was the only things transported, delete
 					// `AudioWorkletNodeOptions.processorOptions` entirely.
 					if Object::keys(&processor_options).length() == 1 {
-						options.processor_options(None);
+						PROCESSOR_OPTIONS_PROPERTY_NAME
+							.with(|name| Reflect::delete_property(&processor_options, name))
+							.expect("expected `processor_options` to be an `Object`");
 					}
 					// Otherwise remove our `data` property so its not observable by the user.
 					else {
-						thread_local! {
-							static DATA_PROPERTY_NAME: JsString =
-								if HAS_TEXT_ENCODER.with(bool::clone) {
-									JsString::from("__web_thread_data")
-								} else {
-									JsString::from_code_point(
-										"__web_thread_data"
-											.chars()
-											.map(u32::from)
-											.collect::<Vec<_>>()
-											.as_slice(),
-									)
-									.expect("found invalid Unicode")
-								};
-						}
-
 						DATA_PROPERTY_NAME
 							.with(|name| Reflect::delete_property(&processor_options, name))
 							.expect("expected `processor_options` to be an `Object`");

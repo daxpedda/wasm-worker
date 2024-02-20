@@ -5,7 +5,10 @@
 //! - Blocking is not recommended.
 //!
 //! Browser bugs:
-//! - Firefox doesn't support `TextEncoder`/`TextDecoder` in audio worklets: <https://bugzilla.mozilla.org/show_bug.cgi?id=1826432>.
+//! - Browsers don't support `TextEncoder`/`TextDecoder` in audio worklets:
+//!   - Chrome: ?
+//!   - Firefox: <https://bugzilla.mozilla.org/show_bug.cgi?id=1826432>
+//!   - Safari: ?
 //! - Firefox doesn't support module service workers: <https://bugzilla.mozilla.org/show_bug.cgi?id=1360870>.
 //! - Browsers don't support blocking in shared workers:
 //!   - Firefox: <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>
