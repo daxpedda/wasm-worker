@@ -40,6 +40,28 @@ async fn offline_register() {
 }
 
 #[wasm_bindgen_test]
+#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+#[should_panic = "`BaseAudioContext` already registered a thread"]
+async fn register_twice() {
+	let context = AudioContext::new().unwrap();
+
+	context.clone().register_thread(|| ()).await.unwrap();
+	context.register_thread(|| ()).await.unwrap();
+}
+
+#[wasm_bindgen_test]
+#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+#[should_panic = "`BaseAudioContext` already registered a thread"]
+async fn offline_register_twice() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	context.clone().register_thread(|| ()).await.unwrap();
+	context.register_thread(|| ()).await.unwrap();
+}
+
+#[wasm_bindgen_test]
 #[should_panic = "`register_thread()` has to be called on this context first"]
 fn node() {
 	AudioContext::new()

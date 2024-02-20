@@ -39,6 +39,19 @@ impl ExtendAudioWorkletProcessor for TestProcessor {
 	}
 }
 
+struct ParkProcessor;
+
+impl ExtendAudioWorkletProcessor for ParkProcessor {
+	type Data = Sender<()>;
+
+	fn new(_: AudioWorkletProcessor, data: Option<Self::Data>, _: AudioWorkletNodeOptions) -> Self {
+		web_thread::park();
+		data.unwrap().try_send(()).unwrap();
+
+		Self
+	}
+}
+
 #[wasm_bindgen_test]
 async fn register() {
 	AudioContext::new()
@@ -49,12 +62,65 @@ async fn register() {
 }
 
 #[wasm_bindgen_test]
+async fn register_destroy() {
+	let (sender, receiver) = async_channel::bounded(1);
+
+	let handle = AudioContext::new()
+		.unwrap()
+		.register_thread(move || sender.try_send(()).unwrap())
+		.await
+		.unwrap();
+
+	receiver.recv().await.unwrap();
+	// SAFETY: We are sure the thread has spawned by now.
+	unsafe { handle.destroy() }
+}
+
+#[wasm_bindgen_test]
+async fn register_drop() {
+	let (sender, receiver) = async_channel::bounded(1);
+
+	AudioContext::new()
+		.unwrap()
+		.register_thread(move || sender.try_send(()).unwrap());
+
+	receiver.recv().await.unwrap();
+}
+
+#[wasm_bindgen_test]
 async fn offline_register() {
 	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 		.unwrap()
 		.register_thread(|| ())
 		.await
 		.unwrap();
+}
+
+#[wasm_bindgen_test]
+async fn offline_register_destroy() {
+	let (sender, receiver) = async_channel::bounded(1);
+
+	let handle =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap()
+			.register_thread(move || sender.try_send(()).unwrap())
+			.await
+			.unwrap();
+
+	receiver.recv().await.unwrap();
+	// SAFETY: We are sure the thread has spawned by now.
+	unsafe { handle.destroy() }
+}
+
+#[wasm_bindgen_test]
+async fn offline_register_drop() {
+	let (sender, receiver) = async_channel::bounded(1);
+
+	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+		.unwrap()
+		.register_thread(move || sender.try_send(()).unwrap());
+
+	receiver.recv().await.unwrap();
 }
 
 #[wasm_bindgen_test]
@@ -163,6 +229,64 @@ async fn offline_node_data() {
 
 	context
 		.audio_worklet_node::<TestProcessor>("test", end_sender, None)
+		.unwrap();
+	end_receiver.recv().await.unwrap();
+}
+
+#[wasm_bindgen_test]
+async fn unpark() {
+	let context = AudioContext::new().unwrap();
+	let (start_sender, start_receiver) = async_channel::bounded(1);
+	let (end_sender, end_receiver) = async_channel::bounded(1);
+	let handle = context
+		.clone()
+		.register_thread(move || {
+			let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+			global
+				.register_processor_ext::<ParkProcessor>("test")
+				.unwrap();
+			start_sender.try_send(()).unwrap();
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start_receiver.recv().await.unwrap();
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	handle.thread().unpark();
+	context
+		.audio_worklet_node::<ParkProcessor>("test", end_sender, None)
+		.unwrap();
+	end_receiver.recv().await.unwrap();
+}
+
+#[wasm_bindgen_test]
+async fn offline_unpark() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+	let (start_sender, start_receiver) = async_channel::bounded(1);
+	let (end_sender, end_receiver) = async_channel::bounded(1);
+	let handle = context
+		.clone()
+		.register_thread(move || {
+			let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+			global
+				.register_processor_ext::<ParkProcessor>("test")
+				.unwrap();
+			start_sender.try_send(()).unwrap();
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start_receiver.recv().await.unwrap();
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	handle.thread().unpark();
+	context
+		.audio_worklet_node::<ParkProcessor>("test", end_sender, None)
 		.unwrap();
 	end_receiver.recv().await.unwrap();
 }
