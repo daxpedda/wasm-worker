@@ -5,6 +5,7 @@
 use std::any::TypeId;
 use std::io::Error;
 use std::marker::PhantomData;
+use std::sync::OnceLock;
 
 use js_sys::{Array, Iterator, JsString, Object, Reflect};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -16,6 +17,32 @@ use super::js::AudioWorkletNodeOptionsExt;
 use super::Data;
 use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
+/// Macro to cache conversions from [`String`]s to [`JsString`]s to avoid
+/// `TextDecoder` and the overhead.
+macro_rules! js_string {
+	($($(#[$doc:meta])* static $name:ident = $value:literal;)*) => {
+		thread_local! {
+			$(
+				$(#[$doc])*
+				static $name: JsString = if HAS_TEXT_DECODER.with(bool::clone) {
+					JsString::from($value)
+				} else {
+					/// There is currently no nice way in Rust to convert
+					/// [`String`]s into `Vec<u32>`s without allocation, so we
+					/// cache it.
+					static NAME: OnceLock<Vec<u32>> = OnceLock::new();
+
+					JsString::from_code_point(
+						NAME.get_or_init(|| $value.chars().map(u32::from).collect())
+							.as_slice(),
+					)
+					.expect("found invalid Unicode")
+				};
+			)*
+		}
+	};
+}
+
 thread_local! {
 	/// Caches if this audio worklet supports [`TextDecoder`]. It is possible
 	/// that users will add a polyfill, so we don't want to assume that all
@@ -26,36 +53,16 @@ thread_local! {
 		.unchecked_into::<GlobalExt>()
 		.text_decoder()
 		.is_undefined();
+}
 
-	/// Cache name to our custom `data` property to avoid `TextDecoder` and the overhead.
-	static DATA_PROPERTY_NAME: JsString =
-		if HAS_TEXT_DECODER.with(bool::clone) {
-			JsString::from("__web_thread_data")
-		} else {
-			JsString::from_code_point(
-				"__web_thread_data"
-					.chars()
-					.map(u32::from)
-					.collect::<Vec<_>>()
-					.as_slice(),
-			)
-			.expect("found invalid Unicode")
-		};
+js_string! {
+	/// Name of our custom property on [`AudioWorkletNodeOptions`].
+	static DATA_PROPERTY_NAME = "__web_thread_data";
 
-	/// Cache name to the `processorOptions` property to avoid `TextDecoder` and the overhead.
-	static PROCESSOR_OPTIONS_PROPERTY_NAME: JsString =
-		if HAS_TEXT_DECODER.with(bool::clone) {
-			JsString::from("processorOptions")
-		} else {
-			JsString::from_code_point(
-				"processorOptions"
-					.chars()
-					.map(u32::from)
-					.collect::<Vec<_>>()
-					.as_slice(),
-			)
-			.expect("found invalid Unicode")
-		};
+	/// Name of the
+	/// [`AudioWorkletNodeOptions.processorOptions`](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions)
+	/// property.
+	static PROCESSOR_OPTIONS_PROPERTY_NAME = "processorOptions";
 }
 
 /// Implementation for
