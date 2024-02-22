@@ -61,7 +61,7 @@ async fn not_registered_node() {
 	let context = AudioContext::new().unwrap();
 	context.clone().register_thread(|| ()).await.unwrap();
 	context
-		.audio_worklet_node::<TestProcessor>("test", Box::new(|| ()), None)
+		.audio_worklet_node::<TestProcessor>("test", Box::new(|| None), None)
 		.unwrap();
 }
 

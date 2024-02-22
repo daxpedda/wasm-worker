@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 
 use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
 use web_sys::{AudioContext, AudioWorkletGlobalScope, AudioWorkletNode, OfflineAudioContext};
 use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContextExt};
@@ -106,8 +107,12 @@ async fn node() {
 			let end = end.clone();
 			move || {
 				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
 					if data
-						.set(RefCell::new(Some(Box::new(move || end.signal()))))
+						.set(RefCell::new(Some(Box::new(move || {
+							end.signal();
+							None
+						}))))
 						.is_err()
 					{
 						panic!()
@@ -146,8 +151,12 @@ async fn offline_node() {
 			let end = end.clone();
 			move || {
 				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
 					if data
-						.set(RefCell::new(Some(Box::new(move || end.signal()))))
+						.set(RefCell::new(Some(Box::new(move || {
+							end.signal();
+							None
+						}))))
 						.is_err()
 					{
 						panic!()
@@ -201,7 +210,10 @@ async fn node_data() {
 			"test",
 			Box::new({
 				let end = end.clone();
-				move || end.signal()
+				move || {
+					end.signal();
+					None
+				}
 			}),
 			None,
 		)
@@ -241,7 +253,10 @@ async fn offline_node_data() {
 			"test",
 			Box::new({
 				let end = end.clone();
-				move || end.signal()
+				move || {
+					end.signal();
+					None
+				}
 			}),
 			None,
 		)
@@ -283,6 +298,7 @@ async fn unpark() {
 				move || {
 					web_thread::park();
 					end.signal();
+					None
 				}
 			}),
 			None,
@@ -327,10 +343,97 @@ async fn offline_unpark() {
 				move || {
 					web_thread::park();
 					end.signal();
+					None
 				}
 			}),
 			None,
 		)
+		.unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+#[cfg(not(unsupported_headless_audiocontext))]
+async fn process() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					if data
+						.set(RefCell::new(Some(Box::new(move || {
+							Some(Box::new(move || end.signal()))
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	AudioWorkletNode::new(&context, "test").unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_process() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					if data
+						.set(RefCell::new(Some(Box::new(move || {
+							Some(Box::new(move || end.signal()))
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	AudioWorkletNode::new(&context, "test").unwrap();
+	JsFuture::from(context.start_rendering().unwrap())
+		.await
 		.unwrap();
 	end.await;
 }

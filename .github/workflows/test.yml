@@ -141,7 +141,7 @@ jobs:
               description: Firefox,
               name: GECKODRIVER,
               value: geckodriver,
-              flags: --cfg=unsupported_service --cfg=unsupported_shared_block --cfg=unsupported_wait_async
+              flags: --cfg=unsupported_service --cfg=unsupported_shared_block --cfg=unsupported_wait_async --cfg=unsupported_headless_audiocontext
             }
           - {
               os: macos-latest,
