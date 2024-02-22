@@ -1,5 +1,6 @@
+#![cfg(test)]
 #![cfg(all(target_family = "wasm", target_feature = "atomics"))]
-#![allow(unreachable_pub)]
+#![allow(dead_code, unreachable_pub)]
 
 use std::future::Future;
 use std::pin::Pin;

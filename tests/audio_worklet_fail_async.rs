@@ -2,18 +2,11 @@
 #![cfg(all(target_family = "wasm", feature = "audio-worklet"))]
 
 use wasm_bindgen_test::wasm_bindgen_test;
-use web_sys::{AudioContext, AudioWorkletNodeOptions, AudioWorkletProcessor, OfflineAudioContext};
-use web_thread::web::audio_worklet::{BaseAudioContextExt, ExtendAudioWorkletProcessor};
+use web_sys::{AudioContext, OfflineAudioContext};
+use web_thread::web::audio_worklet::BaseAudioContextExt;
 
-struct TestProcessor;
-
-impl ExtendAudioWorkletProcessor for TestProcessor {
-	type Data = ();
-
-	fn new(_: AudioWorkletProcessor, _: Option<Self::Data>, _: AudioWorkletNodeOptions) -> Self {
-		Self
-	}
-}
+#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+use super::test_processor::TestProcessor;
 
 #[wasm_bindgen_test]
 #[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
@@ -68,7 +61,7 @@ async fn not_registered_node() {
 	let context = AudioContext::new().unwrap();
 	context.clone().register_thread(|| ()).await.unwrap();
 	context
-		.audio_worklet_node::<TestProcessor>("test", (), None)
+		.audio_worklet_node::<TestProcessor>("test", Box::new(|| ()), None)
 		.unwrap();
 }
 

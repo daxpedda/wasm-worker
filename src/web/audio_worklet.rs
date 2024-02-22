@@ -122,7 +122,7 @@ pub trait BaseAudioContextExt {
 	/// # Errors
 	///
 	/// - If [`Self::register_thread()`] was not called on this context yet.
-	/// - If [`new AudioWorkletNode`] throws.
+	/// - If [`new AudioWorkletNode`] throws an exception.
 	///
 	/// # Example
 	///

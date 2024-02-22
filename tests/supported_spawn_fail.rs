@@ -1,17 +1,14 @@
 #![cfg(test)]
 #![cfg(all(target_family = "wasm", target_feature = "atomics"))]
 
+use std::sync::mpsc;
+
 use futures_util::future::{self, Either};
 use wasm_bindgen_test::wasm_bindgen_test;
 use web_thread::web::{JoinHandleExt, ScopedJoinHandleExt};
 use web_thread::{web, JoinHandle};
 
-#[path = "util.rs"]
-mod util;
-
-use std::sync::mpsc;
-
-use util::{Flag, SIGNAL_DURATION};
+use super::util::{self, Flag, SIGNAL_DURATION};
 
 #[wasm_bindgen_test]
 #[should_panic = "`JoinHandle::join()` called after `JoinHandleFuture` polled to completion"]

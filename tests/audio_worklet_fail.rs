@@ -2,25 +2,17 @@
 #![cfg(all(target_family = "wasm", feature = "audio-worklet"))]
 
 use wasm_bindgen_test::wasm_bindgen_test;
-use web_sys::{AudioContext, AudioWorkletNodeOptions, AudioWorkletProcessor, OfflineAudioContext};
-use web_thread::web::audio_worklet::{BaseAudioContextExt, ExtendAudioWorkletProcessor};
+use web_sys::{AudioContext, OfflineAudioContext};
+use web_thread::web::audio_worklet::BaseAudioContextExt;
 
-struct TestProcessor;
-
-impl ExtendAudioWorkletProcessor for TestProcessor {
-	type Data = ();
-
-	fn new(_: AudioWorkletProcessor, _: Option<Self::Data>, _: AudioWorkletNodeOptions) -> Self {
-		Self
-	}
-}
+use super::test_processor::TestProcessor;
 
 #[wasm_bindgen_test]
 #[should_panic = "`register_thread()` has to be called on this context first"]
 fn node() {
 	AudioContext::new()
 		.unwrap()
-		.audio_worklet_node::<TestProcessor>("test", (), None)
+		.audio_worklet_node::<TestProcessor>("test", Box::new(|| ()), None)
 		.unwrap();
 }
 
@@ -29,6 +21,6 @@ fn node() {
 fn offline_node() {
 	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 		.unwrap()
-		.audio_worklet_node::<TestProcessor>("test", (), None)
+		.audio_worklet_node::<TestProcessor>("test", Box::new(|| ()), None)
 		.unwrap();
 }

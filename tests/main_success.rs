@@ -20,6 +20,8 @@ mod basic_success_async;
 	)
 ))]
 mod supported_spawn_success;
+mod test_processor;
+mod util;
 
 #[cfg(target_family = "wasm")]
 wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
