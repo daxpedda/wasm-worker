@@ -4,6 +4,8 @@
 #![cfg(not(unsupported_service))]
 
 mod basic_fail;
+#[cfg(any(not(target_feature = "atomics"), not(unsupported_wait_async)))]
+mod basic_fail_async;
 mod unsupported_block;
 mod unsupported_spawn;
 

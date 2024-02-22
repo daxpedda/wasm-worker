@@ -276,7 +276,7 @@ pub(crate) fn has_block_support() -> bool {
 				global.as_ref().and_then(|global| match global {
 					Global::Window(_) | Global::Worklet | Global::Service(_) => Some(false),
 					Global::Dedicated(_) => Some(true),
-					// Firefox doesn't support blocking in shared workers, so for cross-browser
+					// Some browsers don't support blocking in shared workers, so for cross-browser
 					// support we have to test manually.
 					// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
 					Global::Shared(_) => {

@@ -1,7 +1,19 @@
 #![cfg(target_family = "wasm")]
 
 mod audio_worklet_fail;
+#[cfg(any(
+	not(target_feature = "atomics"),
+	not(unsupported_spawn),
+	not(unsupported_wait_async)
+))]
+mod audio_worklet_fail_async;
 mod basic_fail;
+#[cfg(any(
+	not(target_feature = "atomics"),
+	not(unsupported_spawn),
+	not(unsupported_wait_async)
+))]
+mod basic_fail_async;
 #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
 mod supported_spawn_fail;
 mod unsupported_block;

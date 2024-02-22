@@ -6,6 +6,11 @@
 ))]
 mod audio_worklet_success;
 mod basic_success;
+#[cfg(all(
+	target_family = "wasm",
+	any(not(unsupported_spawn), not(unsupported_wait_async))
+))]
+mod basic_success_async;
 #[cfg(any(
 	not(target_family = "wasm"),
 	all(
