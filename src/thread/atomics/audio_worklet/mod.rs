@@ -92,11 +92,6 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	data: P::Data,
 	options: Option<&AudioWorkletNodeOptions>,
 ) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
-	let data = Box::new(Data {
-		type_id: TypeId::of::<P>(),
-		data: Box::new(data),
-	});
-
 	// If `processor_options` is set already by the user, don't overwrite it!
 	let options: Cow<'_, AudioWorkletNodeOptionsExt> = options.map_or_else(
 		|| Cow::Owned(Object::new().unchecked_into()),
@@ -104,6 +99,12 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	);
 	let processor_options = options.get_processor_options();
 	let has_processor_options = processor_options.is_some();
+
+	let data = Box::new(Data {
+		type_id: TypeId::of::<P>(),
+		value: Box::new(data),
+		empty: !has_processor_options,
+	});
 	let processor_options = processor_options.unwrap_or_default();
 	let data = Box::into_raw(data);
 	processor_options.set_data(data);
@@ -129,7 +130,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		Err(error) => Err(AudioWorkletNodeError {
 			// SAFETY: We just made this pointer above.
 			data: *unsafe { Box::from_raw(data) }
-				.data
+				.value
 				.downcast()
 				.expect("wrong type encoded"),
 			error: error_from_exception(error),
@@ -145,7 +146,11 @@ struct Data {
 	/// [`TypeId`] to compare to the type when arriving at the constructor.
 	type_id: TypeId,
 	/// [`ExtendAudioWorkletProcessor::Data`].
-	data: Box<dyn Any>,
+	value: Box<dyn Any>,
+	/// If [`AudioWorkletNodeOptions.processorOptions`] was empty.
+	///
+	/// [`AudioWorkletNodeOptions.processorOptions`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions
+	empty: bool,
 }
 
 /// Convert a [`JsValue`] to an [`DomException`] and then to an [`Error`].

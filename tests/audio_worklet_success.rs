@@ -14,7 +14,7 @@ use web_sys::{
 use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContextExt};
 use web_thread::web::{self, YieldTime};
 
-use super::test_processor::{TestProcessor, GLOBAL_DATA};
+use super::test_processor::{AudioWorkletNodeOptionsExt2, TestProcessor, GLOBAL_DATA};
 use super::util::Flag;
 
 #[wasm_bindgen_test]
@@ -458,7 +458,7 @@ async fn no_options() {
 					#[allow(clippy::blocks_in_conditions)]
 					if data
 						.set(RefCell::new(Some(Box::new(move |options| {
-							assert!(options.processor_options().is_none());
+							assert!(options.get_processor_options().is_none());
 							end.signal();
 							None
 						}))))
@@ -503,7 +503,7 @@ async fn offline_no_options() {
 					#[allow(clippy::blocks_in_conditions)]
 					if data
 						.set(RefCell::new(Some(Box::new(move |options| {
-							assert!(options.processor_options().is_none());
+							assert!(options.get_processor_options().is_none());
 							end.signal();
 							None
 						}))))
@@ -531,7 +531,105 @@ async fn offline_no_options() {
 }
 
 #[wasm_bindgen_test]
-async fn no_data_options() {
+async fn zero_options() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							assert_eq!(
+								Object::keys(&options.get_processor_options().unwrap()).length(),
+								0
+							);
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let options = AudioWorkletNodeOptionsExt2::new();
+	options.set_processor_options(Some(&Object::new()));
+	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_zero_options() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							assert_eq!(
+								Object::keys(&options.get_processor_options().unwrap()).length(),
+								0
+							);
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let options = AudioWorkletNodeOptionsExt2::new();
+	options.set_processor_options(Some(&Object::new()));
+	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn data_no_options() {
 	let context = AudioContext::new().unwrap();
 
 	let start = Flag::new();
@@ -561,7 +659,7 @@ async fn no_data_options() {
 			Box::new({
 				let end = end.clone();
 				move |options| {
-					assert!(options.processor_options().is_none());
+					assert!(options.get_processor_options().is_none());
 					end.signal();
 					None
 				}
@@ -573,7 +671,7 @@ async fn no_data_options() {
 }
 
 #[wasm_bindgen_test]
-async fn offline_no_data_options() {
+async fn offline_data_no_options() {
 	let context =
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 			.unwrap();
@@ -605,7 +703,7 @@ async fn offline_no_data_options() {
 			Box::new({
 				let end = end.clone();
 				move |options| {
-					assert!(options.processor_options().is_none());
+					assert!(options.get_processor_options().is_none());
 					end.signal();
 					None
 				}
@@ -613,6 +711,200 @@ async fn offline_no_data_options() {
 			None,
 		)
 		.unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn data_empty_options() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	let options = AudioWorkletNodeOptionsExt2::new();
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |options| {
+					assert!(options.get_processor_options().is_none());
+					end.signal();
+					None
+				}
+			}),
+			Some(&options),
+		)
+		.unwrap();
+	assert!(options.get_processor_options().is_none());
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_data_empty_options() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	let options = AudioWorkletNodeOptionsExt2::new();
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |options| {
+					assert!(options.get_processor_options().is_none());
+					end.signal();
+					None
+				}
+			}),
+			Some(&options),
+		)
+		.unwrap();
+	assert!(options.get_processor_options().is_none());
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn data_zero_options() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	let options = AudioWorkletNodeOptionsExt2::new();
+	options.set_processor_options(Some(&Object::new()));
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |options| {
+					assert_eq!(
+						Object::keys(&options.get_processor_options().unwrap()).length(),
+						0
+					);
+					end.signal();
+					None
+				}
+			}),
+			Some(&options),
+		)
+		.unwrap();
+	assert_eq!(
+		Object::keys(&options.get_processor_options().unwrap()).length(),
+		0
+	);
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_data_zero_options() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	let options = AudioWorkletNodeOptionsExt2::new();
+	options.set_processor_options(Some(&Object::new()));
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |options| {
+					assert_eq!(
+						Object::keys(&options.get_processor_options().unwrap()).length(),
+						0
+					);
+					end.signal();
+					None
+				}
+			}),
+			Some(&options),
+		)
+		.unwrap();
+	assert_eq!(
+		Object::keys(&options.get_processor_options().unwrap()).length(),
+		0
+	);
 	end.await;
 }
 
@@ -632,7 +924,7 @@ async fn options() {
 					#[allow(clippy::blocks_in_conditions, clippy::float_cmp)]
 					if data
 						.set(RefCell::new(Some(Box::new(move |options| {
-							let options: Object = options.processor_options().unwrap();
+							let options: Object = options.get_processor_options().unwrap();
 							let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
 							assert_eq!(var, 42.);
 							assert_eq!(Object::keys(&options).length(), 1);
@@ -687,7 +979,7 @@ async fn offline_options() {
 					#[allow(clippy::blocks_in_conditions, clippy::float_cmp)]
 					if data
 						.set(RefCell::new(Some(Box::new(move |options| {
-							let options: Object = options.processor_options().unwrap();
+							let options: Object = options.get_processor_options().unwrap();
 							let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
 							assert_eq!(var, 42.);
 							assert_eq!(Object::keys(&options).length(), 1);
@@ -760,7 +1052,7 @@ async fn options_data() {
 				let end = end.clone();
 				#[allow(clippy::float_cmp)]
 				move |options| {
-					let options: Object = options.processor_options().unwrap();
+					let options: Object = options.get_processor_options().unwrap();
 					let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
 					assert_eq!(var, 42.);
 					assert_eq!(Object::keys(&options).length(), 1);
@@ -813,7 +1105,7 @@ async fn offline_options_data() {
 				let end = end.clone();
 				#[allow(clippy::float_cmp)]
 				move |options| {
-					let options: Object = options.processor_options().unwrap();
+					let options: Object = options.get_processor_options().unwrap();
 					let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
 					assert_eq!(var, 42.);
 					assert_eq!(Object::keys(&options).length(), 1);

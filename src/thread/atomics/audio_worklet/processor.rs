@@ -98,18 +98,18 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 				let data = unsafe { Box::<Data>::from_raw(data as *mut Data) };
 
 				if data.type_id == TypeId::of::<P>() {
-					processor_data =
-						Some(*data.data.downcast::<P::Data>().expect("wrong type encoded"));
+					processor_data = Some(
+						*data
+							.value
+							.downcast::<P::Data>()
+							.expect("wrong type encoded"),
+					);
 
-					// If our custom `data` property was the only things transported, delete
-					// `AudioWorkletNodeOptions.processorOptions` entirely.
-					if Object::keys(&processor_options).length() == 1 {
+					if data.empty {
 						PROCESSOR_OPTIONS_PROPERTY_NAME
 							.with(|name| Reflect::delete_property(&options, name))
 							.expect("expected `AudioWorkletNodeOptions` to be an `Object`");
-					}
-					// Otherwise remove our `data` property so its not observable by the user.
-					else {
+					} else {
 						DATA_PROPERTY_NAME
 							.with(|name| Reflect::delete_property(&processor_options, name))
 							.expect("expected `processor_options` to be an `Object`");
