@@ -498,6 +498,6 @@ pub trait ExtendAudioWorkletProcessor {
 	/// [`AudioWorkletProcessor.parameterDescriptors`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor/parameterDescriptors
 	#[allow(clippy::must_use_candidate)]
 	fn parameter_descriptors() -> Iterator {
-		Array::new().entries()
+		Array::new().values()
 	}
 }

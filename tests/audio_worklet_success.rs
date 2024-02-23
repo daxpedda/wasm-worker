@@ -3,7 +3,8 @@
 
 use std::cell::RefCell;
 
-use js_sys::{Object, Reflect};
+use js_sys::{Array, Iterator, Object, Reflect};
+use utf32_lit::utf32;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -14,8 +15,11 @@ use web_sys::{
 use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContextExt};
 use web_thread::web::{self, YieldTime};
 
-use super::test_processor::{AudioWorkletNodeOptionsExt2, TestProcessor, GLOBAL_DATA};
+use super::test_processor::{
+	AudioParameter, AudioWorkletNodeOptionsExt2, TestProcessor, GLOBAL_DATA,
+};
 use super::util::Flag;
+use crate::js_string;
 
 #[wasm_bindgen_test]
 async fn register() {
@@ -925,7 +929,7 @@ async fn options() {
 					if data
 						.set(RefCell::new(Some(Box::new(move |options| {
 							let options: Object = options.get_processor_options().unwrap();
-							let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+							let var = Reflect::get_u32(&options, 0).unwrap();
 							assert_eq!(var, 42.);
 							assert_eq!(Object::keys(&options).length(), 1);
 							end.signal();
@@ -980,7 +984,7 @@ async fn offline_options() {
 					if data
 						.set(RefCell::new(Some(Box::new(move |options| {
 							let options: Object = options.get_processor_options().unwrap();
-							let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+							let var = Reflect::get_u32(&options, 0).unwrap();
 							assert_eq!(var, 42.);
 							assert_eq!(Object::keys(&options).length(), 1);
 							end.signal();
@@ -1053,7 +1057,7 @@ async fn options_data() {
 				#[allow(clippy::float_cmp)]
 				move |options| {
 					let options: Object = options.get_processor_options().unwrap();
-					let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+					let var = Reflect::get_u32(&options, 0).unwrap();
 					assert_eq!(var, 42.);
 					assert_eq!(Object::keys(&options).length(), 1);
 					end.signal();
@@ -1106,7 +1110,7 @@ async fn offline_options_data() {
 				#[allow(clippy::float_cmp)]
 				move |options| {
 					let options: Object = options.get_processor_options().unwrap();
-					let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+					let var = Reflect::get_u32(&options, 0).unwrap();
 					assert_eq!(var, 42.);
 					assert_eq!(Object::keys(&options).length(), 1);
 					end.signal();
@@ -1117,5 +1121,121 @@ async fn offline_options_data() {
 		)
 		.unwrap();
 	assert_eq!(Object::keys(&inner_options).length(), 1);
+	end.await;
+}
+
+struct TestParameters;
+
+impl AudioParameter for TestParameters {
+	fn parameter_descriptors() -> Iterator {
+		let parameters = Array::new();
+
+		let parameter = Object::new();
+		Reflect::set(&parameter, &js_string!("name"), &js_string!("test")).unwrap();
+
+		parameters.push(&parameter);
+		parameters.values()
+	}
+}
+
+#[wasm_bindgen_test]
+async fn parameters() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							let parameters = options.get_parameter_data().unwrap();
+							let value = Reflect::get(&parameters, &js_string!("test")).unwrap();
+							assert_eq!(value, 42.);
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor<TestParameters>>("test")
+					.unwrap();
+
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let options = AudioWorkletNodeOptionsExt2::new();
+	let parameters = Array::new();
+	Reflect::set(&parameters, &js_string!("test"), &42.0.into()).unwrap();
+	options.set_parameter_data(Some(&parameters));
+	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_parameters() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							let parameters = options.get_parameter_data().unwrap();
+							let value = Reflect::get(&parameters, &js_string!("test")).unwrap();
+							assert_eq!(value, 42.);
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor<TestParameters>>("test")
+					.unwrap();
+
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let options = AudioWorkletNodeOptionsExt2::new();
+	let parameters = Array::new();
+	Reflect::set(&parameters, &js_string!("test"), &42.0.into()).unwrap();
+	options.set_parameter_data(Some(&parameters));
+	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
 	end.await;
 }

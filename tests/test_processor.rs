@@ -6,8 +6,9 @@
 )]
 
 use std::cell::{OnceCell, RefCell};
+use std::marker::PhantomData;
 
-use js_sys::{Array, Object};
+use js_sys::{Array, Iterator, Object};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNodeOptions, AudioWorkletProcessor};
@@ -18,9 +19,12 @@ thread_local! {
 	pub static GLOBAL_DATA: OnceCell<RefCell<Option<Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnOnce()>>>>>> = OnceCell::new();
 }
 
-pub struct TestProcessor(Option<Box<dyn FnOnce()>>);
+pub struct TestProcessor<P: AudioParameter = ()> {
+	process: Option<Box<dyn FnOnce()>>,
+	parameter: PhantomData<P>,
+}
 
-impl ExtendAudioWorkletProcessor for TestProcessor {
+impl<P: AudioParameter> ExtendAudioWorkletProcessor for TestProcessor<P> {
 	type Data = Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnOnce()>> + Send>;
 
 	fn new(
@@ -28,23 +32,43 @@ impl ExtendAudioWorkletProcessor for TestProcessor {
 		data: Option<Self::Data>,
 		options: AudioWorkletNodeOptions,
 	) -> Self {
-		if let Some(data) =
+		let process = if let Some(data) =
 			GLOBAL_DATA.with(|data| data.get().and_then(|data| data.borrow_mut().take()))
 		{
-			Self(data(options.unchecked_into()))
+			data(options.unchecked_into())
 		} else if let Some(data) = data {
-			Self(data(options.unchecked_into()))
+			data(options.unchecked_into())
 		} else {
-			Self(None)
+			None
+		};
+
+		Self {
+			process,
+			parameter: PhantomData,
 		}
 	}
 
 	fn process(&mut self, _: Array, _: Array, _: Object) -> bool {
-		if let Some(fun) = self.0.take() {
+		if let Some(fun) = self.process.take() {
 			fun();
 		}
 
 		false
+	}
+
+	fn parameter_descriptors() -> Iterator {
+		P::parameter_descriptors()
+	}
+}
+
+pub trait AudioParameter {
+	#[must_use]
+	fn parameter_descriptors() -> Iterator;
+}
+
+impl AudioParameter for () {
+	fn parameter_descriptors() -> Iterator {
+		Array::new().values()
 	}
 }
 
@@ -59,6 +83,12 @@ extern "C" {
 
 	#[wasm_bindgen(setter, method, js_name = processorOptions)]
 	pub fn set_processor_options(this: &AudioWorkletNodeOptionsExt2, value: Option<&Object>);
+
+	#[wasm_bindgen(getter, method, js_name = parameterData)]
+	pub fn get_parameter_data(this: &AudioWorkletNodeOptionsExt2) -> Option<Array>;
+
+	#[wasm_bindgen(setter, method, js_name = parameterData)]
+	pub fn set_parameter_data(this: &AudioWorkletNodeOptionsExt2, value: Option<&Array>);
 }
 
 impl AudioWorkletNodeOptionsExt2 {
@@ -66,4 +96,12 @@ impl AudioWorkletNodeOptionsExt2 {
 	pub fn new() -> Self {
 		Object::new().unchecked_into()
 	}
+}
+
+#[macro_export]
+macro_rules! js_string {
+	($string:literal) => {
+		js_sys::JsString::from_code_point(bytemuck::cast_slice(utf32!($string)))
+			.expect("found invalid Unicode")
+	};
 }

@@ -83,7 +83,12 @@ web-time = "1"
 
 [target.'cfg(all(target_family = "wasm", target_feature = "atomics"))'.dev-dependencies]
 atomic-waker = "1"
+bytemuck = "1"
 futures-util = { version = "0.3", default-features = false }
+utf32-lit = "1"
+
+[patch.crates-io]
+utf32-lit = { git = "https://github.com/daxpedda/utf32-lit", branch = "web-thread" }
 
 [[example]]
 doc-scrape-examples = true
