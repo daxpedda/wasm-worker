@@ -5,65 +5,15 @@
 use std::any::TypeId;
 use std::io::Error;
 use std::marker::PhantomData;
-use std::sync::OnceLock;
 
 use js_sys::{Array, Iterator, JsString, Object, Reflect};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNodeOptions, DomException};
 
-use super::super::super::js::GlobalExt;
 use super::js::AudioWorkletNodeOptionsExt;
-use super::Data;
+use super::{Data, DATA_PROPERTY_NAME, HAS_TEXT_DECODER, PROCESSOR_OPTIONS_PROPERTY_NAME};
 use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
-
-/// Macro to cache conversions from [`String`]s to [`JsString`]s to avoid
-/// `TextDecoder` and the overhead.
-macro_rules! js_string {
-	($($(#[$doc:meta])* static $name:ident = $value:literal;)*) => {
-		thread_local! {
-			$(
-				$(#[$doc])*
-				static $name: JsString = if HAS_TEXT_DECODER.with(bool::clone) {
-					JsString::from($value)
-				} else {
-					/// There is currently no nice way in Rust to convert
-					/// [`String`]s into `Vec<u32>`s without allocation, so we
-					/// cache it.
-					static NAME: OnceLock<Vec<u32>> = OnceLock::new();
-
-					JsString::from_code_point(
-						NAME.get_or_init(|| $value.chars().map(u32::from).collect())
-							.as_slice(),
-					)
-					.expect("found invalid Unicode")
-				};
-			)*
-		}
-	};
-}
-
-thread_local! {
-	/// Caches if this audio worklet supports [`TextDecoder`]. It is possible
-	/// that users will add a polyfill, so we don't want to assume that all
-	/// audio worklets have the same support.
-	///
-	/// [`TextDecoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder
-	static HAS_TEXT_DECODER: bool = !js_sys::global()
-		.unchecked_into::<GlobalExt>()
-		.text_decoder()
-		.is_undefined();
-}
-
-js_string! {
-	/// Name of our custom property on [`AudioWorkletNodeOptions`].
-	static DATA_PROPERTY_NAME = "__web_thread_data";
-
-	/// Name of the
-	/// [`AudioWorkletNodeOptions.processorOptions`](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions)
-	/// property.
-	static PROCESSOR_OPTIONS_PROPERTY_NAME = "processorOptions";
-}
 
 /// Implementation for
 /// [`crate::web::audio_worklet::AudioWorkletGlobalScopeExt::register_processor_ext()`].
@@ -142,11 +92,10 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 			.unchecked_ref::<AudioWorkletNodeOptionsExt>()
 			.get_processor_options()
 		{
-			let data = processor_options.data();
-
-			if !data.is_null() {
-				// SAFETY: We only store `*const Data` at `__web_thread_data`.
-				let data = unsafe { Box::<Data>::from_raw(data.cast_mut().cast()) };
+			if let Some(data) = processor_options.data() {
+				// SAFETY: We only store `*mut Data` at `__web_thread_data`.
+				#[allow(clippy::as_conversions)]
+				let data = unsafe { Box::<Data>::from_raw(data as *mut Data) };
 
 				if data.type_id == TypeId::of::<P>() {
 					processor_data =
@@ -156,8 +105,8 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 					// `AudioWorkletNodeOptions.processorOptions` entirely.
 					if Object::keys(&processor_options).length() == 1 {
 						PROCESSOR_OPTIONS_PROPERTY_NAME
-							.with(|name| Reflect::delete_property(&processor_options, name))
-							.expect("expected `processor_options` to be an `Object`");
+							.with(|name| Reflect::delete_property(&options, name))
+							.expect("expected `AudioWorkletNodeOptions` to be an `Object`");
 					}
 					// Otherwise remove our `data` property so its not observable by the user.
 					else {

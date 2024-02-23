@@ -12,7 +12,7 @@ use super::test_processor::TestProcessor;
 fn node() {
 	AudioContext::new()
 		.unwrap()
-		.audio_worklet_node::<TestProcessor>("test", Box::new(|| None), None)
+		.audio_worklet_node::<TestProcessor>("test", Box::new(|_| None), None)
 		.unwrap();
 }
 
@@ -21,6 +21,6 @@ fn node() {
 fn offline_node() {
 	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 		.unwrap()
-		.audio_worklet_node::<TestProcessor>("test", Box::new(|| None), None)
+		.audio_worklet_node::<TestProcessor>("test", Box::new(|_| None), None)
 		.unwrap();
 }

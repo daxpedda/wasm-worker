@@ -176,7 +176,7 @@ pub trait BaseAudioContextExt {
 		&self,
 		name: &str,
 		data: P::Data,
-		options: Option<AudioWorkletNodeOptions>,
+		options: Option<&AudioWorkletNodeOptions>,
 	) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>>
 	where
 		P: 'static + ExtendAudioWorkletProcessor;
@@ -203,7 +203,7 @@ where
 		&self,
 		name: &str,
 		data: P::Data,
-		options: Option<AudioWorkletNodeOptions>,
+		options: Option<&AudioWorkletNodeOptions>,
 	) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>>
 	where
 		P: 'static + ExtendAudioWorkletProcessor,

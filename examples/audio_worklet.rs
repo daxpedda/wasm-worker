@@ -214,7 +214,7 @@ mod web {
 		let mut options = AudioWorkletNodeOptions::new();
 		options.output_channel_count(&Array::of1(&channel_count.into()));
 		let worklet = context
-			.audio_worklet_node::<ExampleProcessor>("example", data, Some(options))
+			.audio_worklet_node::<ExampleProcessor>("example", data, Some(&options))
 			.unwrap();
 		worklet
 			.connect_with_audio_node(&context.destination())

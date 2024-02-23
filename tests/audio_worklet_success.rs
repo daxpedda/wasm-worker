@@ -3,10 +3,14 @@
 
 use std::cell::RefCell;
 
+use js_sys::{Object, Reflect};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
-use web_sys::{AudioContext, AudioWorkletGlobalScope, AudioWorkletNode, OfflineAudioContext};
+use web_sys::{
+	AudioContext, AudioWorkletGlobalScope, AudioWorkletNode, AudioWorkletNodeOptions,
+	OfflineAudioContext,
+};
 use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContextExt};
 use web_thread::web::{self, YieldTime};
 
@@ -16,6 +20,15 @@ use super::util::Flag;
 #[wasm_bindgen_test]
 async fn register() {
 	AudioContext::new()
+		.unwrap()
+		.register_thread(|| ())
+		.await
+		.unwrap();
+}
+
+#[wasm_bindgen_test]
+async fn offline_register() {
+	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
 		.unwrap()
 		.register_thread(|| ())
 		.await
@@ -41,27 +54,6 @@ async fn register_destroy() {
 }
 
 #[wasm_bindgen_test]
-async fn register_drop() {
-	let flag = Flag::new();
-
-	AudioContext::new().unwrap().register_thread({
-		let flag = flag.clone();
-		move || flag.signal()
-	});
-
-	flag.await;
-}
-
-#[wasm_bindgen_test]
-async fn offline_register() {
-	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
-		.unwrap()
-		.register_thread(|| ())
-		.await
-		.unwrap();
-}
-
-#[wasm_bindgen_test]
 async fn offline_register_destroy() {
 	let flag = Flag::new();
 
@@ -78,6 +70,18 @@ async fn offline_register_destroy() {
 	flag.await;
 	// SAFETY: We are sure the thread has spawned by now.
 	unsafe { handle.destroy() }
+}
+
+#[wasm_bindgen_test]
+async fn register_drop() {
+	let flag = Flag::new();
+
+	AudioContext::new().unwrap().register_thread({
+		let flag = flag.clone();
+		move || flag.signal()
+	});
+
+	flag.await;
 }
 
 #[wasm_bindgen_test]
@@ -109,7 +113,7 @@ async fn node() {
 				GLOBAL_DATA.with(move |data| {
 					#[allow(clippy::blocks_in_conditions)]
 					if data
-						.set(RefCell::new(Some(Box::new(move || {
+						.set(RefCell::new(Some(Box::new(move |_| {
 							end.signal();
 							None
 						}))))
@@ -153,7 +157,7 @@ async fn offline_node() {
 				GLOBAL_DATA.with(move |data| {
 					#[allow(clippy::blocks_in_conditions)]
 					if data
-						.set(RefCell::new(Some(Box::new(move || {
+						.set(RefCell::new(Some(Box::new(move |_| {
 							end.signal();
 							None
 						}))))
@@ -210,7 +214,7 @@ async fn node_data() {
 			"test",
 			Box::new({
 				let end = end.clone();
-				move || {
+				move |_| {
 					end.signal();
 					None
 				}
@@ -253,7 +257,7 @@ async fn offline_node_data() {
 			"test",
 			Box::new({
 				let end = end.clone();
-				move || {
+				move |_| {
 					end.signal();
 					None
 				}
@@ -295,7 +299,7 @@ async fn unpark() {
 			"test",
 			Box::new({
 				let end = end.clone();
-				move || {
+				move |_| {
 					web_thread::park();
 					end.signal();
 					None
@@ -340,7 +344,7 @@ async fn offline_unpark() {
 			"test",
 			Box::new({
 				let end = end.clone();
-				move || {
+				move |_| {
 					web_thread::park();
 					end.signal();
 					None
@@ -367,7 +371,7 @@ async fn process() {
 			move || {
 				GLOBAL_DATA.with(move |data| {
 					if data
-						.set(RefCell::new(Some(Box::new(move || {
+						.set(RefCell::new(Some(Box::new(move |_| {
 							Some(Box::new(move || end.signal()))
 						}))))
 						.is_err()
@@ -409,7 +413,7 @@ async fn offline_process() {
 			move || {
 				GLOBAL_DATA.with(move |data| {
 					if data
-						.set(RefCell::new(Some(Box::new(move || {
+						.set(RefCell::new(Some(Box::new(move |_| {
 							Some(Box::new(move || end.signal()))
 						}))))
 						.is_err()
@@ -435,5 +439,391 @@ async fn offline_process() {
 	JsFuture::from(context.start_rendering().unwrap())
 		.await
 		.unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn no_options() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							assert!(options.processor_options().is_none());
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	AudioWorkletNode::new(&context, "test").unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_no_options() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							assert!(options.processor_options().is_none());
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	AudioWorkletNode::new(&context, "test").unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn no_data_options() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |options| {
+					assert!(options.processor_options().is_none());
+					end.signal();
+					None
+				}
+			}),
+			None,
+		)
+		.unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_no_data_options() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |options| {
+					assert!(options.processor_options().is_none());
+					end.signal();
+					None
+				}
+			}),
+			None,
+		)
+		.unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn options() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions, clippy::float_cmp)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							let options: Object = options.processor_options().unwrap();
+							let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+							assert_eq!(var, 42.);
+							assert_eq!(Object::keys(&options).length(), 1);
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let options = Object::new();
+	Reflect::set_u32(&options, 0, &42.into()).unwrap();
+	AudioWorkletNode::new_with_options(
+		&context,
+		"test",
+		AudioWorkletNodeOptions::new().processor_options(Some(&options)),
+	)
+	.unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_options() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			let end = end.clone();
+			move || {
+				GLOBAL_DATA.with(move |data| {
+					#[allow(clippy::blocks_in_conditions, clippy::float_cmp)]
+					if data
+						.set(RefCell::new(Some(Box::new(move |options| {
+							let options: Object = options.processor_options().unwrap();
+							let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+							assert_eq!(var, 42.);
+							assert_eq!(Object::keys(&options).length(), 1);
+							end.signal();
+							None
+						}))))
+						.is_err()
+					{
+						panic!()
+					}
+				});
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let options = Object::new();
+	Reflect::set_u32(&options, 0, &42.into()).unwrap();
+	AudioWorkletNode::new_with_options(
+		&context,
+		"test",
+		AudioWorkletNodeOptions::new().processor_options(Some(&options)),
+	)
+	.unwrap();
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn options_data() {
+	let context = AudioContext::new().unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	let inner_options = Object::new();
+	Reflect::set_u32(&inner_options, 0, &42.into()).unwrap();
+	let mut options = AudioWorkletNodeOptions::new();
+	options.processor_options(Some(&inner_options));
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				#[allow(clippy::float_cmp)]
+				move |options| {
+					let options: Object = options.processor_options().unwrap();
+					let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+					assert_eq!(var, 42.);
+					assert_eq!(Object::keys(&options).length(), 1);
+					end.signal();
+					None
+				}
+			}),
+			Some(&options),
+		)
+		.unwrap();
+	assert_eq!(Object::keys(&inner_options).length(), 1);
+	end.await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_options_data() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+
+	let start = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	let end = Flag::new();
+	let inner_options = Object::new();
+	Reflect::set_u32(&inner_options, 0, &42.into()).unwrap();
+	let mut options = AudioWorkletNodeOptions::new();
+	options.processor_options(Some(&inner_options));
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				#[allow(clippy::float_cmp)]
+				move |options| {
+					let options: Object = options.processor_options().unwrap();
+					let var = Reflect::get_u32(&options, 0).unwrap().as_f64().unwrap();
+					assert_eq!(var, 42.);
+					assert_eq!(Object::keys(&options).length(), 1);
+					end.signal();
+					None
+				}
+			}),
+			Some(&options),
+		)
+		.unwrap();
+	assert_eq!(Object::keys(&inner_options).length(), 1);
 	end.await;
 }

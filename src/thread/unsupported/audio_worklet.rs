@@ -92,7 +92,7 @@ pub(in super::super) fn audio_worklet_node<P: ExtendAudioWorkletProcessor>(
 	_: &BaseAudioContext,
 	_: &str,
 	_: P::Data,
-	_: Option<AudioWorkletNodeOptions>,
+	_: Option<&AudioWorkletNodeOptions>,
 ) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
 	unreachable!("reached despite not being able to register a thread")
 }

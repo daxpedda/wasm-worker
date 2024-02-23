@@ -31,6 +31,7 @@ extern "C" {
 	pub(super) fn queue_microtask(closure: &Function);
 
 	/// Extension for [`AudioWorkletNodeOptions`].
+	#[derive(Clone)]
 	#[wasm_bindgen(extends = AudioWorkletNodeOptions)]
 	pub(super) type AudioWorkletNodeOptionsExt;
 
@@ -40,6 +41,13 @@ extern "C" {
 		this: &AudioWorkletNodeOptionsExt,
 	) -> Option<ProcessorOptions>;
 
+	/// Sets [`AudioWorkletNodeOptions.processorOptions`](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions).
+	#[wasm_bindgen(method, setter, js_name = processorOptions)]
+	pub(super) fn set_processor_options(
+		this: &AudioWorkletNodeOptionsExt,
+		options: Option<&ProcessorOptions>,
+	);
+
 	/// Type for [`AudioWorkletNodeOptions.processorOptions`](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions).
 	#[wasm_bindgen(extends = Object)]
 	#[derive(Default)]
@@ -47,11 +55,11 @@ extern "C" {
 
 	/// Returns our custom `data` property.
 	#[wasm_bindgen(method, getter, js_name = __web_thread_data)]
-	pub(super) fn data(this: &ProcessorOptions) -> *const Data;
+	pub(super) fn data(this: &ProcessorOptions) -> Option<usize>;
 
 	/// Sets our custom `data` property.
 	#[wasm_bindgen(method, setter, js_name = __web_thread_data)]
-	pub(super) fn set_data(this: &ProcessorOptions, value: *const Data);
+	pub(super) fn set_data(this: &ProcessorOptions, value: *mut Data);
 
 	/// Type of [`WebAssembly.Module.exports()`s return value](https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Module/exports_static).
 	pub(super) type Exports;

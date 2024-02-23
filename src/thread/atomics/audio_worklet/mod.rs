@@ -6,9 +6,11 @@ mod processor;
 mod register;
 
 use std::any::{Any, TypeId};
+use std::borrow::Cow;
 use std::io::Error;
+use std::sync::OnceLock;
 
-use js_sys::Object;
+use js_sys::{JsString, Object, Reflect};
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, DomException};
 
@@ -17,8 +19,57 @@ pub(in super::super) use self::processor::register_processor;
 pub(in super::super) use self::register::{
 	register_thread, AudioWorkletHandle, RegisterThreadFuture,
 };
+use super::super::js::GlobalExt;
 use super::MAIN_THREAD;
 use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
+
+/// Macro to cache conversions from [`String`]s to [`JsString`]s to avoid
+/// `TextDecoder` when not available and the overhead of creating [`JsString`].
+macro_rules! js_string {
+	($($(#[$doc:meta])* static $name:ident = $value:literal;)*) => {
+		thread_local! {
+			$(
+				$(#[$doc])*
+				static $name: JsString = if HAS_TEXT_DECODER.with(bool::clone) {
+					JsString::from($value)
+				} else {
+					/// There is currently no nice way in Rust to convert
+					/// [`String`]s into `Vec<u32>`s without allocation, so we
+					/// cache it.
+					static NAME: OnceLock<Vec<u32>> = OnceLock::new();
+
+					JsString::from_code_point(
+						NAME.get_or_init(|| $value.chars().map(u32::from).collect())
+							.as_slice(),
+					)
+					.expect("found invalid Unicode")
+				};
+			)*
+		}
+	};
+}
+
+thread_local! {
+	/// Caches if this audio worklet supports [`TextDecoder`]. It is possible
+	/// that users will add a polyfill, so we don't want to assume that all
+	/// audio worklets have the same support.
+	///
+	/// [`TextDecoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder
+	static HAS_TEXT_DECODER: bool = !js_sys::global()
+		.unchecked_into::<GlobalExt>()
+		.text_decoder()
+		.is_undefined();
+}
+
+js_string! {
+	/// Name of our custom property on [`AudioWorkletNodeOptions`].
+	static DATA_PROPERTY_NAME = "__web_thread_data";
+
+	/// Name of the
+	/// [`AudioWorkletNodeOptions.processorOptions`](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions)
+	/// property.
+	static PROCESSOR_OPTIONS_PROPERTY_NAME = "processorOptions";
+}
 
 /// Determined if the current thread is the main thread.
 pub(in super::super) fn is_main_thread() -> bool {
@@ -39,7 +90,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	context: &BaseAudioContext,
 	name: &str,
 	data: P::Data,
-	options: Option<AudioWorkletNodeOptions>,
+	options: Option<&AudioWorkletNodeOptions>,
 ) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
 	let data = Box::new(Data {
 		type_id: TypeId::of::<P>(),
@@ -47,22 +98,33 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	});
 
 	// If `processor_options` is set already by the user, don't overwrite it!
-	let options: AudioWorkletNodeOptionsExt = options.map_or_else(
-		|| Object::new().unchecked_into(),
-		AudioWorkletNodeOptions::unchecked_into,
+	let options: Cow<'_, AudioWorkletNodeOptionsExt> = options.map_or_else(
+		|| Cow::Owned(Object::new().unchecked_into()),
+		|options| Cow::Borrowed(options.unchecked_ref()),
 	);
 	let processor_options = options.get_processor_options();
 	let has_processor_options = processor_options.is_some();
 	let processor_options = processor_options.unwrap_or_default();
 	let data = Box::into_raw(data);
 	processor_options.set_data(data);
-	let mut options = AudioWorkletNodeOptions::from(options);
 
 	if !has_processor_options {
-		options.processor_options(Some(&processor_options));
+		options.set_processor_options(Some(&processor_options));
 	}
 
-	match AudioWorkletNode::new_with_options(context, name, &options) {
+	let result = AudioWorkletNode::new_with_options(context, name, &options);
+
+	if has_processor_options {
+		DATA_PROPERTY_NAME
+			.with(|name| Reflect::delete_property(&processor_options, name))
+			.expect("expected `processor_options` to be an `Object`");
+	} else {
+		PROCESSOR_OPTIONS_PROPERTY_NAME
+			.with(|name| Reflect::delete_property(&options, name))
+			.expect("expected `AudioWorkletNodeOptions` to be an `Object`");
+	}
+
+	match result {
 		Ok(node) => Ok(node),
 		Err(error) => Err(AudioWorkletNodeError {
 			// SAFETY: We just made this pointer above.

@@ -84,7 +84,7 @@ pub(crate) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProcessor>(
 	context: &BaseAudioContext,
 	name: &str,
 	data: P::Data,
-	options: Option<AudioWorkletNodeOptions>,
+	options: Option<&AudioWorkletNodeOptions>,
 ) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
 	if audio_worklet::is_registered(context) {
 		audio_worklet::audio_worklet_node(context, name, data, options)
