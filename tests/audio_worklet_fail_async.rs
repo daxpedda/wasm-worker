@@ -66,6 +66,19 @@ async fn not_registered_node() {
 }
 
 #[wasm_bindgen_test]
+#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+#[should_panic = "name"]
+async fn offline_not_registered_node() {
+	let context =
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
+			.unwrap();
+	context.clone().register_thread(|| ()).await.unwrap();
+	context
+		.audio_worklet_node::<TestProcessor>("test", Box::new(|_| None), None)
+		.unwrap();
+}
+
+#[wasm_bindgen_test]
 #[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
 async fn check_failing_spawn() {
 	use js_sys::Array;

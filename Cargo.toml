@@ -85,6 +85,7 @@ web-time = "1"
 atomic-waker = "1"
 bytemuck = "1"
 futures-util = { version = "0.3", default-features = false }
+paste = "1"
 utf32-lit = "1"
 
 [patch.crates-io]
