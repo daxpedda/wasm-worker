@@ -361,6 +361,8 @@ async fn offline_unpark() {
 }
 
 #[wasm_bindgen_test]
+// Firefox doesn't support running `AudioContext` without an actual audio device.
+// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1881904>.
 #[cfg(not(unsupported_headless_audiocontext))]
 async fn process() {
 	let context = AudioContext::new().unwrap();

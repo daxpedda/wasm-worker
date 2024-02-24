@@ -24,6 +24,10 @@
 //!   - Chrome: <https://issues.chromium.org/issues/40072701>
 //!   - Firefox: <https://bugzilla.mozilla.org/show_bug.cgi?id=1878516>
 //!   - Safari: ?
+//! - Headless browsers seem to have some issues when spawning too many threads:
+//!   - Firefox: ?
+//!   - Safari: ?
+//! - Headless Firefox can't run `AudioContext` without a real audio device: <https://bugzilla.mozilla.org/show_bug.cgi?id=1881904>.
 
 #![cfg_attr(
 	all(
