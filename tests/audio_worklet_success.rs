@@ -140,7 +140,8 @@ async fn test_register_destroy(context: BaseAudioContext) {
 		.unwrap();
 
 	flag.await;
-	// SAFETY: We are sure the thread has spawned by now.
+	// SAFETY: We are sure the thread has spawned by now and we also didn't register
+	// any events or promises that could call into the Wasm module later.
 	unsafe { handle.destroy() }
 }
 

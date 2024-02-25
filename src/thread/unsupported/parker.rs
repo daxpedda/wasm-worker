@@ -1,11 +1,13 @@
 //! Parker implementation inspired by Std but adapted to non-threaded
 //! environment.
 
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use js_sys::Atomics;
 
+use super::super::ThreadId;
 use super::ZERO_ARRAY;
 
 /// Parker implementation.
@@ -15,12 +17,12 @@ pub(in super::super) struct Parker(AtomicBool);
 impl Parker {
 	/// Creates a new [`Parker`].
 	#[allow(clippy::missing_const_for_fn)]
-	pub(in super::super) fn new() -> Self {
+	pub(in super::super) fn new(_: ThreadId) -> Self {
 		Self(AtomicBool::new(false))
 	}
 
 	/// Parks the thread.
-	pub(in super::super) unsafe fn park(&self) {
+	pub(in super::super) fn park(self: Pin<&Self>) {
 		if self.0.swap(false, Ordering::Relaxed) {
 			return;
 		}
@@ -30,7 +32,7 @@ impl Parker {
 	}
 
 	/// Parks the thread with a timeout.
-	pub(in super::super) unsafe fn park_timeout(&self, timeout: Duration) {
+	pub(in super::super) fn park_timeout(self: Pin<&Self>, timeout: Duration) {
 		if self.0.swap(false, Ordering::Relaxed) {
 			return;
 		}
@@ -39,7 +41,7 @@ impl Parker {
 	}
 
 	/// Unparks the thread.
-	pub(in super::super) fn unpark(&self) {
+	pub(in super::super) fn unpark(self: Pin<&Self>) {
 		self.0.store(true, Ordering::Relaxed);
 	}
 }

@@ -87,7 +87,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	data: P::Data,
 	options: Option<&AudioWorkletNodeOptions>,
 ) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
-	// If `processor_options` is set already by the user, don't overwrite it!
+	// If `processor_options` is set already by the caller, don't overwrite it!
 	let options: Cow<'_, AudioWorkletNodeOptionsExt> = options.map_or_else(
 		|| Cow::Owned(Object::new().unchecked_into()),
 		|options| Cow::Borrowed(options.unchecked_ref()),
@@ -123,7 +123,8 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	match result {
 		Ok(node) => Ok(node),
 		Err(error) => Err(AudioWorkletNodeError {
-			// SAFETY: We just made this pointer above.
+			// SAFETY: We just made this pointer above and `new AudioWorkletNode` has to guarantee
+			// that on error transmission failed to avoid double-free.
 			data: *unsafe { Box::from_raw(data) }
 				.value
 				.downcast()

@@ -133,11 +133,11 @@ impl Scope {
 		0
 	}
 
-	/// End the scope after calling the user function.
+	/// End the scope after calling the supplied function.
 	#[allow(clippy::missing_const_for_fn, clippy::unused_self)]
 	pub(super) fn finish(&self) {}
 
-	/// End the scope after calling the user function.
+	/// End the scope after calling the supplied function.
 	#[allow(clippy::missing_const_for_fn, clippy::unused_self)]
 	pub(super) fn finish_async(&self, _: &Context<'_>) -> Poll<()> {
 		Poll::Ready(())

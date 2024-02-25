@@ -65,6 +65,12 @@ extern "C" {
 	pub(super) type Exports;
 
 	/// [`wasm-bindgen`](wasm_bindgen)s thread destruction function.
+	///
+	/// # Safety
+	///
+	/// - The thread is not allowed to be used while or after this function is
+	///   executed.
+	/// - Must not be called twice for the same thread.
 	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
 	pub(super) unsafe fn thread_destroy(this: &Exports, tls_base: &Global, stack_alloc: &Global);
 

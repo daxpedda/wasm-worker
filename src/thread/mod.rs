@@ -16,6 +16,7 @@ mod yield_now;
 use std::cell::OnceCell;
 use std::io::{self, Error, ErrorKind};
 use std::num::{NonZeroU64, NonZeroUsize};
+use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -25,7 +26,7 @@ use r#impl::Parker;
 #[cfg(target_feature = "atomics")]
 use self::atomics as r#impl;
 pub use self::builder::Builder;
-use self::global::{Global, GLOBAL};
+use self::global::Global;
 pub use self::scope::{scope, Scope, ScopedJoinHandle};
 pub(crate) use self::scope::{scope_async, ScopeFuture};
 pub use self::spawn::{spawn, JoinHandle};
@@ -36,7 +37,7 @@ pub(crate) use self::yield_now::YieldNowFuture;
 
 /// See [`std::thread::Thread`].
 #[derive(Clone, Debug)]
-pub struct Thread(Arc<ThreadInner>);
+pub struct Thread(Pin<Arc<ThreadInner>>);
 
 /// Inner shared wrapper for [`Thread`].
 #[derive(Debug)]
@@ -57,25 +58,27 @@ thread_local! {
 impl Thread {
 	/// Create a new [`Thread`].
 	fn new() -> Self {
-		let name = GLOBAL
-			.with(|global| match global.as_ref()? {
-				Global::Dedicated(worker) => Some(worker.name()),
-				Global::Shared(worker) => Some(worker.name()),
-				Global::Window(_) | Global::Service(_) | Global::Worklet | Global::Worker(_) => {
-					None
-				}
-			})
-			.filter(|name| !name.is_empty());
+		let name = Global::with(|global| match global {
+			Global::Dedicated(worker) => Some(worker.name()),
+			Global::Shared(worker) => Some(worker.name()),
+			Global::Window(_)
+			| Global::Service(_)
+			| Global::Worklet
+			| Global::Worker(_)
+			| Global::Unknown => None,
+		})
+		.filter(|name| !name.is_empty());
 
 		Self::new_with_name(name)
 	}
 
 	/// Create a new [`Thread`].
 	fn new_with_name(name: Option<String>) -> Self {
-		Self(Arc::new(ThreadInner {
-			id: ThreadId::new(),
+		let id = ThreadId::new();
+		Self(Arc::pin(ThreadInner {
+			id,
 			name,
-			parker: Parker::new(),
+			parker: Parker::new(id),
 		}))
 	}
 
@@ -94,7 +97,7 @@ impl Thread {
 	/// See [`std::thread::Thread::unpark()`].
 	#[inline]
 	pub fn unpark(&self) {
-		self.0.parker.unpark();
+		Pin::new(&self.0.parker).unpark();
 	}
 }
 
@@ -143,26 +146,21 @@ impl ThreadId {
 /// unsupported thread type.
 #[allow(clippy::missing_panics_doc)]
 pub fn available_parallelism() -> io::Result<NonZeroUsize> {
-	let value = GLOBAL.with(|global| {
-		let global = global.as_ref().ok_or_else(|| {
-			Error::new(
-				ErrorKind::Unsupported,
-				"encountered unsupported thread type",
-			)
-		})?;
-
-		match global {
-			Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
-			Global::Dedicated(worker) => Ok(worker.navigator().hardware_concurrency()),
-			Global::Shared(worker) => Ok(worker.navigator().hardware_concurrency()),
-			Global::Service(worker) | Global::Worker(worker) => {
-				Ok(worker.navigator().hardware_concurrency())
-			}
-			Global::Worklet => Err(Error::new(
-				ErrorKind::Unsupported,
-				"operation not supported in worklets",
-			)),
+	let value = Global::with(|global| match global {
+		Global::Window(window) => Ok(window.navigator().hardware_concurrency()),
+		Global::Dedicated(worker) => Ok(worker.navigator().hardware_concurrency()),
+		Global::Shared(worker) => Ok(worker.navigator().hardware_concurrency()),
+		Global::Service(worker) | Global::Worker(worker) => {
+			Ok(worker.navigator().hardware_concurrency())
 		}
+		Global::Worklet => Err(Error::new(
+			ErrorKind::Unsupported,
+			"operation not supported in worklets",
+		)),
+		Global::Unknown => Err(Error::new(
+			ErrorKind::Unsupported,
+			"encountered unsupported thread type",
+		)),
 	})?;
 
 	#[allow(
@@ -197,10 +195,7 @@ pub fn current() -> Thread {
 /// [`web::has_block_support()`](crate::web::has_block_support).
 pub fn park() {
 	if has_block_support() {
-		// SAFETY: `park` is called on the parker owned by this thread.
-		unsafe {
-			current().0.parker.park();
-		}
+		Pin::new(&current().0.parker).park();
 	}
 }
 
@@ -218,10 +213,7 @@ pub fn park() {
 /// [`web::has_block_support()`](crate::web::has_block_support).
 pub fn park_timeout(dur: Duration) {
 	if has_block_support() {
-		// SAFETY: `park_timeout` is called on the parker owned by this thread.
-		unsafe {
-			current().0.parker.park_timeout(dur);
-		}
+		Pin::new(&current().0.parker).park_timeout(dur);
 	}
 }
 
@@ -270,25 +262,23 @@ pub fn sleep_ms(ms: u32) {
 /// Implementation for [`crate::web::has_block_support()`].
 pub(crate) fn has_block_support() -> bool {
 	thread_local! {
-		static HAS_BLOCK_SUPPORT: bool = GLOBAL
-			.with(|global| {
-				global.as_ref().and_then(|global| match global {
-					Global::Window(_) | Global::Worklet | Global::Service(_) => Some(false),
-					Global::Dedicated(_) => Some(true),
-					// Some browsers don't support blocking in shared workers, so for cross-browser
-					// support we have to test manually.
-					// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
-					Global::Shared(_) => {
-						/// Cache if blocking on shared workers is supported.
-						static HAS_SHARED_WORKER_BLOCK_SUPPORT: OnceLock<bool> = OnceLock::new();
+		static HAS_BLOCK_SUPPORT: bool = Global::with(|global| {
+			match global {
+				Global::Window(_) | Global::Worklet | Global::Service(_) => false,
+				Global::Dedicated(_) => true,
+				// Some browsers don't support blocking in shared workers, so for cross-browser
+				// support we have to test manually.
+				// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
+				Global::Shared(_) => {
+					/// Cache if blocking on shared workers is supported.
+					static HAS_SHARED_WORKER_BLOCK_SUPPORT: OnceLock<bool> = OnceLock::new();
 
-						Some(*HAS_SHARED_WORKER_BLOCK_SUPPORT.get_or_init(r#impl::test_block_support))
-					}
-					Global::Worker(_) => None,
-				})
-			})
-			// For unknown worker types we test manually.
-			.unwrap_or_else(r#impl::test_block_support);
+					*HAS_SHARED_WORKER_BLOCK_SUPPORT.get_or_init(r#impl::test_block_support)
+				}
+				// For unknown worker types we test manually.
+				Global::Worker(_) | Global::Unknown => r#impl::test_block_support(),
+			}
+		});
 	}
 
 	HAS_BLOCK_SUPPORT.with(bool::clone)

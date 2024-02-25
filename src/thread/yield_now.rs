@@ -13,7 +13,7 @@ use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{AbortController, MessageChannel, MessagePort};
 
-use super::global::{Global, GLOBAL};
+use super::global::Global;
 use super::js::{SchedulerPostTaskOptions, TaskPriority, WindowExt};
 use crate::web::YieldTime;
 
@@ -68,8 +68,8 @@ impl Drop for YieldNowFuture {
 		if let Some(state) = self.0.take() {
 			match state {
 				State::Scheduler { controller, .. } => controller.abort(),
-				State::Idle { handle, .. } => GLOBAL.with(|global| {
-					let Some(Global::Window(window)) = global.as_ref() else {
+				State::Idle { handle, .. } => Global::with(|global| {
+					let Global::Window(window) = global else {
 						unreachable!("expected `Window`")
 					};
 					window.cancel_idle_callback(handle);
@@ -109,8 +109,8 @@ impl YieldNowFuture {
 	pub(crate) fn new(time: YieldTime) -> Self {
 		thread_local! {
 			static HAS_SCHEDULER: bool = Global::with_window_or_worker(|global| !global.has_scheduler().is_undefined()).unwrap_or(false);
-			static HAS_REQUEST_IDLE_CALLBACK: bool = GLOBAL.with(|global| {
-				if let Some(Global::Window(window)) = global.as_ref() {
+			static HAS_REQUEST_IDLE_CALLBACK: bool = Global::with(|global| {
+				if let Global::Window(window) = global {
 					let window: &WindowExt = window.unchecked_ref();
 					!window.has_request_idle_callback().is_undefined()
 				} else {
@@ -149,8 +149,8 @@ impl YieldNowFuture {
 				.expect("found invalid global context despite previous check")
 			}
 			YieldTime::Idle if HAS_REQUEST_IDLE_CALLBACK.with(bool::clone) => {
-				GLOBAL.with(|global| {
-					let Some(Global::Window(window)) = global.as_ref() else {
+				Global::with(|global| {
+					let Global::Window(window) = global else {
 						unreachable!("expected `Window`")
 					};
 

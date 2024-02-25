@@ -60,6 +60,11 @@ impl AudioWorkletHandle {
 
 	/// Implementation for
 	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	///
+	/// # Safety
+	///
+	/// This is only marked `unsafe` for compatibility with the atomics
+	/// implementation.
 	#[allow(clippy::unused_self)]
 	pub(crate) unsafe fn destroy(self) {
 		unreachable!("reached `register_thread()` without atomics target feature")

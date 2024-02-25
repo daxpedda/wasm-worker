@@ -21,6 +21,9 @@ use super::js::BaseAudioContextExt;
 use super::memory::ThreadMemory;
 use crate::thread::atomics::is_main_thread;
 
+/// Type of the task being sent to the worklet.
+type Task<'scope> = Box<dyn 'scope + FnOnce() + Send>;
+
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
 pub(in super::super::super) fn register_thread<F>(
@@ -100,8 +103,8 @@ enum State {
 		context: BaseAudioContext,
 		/// `Promise` returned by `Worklet.addModule()`.
 		promise: JsFuture,
-		/// User-supplied task.
-		task: Box<dyn 'static + FnOnce() + Send>,
+		/// Caller-supplied task.
+		task: Task<'static>,
 		/// Receiver for the [`Package`].
 		receiver: Receiver<Package>,
 	},
@@ -205,8 +208,9 @@ impl Future for RegisterThreadFuture {
 						) {
 							Ok(_) => self.0 = Some(State::Package { context, receiver }),
 							Err(error) => {
-								// SAFETY: We have to assume that if this fails it never arrived at
-								// the thread.
+								// SAFETY: We just made this pointer above and `new
+								// AudioWorkletNode` has to guarantee that on error transmission
+								// failed to avoid double-free.
 								drop(unsafe { Box::from_raw(task) });
 								return Poll::Ready(Err(super::error_from_exception(error)));
 							}
@@ -263,20 +267,31 @@ impl AudioWorkletHandle {
 
 	/// Implementation for
 	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	///
+	/// # Safety
+	///
+	/// See [`ThreadMemory::destroy()`].
 	pub(crate) unsafe fn destroy(self) {
-		// SAFETY: This is guaranteed to be called only once for the corresponding
-		// thread. Other safety guarantees have to be uphold by the user.
+		// SAFETY: See `ThreadMemory::destroy()`. Other safety guarantees have to be
+		// uphold by the caller.
 		unsafe { self.memory.destroy() };
 	}
 }
 
+/// TODO: Remove when `wasm-bindgen` supports `'static` in functions.
+type TaskStatic = Task<'static>;
+
 /// Entry function for the worklet.
+///
+/// # Safety
+///
+/// `task` has to be a valid pointer to [`Task`].
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
-pub unsafe fn __web_thread_worklet_entry(task: *mut Box<dyn FnOnce() + Send>) {
-	// SAFETY: Has to be a valid pointer to a `Box<dyn FnOnce() + Send>`. We only
-	// call `__web_thread_worker_entry` from `worklet.js`. The data sent to it
-	// should only come from `RegisterThreadFuture::poll()`.
+pub unsafe fn __web_thread_worklet_entry(task: *mut TaskStatic) {
+	// SAFETY: Has to be a valid pointer to a `TaskStatic`. We only call
+	// `__web_thread_worklet_entry` from `worklet.js`. The data sent to it comes
+	// only from `RegisterThreadFuture::poll()`.
 	let task = *unsafe { Box::from_raw(task) };
 	task();
 }

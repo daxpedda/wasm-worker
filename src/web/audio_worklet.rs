@@ -336,14 +336,14 @@ impl AudioWorkletHandle {
 	/// // Wait until audio worklet is finished.
 	/// receiver.recv().await.unwrap();
 	/// JsFuture::from(context.close().unwrap()).await.unwrap();
-	/// // We are sure we are done with the audio worklet and didn't register any
-	/// // events or promises that could be called later.
+	/// // SAFETY: We are sure we are done with the audio worklet and didn't register any
+	/// // events or promises that could call into the Wasm module later.
 	/// unsafe { handle.destroy() };
 	/// # }
 	/// ```
 	pub unsafe fn destroy(self) {
-		// SAFETY: This is guaranteed to be called only once for the corresponding
-		// thread. Other safety guarantees have to be uphold by the user.
+		// SAFETY: See `ThreadMemory::destroy()`. Other safety guarantees have to be
+		// uphold by the caller.
 		unsafe { self.0.destroy() };
 	}
 }

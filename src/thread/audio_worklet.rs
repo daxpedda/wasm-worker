@@ -56,9 +56,13 @@ impl AudioWorkletHandle {
 
 	/// Implementation for
 	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	///
+	/// # Safety
+	///
+	/// See [`AudioWorkletHandle::destroy()`](audio_worklet::AudioWorkletHandle::destroy).
 	pub(crate) unsafe fn destroy(self) {
-		// SAFETY: This is guaranteed to be called only once for the corresponding
-		// thread. Other safety guarantees have to be uphold by the user.
+		// SAFETY: See `ThreadMemory::destroy()`. Other safety guarantees have to be
+		// uphold by the caller.
 		unsafe { self.0.destroy() };
 	}
 }

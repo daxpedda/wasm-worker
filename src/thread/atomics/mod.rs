@@ -230,14 +230,14 @@ impl Scope {
 		self.0.threads.load(Ordering::Relaxed)
 	}
 
-	/// End the scope after calling the user function.
+	/// End the scope after calling the supplied function.
 	pub(super) fn finish(&self) {
 		while self.0.threads.load(Ordering::Acquire) != 0 {
 			super::park();
 		}
 	}
 
-	/// End the scope after calling the user function.
+	/// End the scope after calling the supplied function.
 	pub(super) fn finish_async(&self, cx: &Context<'_>) -> Poll<()> {
 		if self.0.threads.load(Ordering::Acquire) == 0 {
 			return Poll::Ready(());

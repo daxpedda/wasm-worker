@@ -4,9 +4,12 @@
 
 // See <https://github.com/rust-lang/rust/blob/1.75.0/library/std/src/sys_common/thread_parking/futex.rs>.
 
+use std::pin::Pin;
 use std::sync::atomic::AtomicU32;
 use std::sync::atomic::Ordering::{Acquire, Release};
 use std::time::Duration;
+
+use super::super::ThreadId;
 
 const PARKED: u32 = u32::MAX;
 const EMPTY: u32 = 0;
@@ -15,6 +18,8 @@ const NOTIFIED: u32 = 1;
 // CHANGED: Derived `Debug`.
 #[derive(Debug)]
 pub struct Parker {
+	// CHANGED: Added corresponding [`ThreadId`].
+	id: ThreadId,
 	state: AtomicU32,
 }
 
@@ -40,16 +45,24 @@ pub struct Parker {
 // using Ordering::Acquire when checking for this state in `park()`.
 impl Parker {
 	// MODIFIED: This can be safe.
-	pub fn new() -> Self {
+	pub fn new(id: ThreadId) -> Self {
 		Self {
+			id,
 			state: AtomicU32::new(EMPTY),
 		}
 	}
 
 	// Assumes this is only called by the thread that owns the Parker,
 	// which means that `self.state != PARKED`.
-	// CHANGED: Remove `Pin` requirement.
-	pub unsafe fn park(&self) {
+	// CHANGED: Remove `unsafe` requirement.
+	pub fn park(self: Pin<&Self>) {
+		// CHANGED: Ascertain safety requirements during runtime.
+		assert_eq!(
+			self.id,
+			super::current_id(),
+			"called `park()` not from its corresponding thread"
+		);
+
 		// Change `NOTIFIED=>EMPTY` or `EMPTY=>PARKED`, and directly return in the
 		// first case.
 		if self.state.fetch_sub(1, Acquire) == NOTIFIED {
@@ -73,8 +86,15 @@ impl Parker {
 
 	// Assumes this is only called by the thread that owns the Parker,
 	// which means that `self.state != PARKED`.
-	// CHANGED: Remove `Pin` requirement.
-	pub unsafe fn park_timeout(&self, timeout: Duration) {
+	// CHANGED: Remove `unsafe` requirement.
+	pub fn park_timeout(self: Pin<&Self>, timeout: Duration) {
+		// CHANGED: Ascertain safety requirements during runtime.
+		assert_eq!(
+			self.id,
+			super::current_id(),
+			"called `park_timeout()` not from its corresponding thread"
+		);
+
 		// Change `NOTIFIED=>EMPTY` or `EMPTY=>PARKED`, and directly return in the
 		// first case.
 		if self.state.fetch_sub(1, Acquire) == NOTIFIED {
@@ -93,9 +113,8 @@ impl Parker {
 		}
 	}
 
-	// CHANGED: Remove `Pin` requirement.
 	#[inline]
-	pub fn unpark(&self) {
+	pub fn unpark(self: Pin<&Self>) {
 		// Change `PARKED=>NOTIFIED`, `EMPTY=>NOTIFIED`, or `NOTIFIED=>NOTIFIED`, and
 		// wake the thread in the first case.
 		//

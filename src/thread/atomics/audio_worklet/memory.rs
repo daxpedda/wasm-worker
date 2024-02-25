@@ -1,5 +1,7 @@
 //! TLS destruction handling.
 
+use std::cell::OnceCell;
+
 use js_sys::WebAssembly::Global;
 use js_sys::{Number, Object};
 use wasm_bindgen::JsCast;
@@ -18,6 +20,14 @@ pub(super) struct ThreadMemory {
 impl ThreadMemory {
 	/// Create new [`ThreadMemory`] for the calling thread.
 	pub(super) fn new() -> Self {
+		thread_local! {
+			static EXISTS: OnceCell<()> = const { OnceCell::new() };
+		}
+
+		EXISTS
+			.with(|exists| exists.set(()))
+			.expect("created `ThreadMemory` twice for this thread");
+
 		let exports: Exports = wasm_bindgen::exports().unchecked_into();
 		let tls_base = Number::unchecked_from_js(exports.tls_base().value()).value_of();
 		let stack_alloc = Number::unchecked_from_js(exports.stack_alloc().value()).value_of();
@@ -55,7 +65,10 @@ impl ThreadMemory {
 			)
 		});
 
-		// SAFETY: User has to uphold the guarantees of this functions documentation.
+		// SAFETY: This is guaranteed to be called only once for the corresponding
+		// thread because `Self::new()` prevents two objects to the same thread from
+		// being created and `ThreadMemory::destroy()` consumes itself. Other safety
+		// guarantees have to be uphold by the caller.
 		EXPORTS.with(|exports| unsafe {
 			exports.thread_destroy(&tls_base, &stack_alloc);
 		});

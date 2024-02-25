@@ -3,6 +3,7 @@
 use std::fmt::{self, Debug, Formatter};
 use std::future::{Future, Ready};
 use std::marker::PhantomData;
+use std::ops::Deref;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 use std::{any, mem, thread};
@@ -52,9 +53,10 @@ where
 		_scope: PhantomData,
 		_env: PhantomData,
 	});
-	// SAFETY: We have to make sure that `task` is dropped and all threads have
-	// finished before `scope` is dropped.
-	let task = task(unsafe { mem::transmute(scope.as_ref()) });
+	// SAFETY: `scope` and `task` reference each other, but self-referential objects
+	// are not support. We have to make sure that `task` is dropped and all threads
+	// have finished before `scope` is dropped.
+	let task = task(unsafe { mem::transmute::<&Scope<'_, '_>, &Scope<'_, '_>>(scope.deref()) });
 
 	ScopeFuture::new(task, scope)
 }
@@ -194,7 +196,7 @@ pub(crate) struct ScopeFuture<'scope, 'env, F, T>(#[pin] State<'scope, 'env, F, 
 enum State<'scope, 'env, F, T> {
 	/// Executing the task given to [`scope_async()`].
 	Task {
-		/// [`Future`] given by the user.
+		/// [`Future`] given by the caller.
 		#[pin]
 		task: F,
 		/// Corresponding [`Scope`].
@@ -202,7 +204,7 @@ enum State<'scope, 'env, F, T> {
 	},
 	/// Wait for all threads to finish.
 	Wait {
-		/// Result of the [`Future`] given by the user.
+		/// Result of the [`Future`] given by the caller.
 		result: T,
 		/// Corresponding [`Scope`].
 		scope: Pin<Box<Scope<'scope, 'env>>>,

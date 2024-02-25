@@ -34,7 +34,7 @@ pub(in super::super::super) fn register_processor<P: 'static + ExtendAudioWorkle
 	.map_err(|error| super::error_from_exception(error.into()))
 }
 
-/// Holds the user-supplied [`ExtendAudioWorkletProcessor`] while type-erasing
+/// Holds the supplied [`ExtendAudioWorkletProcessor`] while type-erasing
 /// it.
 #[wasm_bindgen]
 struct __WebThreadProcessorConstructor(Box<dyn ProcessorConstructor>);
@@ -61,7 +61,7 @@ impl __WebThreadProcessorConstructor {
 	}
 }
 
-/// Wrapper for the user-supplied [`ExtendAudioWorkletProcessor`].
+/// Wrapper for the supplied [`ExtendAudioWorkletProcessor`].
 struct ProcessorConstructorWrapper<P: 'static + ExtendAudioWorkletProcessor>(PhantomData<P>);
 
 /// Object-safe version of [`ExtendAudioWorkletProcessor`].
@@ -93,7 +93,8 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 			.get_processor_options()
 		{
 			if let Some(data) = processor_options.data() {
-				// SAFETY: We only store `*mut Data` at `__web_thread_data`.
+				// SAFETY: We only store `*mut Data` in `__web_thread_data` at
+				// `super::audio_worklet_node()`.
 				#[allow(clippy::as_conversions)]
 				let data = unsafe { Box::<Data>::from_raw(data as *mut Data) };
 
@@ -126,7 +127,7 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 	}
 }
 
-/// Holds the user-supplied [`ExtendAudioWorkletProcessor`] while type-erasing
+/// Holds the supplied [`ExtendAudioWorkletProcessor`] while type-erasing
 /// it.
 #[wasm_bindgen]
 struct __WebThreadProcessor(Box<dyn Processor>);
