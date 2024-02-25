@@ -37,7 +37,11 @@
 	),
 	feature(stdarch_wasm_atomic_wait)
 )]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg, doc_cfg, doc_cfg_hide))]
+#![cfg_attr(
+	docsrs,
+	doc(cfg_hide(docsrs, target_family = "wasm", target_os = "unknown"))
+)]
 
 #[cfg(all(target_family = "wasm", target_os = "unknown"))]
 mod thread;
