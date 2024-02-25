@@ -1,7 +1,6 @@
 //! Implementation of [`spawn()`] and types related to it.
 
 use std::fmt::{Debug, Formatter};
-use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{fmt, thread};
@@ -22,18 +21,6 @@ where
 	T: Send + 'static,
 {
 	Builder::new().spawn(f).expect("failed to spawn thread")
-}
-
-/// Implementation for [`crate::web::spawn_async()`].
-pub(crate) fn spawn_async<F1, F2, T>(task: F1) -> JoinHandle<T>
-where
-	F1: 'static + FnOnce() -> F2 + Send,
-	F2: 'static + Future<Output = T>,
-	T: 'static + Send,
-{
-	Builder::new()
-		.spawn_async_internal(task)
-		.expect("failed to spawn thread")
 }
 
 /// See [`std::thread::JoinHandle`].

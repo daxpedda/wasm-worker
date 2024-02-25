@@ -28,7 +28,6 @@ pub use self::builder::Builder;
 use self::global::{Global, GLOBAL};
 pub use self::scope::{scope, Scope, ScopedJoinHandle};
 pub(crate) use self::scope::{scope_async, ScopeFuture};
-pub(crate) use self::spawn::spawn_async;
 pub use self::spawn::{spawn, JoinHandle};
 #[cfg(not(target_feature = "atomics"))]
 use self::unsupported as r#impl;

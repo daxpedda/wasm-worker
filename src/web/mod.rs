@@ -642,7 +642,9 @@ where
 	F2: 'static + Future<Output = T>,
 	T: 'static + Send,
 {
-	thread::spawn_async(f)
+	Builder::new()
+		.spawn_async(f)
+		.expect("failed to spawn thread")
 }
 
 /// Async version of [`yield_now()`](std::thread::yield_now). This yields
