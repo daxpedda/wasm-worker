@@ -33,10 +33,6 @@ pub(super) use self::parker::Parker;
 use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
 use super::{ScopedJoinHandle, Thread, ThreadId, THREAD};
 
-/// Saves the [`ThreadId`] of the main thread. Make sure this gets initialized
-/// before spawning any threads.
-static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
-
 thread_local! {
 	/// [`Memory`] of the Wasm module.
 	pub(super) static MEMORY: Memory = wasm_bindgen::memory().unchecked_into();
@@ -274,7 +270,7 @@ pub(super) fn test_block_support() -> bool {
 }
 
 /// Implementation for [`crate::web::has_spawn_support()`]. Make sure to
-/// instantiate it on the main thread!
+/// call at least once on the main thread!
 pub(super) fn has_spawn_support() -> bool {
 	/// We spawn only from the main thread, so we cache the result to be able to
 	/// call it from other threads but get the result of the main thread.
@@ -292,6 +288,15 @@ pub(super) fn has_spawn_support() -> bool {
 /// [`Arc`].
 fn current_id() -> ThreadId {
 	THREAD.with(|cell| cell.get_or_init(Thread::new).id())
+}
+
+/// Determined if the current thread is the main thread.
+pub(super) fn is_main_thread() -> bool {
+	/// Saves the [`ThreadId`] of the main thread. Make sure this gets
+	/// initialized before spawning any threads.
+	static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
+
+	*MAIN_THREAD.get_or_init(current_id) == current_id()
 }
 
 /// Converts a reference to a pointer to [`i32`] to an index into the internal

@@ -3,6 +3,8 @@
 //! Things to note:
 //! - Will fail on import when used with the `no-modules` target.
 //! - Blocking is not recommended.
+//! - Audio worklets are very limited.
+//! - Spawning happens on the "main" thread, e.g. if blocked nothing will spawn.
 //!
 //! Browser bugs:
 //! - Browsers don't support `TextEncoder`/`TextDecoder` in audio worklets:

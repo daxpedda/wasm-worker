@@ -20,7 +20,7 @@ pub(in super::super) use self::register::{
 	register_thread, AudioWorkletHandle, RegisterThreadFuture,
 };
 use super::super::js::GlobalExt;
-use super::MAIN_THREAD;
+pub(in super::super) use super::is_main_thread;
 use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
 
 /// Macro to cache conversions from [`String`]s to [`JsString`]s to avoid
@@ -69,11 +69,6 @@ js_string! {
 	/// [`AudioWorkletNodeOptions.processorOptions`](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions)
 	/// property.
 	static PROCESSOR_OPTIONS_PROPERTY_NAME = "processorOptions";
-}
-
-/// Determined if the current thread is the main thread.
-pub(in super::super) fn is_main_thread() -> bool {
-	*MAIN_THREAD.get_or_init(super::current_id) == super::current_id()
 }
 
 /// Returns [`true`] if this context has a registered thread.

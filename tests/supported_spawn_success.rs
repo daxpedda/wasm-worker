@@ -89,6 +89,24 @@ async fn spawn() {
 
 #[cfg_attr(not(target_family = "wasm"), pollster::test)]
 #[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
+async fn nested() {
+	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
+	let mut handle = web_thread::spawn(|| web_thread::spawn(|| ()));
+
+	#[cfg(not(target_family = "wasm"))]
+	handle.join().unwrap().join().unwrap();
+	#[cfg(target_family = "wasm")]
+	handle
+		.join_async()
+		.await
+		.unwrap()
+		.join_async()
+		.await
+		.unwrap();
+}
+
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
 async fn scope() {
 	let mut test = 0;
 

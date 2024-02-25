@@ -16,9 +16,10 @@ use web_sys::{AudioContextState, AudioWorkletNode, AudioWorkletNodeOptions, Base
 use super::super::js::META;
 use super::super::oneshot::{self, Receiver};
 use super::super::url::ScriptUrl;
-use super::super::{Thread, MAIN_THREAD};
+use super::super::Thread;
 use super::js::BaseAudioContextExt;
 use super::memory::ThreadMemory;
+use crate::thread::atomics::is_main_thread;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -171,8 +172,13 @@ impl Future for RegisterThreadFuture {
 					ref mut promise, ..
 				} => match Pin::new(promise).poll(cx) {
 					Poll::Ready(Ok(_)) => {
-						// Before spawning a new thread make sure we initialize [`MAIN_THREAD`].
-						MAIN_THREAD.get_or_init(super::super::current_id);
+						// This is checked earlier.
+						debug_assert!(
+							is_main_thread(),
+							"started registering thread without being on the main thread"
+						);
+						// Before spawning a new thread make sure we initialize the main thread.
+						super::super::spawn::init_main_thread();
 
 						let State::Module {
 							context,

@@ -16,12 +16,10 @@ use super::channel::Sender;
 use super::js::META;
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
-use super::{
-	channel, oneshot, JoinHandle, ScopeData, Thread, ThreadId, MAIN_THREAD, MEMORY, MODULE,
-};
+use super::{channel, oneshot, JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
 
 /// [`Sender`] to the main thread.
-static SENDER: OnceLock<Sender<Command>> = OnceLock::new();
+static THREAD_HANDLER: OnceLock<Sender<Command>> = OnceLock::new();
 
 thread_local! {
 	/// Containing all spawned workers.
@@ -54,10 +52,19 @@ enum Command {
 	},
 }
 
-/// Initializes the main thread sender and receiver. Make sure to only call this
-/// from the main thread.
-fn init_main() {
-	SENDER.get_or_init(|| {
+/// Initializes the main thread thread handler. Make sure to call this at
+/// least once on the main thread before spawning any thread.
+///
+/// # Panics
+///
+/// This will panic if called outside the main thread.
+pub(super) fn init_main_thread() {
+	debug_assert!(
+		super::is_main_thread(),
+		"initizalizing main thread without being on the main thread"
+	);
+
+	THREAD_HANDLER.get_or_init(|| {
 		super::has_spawn_support();
 
 		let (sender, receiver) = channel::channel::<Command>();
@@ -129,7 +136,7 @@ where
 				let value = Box::pin(AtomicI32::new(0));
 				let index = super::i32_to_buffer_index(value.as_ptr());
 
-				SENDER
+				THREAD_HANDLER
 					.get()
 					.expect("closing thread without `SENDER` being initialized")
 					.send(Command::Terminate {
@@ -146,12 +153,12 @@ where
 	// its lifetime.
 	let task: TaskStatic = unsafe { mem::transmute(task) };
 
-	if *MAIN_THREAD.get_or_init(super::current_id) == super::current_id() {
-		init_main();
+	if super::is_main_thread() {
+		init_main_thread();
 
 		spawn_internal(thread.id(), task, thread.name());
 	} else {
-		SENDER
+		THREAD_HANDLER
 			.get()
 			.expect("not spawning from main thread without initializing `SENDER`")
 			.send(Command::Spawn {

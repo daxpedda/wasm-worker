@@ -46,6 +46,82 @@ macro_rules! test {
 	};
 }
 
+async fn test_nested<C, F>(context: C, post: impl FnOnce(C) -> F)
+where
+	C: Clone + BaseAudioContextExt + AsRef<BaseAudioContext>,
+	F: Future<Output = ()>,
+{
+	let start = Flag::new();
+	let end = Flag::new();
+	context
+		.clone()
+		.register_thread({
+			let start = start.clone();
+			move || {
+				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+				global
+					.register_processor_ext::<TestProcessor>("test")
+					.unwrap();
+				start.signal();
+			}
+		})
+		.await
+		.unwrap();
+
+	// Wait until processor is registered.
+	start.await;
+	web::yield_now_async(YieldTime::UserBlocking).await;
+
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |_| {
+					let handle = web_thread::spawn(|| ());
+					Some(Box::new(move || {
+						if handle.is_finished() {
+							end.signal();
+							false
+						} else {
+							true
+						}
+					}))
+				}
+			}),
+			None,
+		)
+		.unwrap();
+	post(context).await;
+	end.await;
+}
+
+#[wasm_bindgen_test]
+// Firefox doesn't support running `AudioContext` without an actual audio device.
+// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1881904>.
+#[cfg(not(unsupported_headless_audiocontext))]
+async fn nested() {
+	test_nested(AudioContext::new().unwrap(), |_| async {}).await;
+}
+
+#[wasm_bindgen_test]
+async fn offline_nested() {
+	test_nested(
+		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
+			1,
+			100_000_000,
+			8000.,
+		)
+		.unwrap(),
+		|context| async move {
+			JsFuture::from(context.start_rendering().unwrap())
+				.await
+				.unwrap();
+		},
+	)
+	.await;
+}
+
 async fn test_register(context: BaseAudioContext) {
 	context.register_thread(|| ()).await.unwrap();
 }
@@ -217,18 +293,7 @@ where
 		.clone()
 		.register_thread({
 			let start = start.clone();
-			let end = end.clone();
 			move || {
-				GLOBAL_DATA.with(move |data| {
-					if data
-						.set(RefCell::new(Some(Box::new(move |_| {
-							Some(Box::new(move || end.signal()))
-						}))))
-						.is_err()
-					{
-						panic!()
-					}
-				});
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
 				global
 					.register_processor_ext::<TestProcessor>("test")
@@ -243,7 +308,21 @@ where
 	start.await;
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
-	AudioWorkletNode::new(context.as_ref(), "test").unwrap();
+	context
+		.audio_worklet_node::<TestProcessor>(
+			"test",
+			Box::new({
+				let end = end.clone();
+				move |_| {
+					Some(Box::new(move || {
+						end.signal();
+						false
+					}))
+				}
+			}),
+			None,
+		)
+		.unwrap();
 	post(context).await;
 	end.await;
 }

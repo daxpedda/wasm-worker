@@ -16,16 +16,17 @@ use web_thread::web::audio_worklet::ExtendAudioWorkletProcessor;
 
 thread_local! {
 	#[allow(clippy::type_complexity)]
-	pub static GLOBAL_DATA: OnceCell<RefCell<Option<Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnOnce()>>>>>> = OnceCell::new();
+	pub static GLOBAL_DATA: OnceCell<RefCell<Option<Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnMut() -> bool>>>>>> = OnceCell::new();
 }
 
 pub struct TestProcessor<P: AudioParameter = ()> {
-	process: Option<Box<dyn FnOnce()>>,
+	process: Option<Box<dyn FnMut() -> bool>>,
 	parameter: PhantomData<P>,
 }
 
 impl<P: AudioParameter> ExtendAudioWorkletProcessor for TestProcessor<P> {
-	type Data = Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnOnce()>> + Send>;
+	type Data =
+		Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnMut() -> bool>> + Send>;
 
 	fn new(
 		_: AudioWorkletProcessor,
@@ -49,11 +50,16 @@ impl<P: AudioParameter> ExtendAudioWorkletProcessor for TestProcessor<P> {
 	}
 
 	fn process(&mut self, _: Array, _: Array, _: Object) -> bool {
-		if let Some(fun) = self.process.take() {
-			fun();
+		if let Some(fun) = &mut self.process {
+			if fun() {
+				true
+			} else {
+				self.process = None;
+				false
+			}
+		} else {
+			false
 		}
-
-		false
 	}
 
 	fn parameter_descriptors() -> Iterator {
