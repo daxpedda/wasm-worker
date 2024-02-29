@@ -191,6 +191,8 @@ unsafe_op_in_unsafe_fn = "warn"
 unused_import_braces = "warn"
 unused_lifetimes = "warn"
 unused_qualifications = "warn"
+## https://github.com/rust-lang/rust/issues/121621#issuecomment-1963599974
+non_local_definitions = "allow"
 
 [lints.clippy]
 # Clippy groups.
@@ -261,6 +263,8 @@ unwrap_used = "warn"
 use_debug = "warn"
 verbose_file_reads = "warn"
 # Allowed Clippy lints.
+## https://github.com/rust-lang/rust-clippy/issues/12377
+empty_docs = "allow"
 equatable_if_let = "allow"
 explicit_deref_methods = "allow"
 future_not_send = "allow"
