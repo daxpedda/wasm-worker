@@ -302,13 +302,7 @@ impl AudioWorkletHandle {
 	}
 
 	/// This cleans up memory allocated for the corresponding audio worklet
-	/// thread. This call *may* block.
-	///
-	/// # Exception
-	///
-	/// This call *may* block and throw an exception if the calling thread
-	/// doesn't support blocking, see
-	/// [`web::has_block_support()`](crate::web::has_block_support).
+	/// thread.
 	///
 	/// # Safety
 	///

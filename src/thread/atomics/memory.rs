@@ -7,6 +7,8 @@ use js_sys::{Number, Object};
 use wasm_bindgen::JsCast;
 
 use super::js::{Exports, GlobalDescriptor};
+#[cfg(feature = "audio-worklet")]
+use super::spawn::{Command, THREAD_HANDLER};
 
 /// Holds pointers to the memory of a thread.
 #[derive(Debug)]
@@ -38,13 +40,45 @@ impl ThreadMemory {
 		}
 	}
 
-	/// Destroys the memory of the referenced thread.
+	/// Schedules the memory of the referenced thread to be destroyed.
 	///
 	/// # Safety
 	///
 	/// The thread is not allowed to be used while or after this function is
 	/// executed.
 	pub(super) unsafe fn destroy(self) {
+		#[cfg(not(feature = "audio-worklet"))]
+		{
+			debug_assert!(
+				super::is_main_thread(),
+				"called `ThreadMemory::destroy()` from outside the main thread"
+			);
+			// SAFETY: Safety has to be uphold by the caller. See `destroy_internal()` for
+			// more details.
+			unsafe { self.destroy_internal() };
+		}
+
+		#[cfg(feature = "audio-worklet")]
+		if super::is_main_thread() {
+			// SAFETY: Safety has to be uphold by the caller. See `destroy_internal()` for
+			// more details.
+			unsafe { self.destroy_internal() };
+		} else {
+			THREAD_HANDLER
+				.get()
+				.expect("called `ThreadMemory::destroy()` before main thread was initizalized")
+				.send(Command::Destroy(self))
+				.expect("`Receiver` was somehow dropped from the main thread");
+		}
+	}
+
+	/// Destroys the memory of the referenced thread.
+	///
+	/// # Safety
+	///
+	/// The thread is not allowed to be used while or after this function is
+	/// executed.
+	unsafe fn destroy_internal(self) {
 		thread_local! {
 			/// Caches the [`Exports`] object.
 			static EXPORTS: Exports = wasm_bindgen::exports().unchecked_into();
@@ -67,8 +101,8 @@ impl ThreadMemory {
 
 		// SAFETY: This is guaranteed to be called only once for the corresponding
 		// thread because `Self::new()` prevents two objects to the same thread from
-		// being created and `ThreadMemory::destroy()` consumes itself. Other safety
-		// guarantees have to be uphold by the caller.
+		// being created and `ThreadMemory::destroy_internal()` consumes itself. Other
+		// safety guarantees have to be uphold by the caller.
 		EXPORTS.with(|exports| unsafe {
 			exports.thread_destroy(&tls_base, &stack_alloc);
 		});

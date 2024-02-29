@@ -24,7 +24,7 @@ use super::wait_async::WaitAsync;
 use super::{channel, oneshot, JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
 
 /// [`Sender`] to the main thread.
-static THREAD_HANDLER: OnceLock<Sender<Command>> = OnceLock::new();
+pub(super) static THREAD_HANDLER: OnceLock<Sender<Command>> = OnceLock::new();
 
 thread_local! {
 	/// Containing all spawned workers.
@@ -42,7 +42,7 @@ type Task<'scope> =
 	Box<dyn 'scope + FnOnce() -> Pin<Box<dyn 'scope + Future<Output = u32>>> + Send>;
 
 /// Command sent to the main thread.
-enum Command {
+pub(super) enum Command {
 	/// Spawn a new thread.
 	Spawn(SpawnData<Task<'static>>),
 	/// Terminate thread.
@@ -54,10 +54,15 @@ enum Command {
 		/// Memory to destroy the thread.
 		memory: ThreadMemory,
 	},
+	/// Sent by
+	/// [`AudioWorkletHandle::destroy()`](super::audio_worklet::AudioWorkletHandle::destroy)
+	/// to destroy the thread.
+	#[cfg(feature = "audio-worklet")]
+	Destroy(ThreadMemory),
 }
 
 /// Data to spawn new thread.
-struct SpawnData<T> {
+pub(super) struct SpawnData<T> {
 	/// [`ThreadId`] of the thread to be spawned.
 	id: ThreadId,
 	/// Task.
@@ -108,6 +113,11 @@ pub(super) fn init_main_thread() {
 								.terminate();
 						});
 					}
+					#[cfg(feature = "audio-worklet")]
+					Command::Destroy(memory) =>
+					// SAFETY: Safety has to be uphold by the caller. See
+					// `AudioWorkletHandle::destroy()`.
+					unsafe { memory.destroy() },
 				}
 			}
 		});
