@@ -1,10 +1,11 @@
 //! Polyfill for `Atomics.waitAsync`.
 
 use std::cell::{Cell, RefCell};
-use std::future;
+use std::future::Future;
+use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::task::{Poll, Waker};
+use std::task::{ready, Context, Poll, Waker};
 
 use js_sys::{Array, Atomics};
 use wasm_bindgen::closure::Closure;
@@ -20,18 +21,72 @@ use super::{MEMORY, MEMORY_ARRAY};
 const POLYFILL_WORKER_CACHE: usize = 10;
 
 /// Mimics the interface we need from [`Atomics`].
-pub(super) struct WaitAsync;
+#[derive(Debug)]
+pub(super) struct WaitAsync(Option<State>);
+
+/// State for [`WaitAsync`] [`Future`] implementation.
+#[derive(Debug)]
+enum State {
+	/// Atomic request was ready immediately.
+	Ready,
+	/// [`Promise`](js_sys::Promise) returned by [`Atomics::wait_async()`].
+	WaitAsync(JsFuture),
+	/// Polyfill implementation of [`Atomics::wait_async()`].
+	Polyfill(Rc<Shared>),
+}
+
+/// Shared state for polyfill implementation.
+#[derive(Debug)]
+struct Shared {
+	/// [`true`] when finished.
+	finished: Cell<bool>,
+	/// Stores [`Waker`] for callback.
+	waker: RefCell<Option<Waker>>,
+}
+
+impl Future for WaitAsync {
+	type Output = ();
+
+	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+		let state = self
+			.0
+			.as_mut()
+			.expect("`WaitAsync` polled after completion");
+
+		match state {
+			State::Ready => {
+				self.0.take();
+				Poll::Ready(())
+			}
+			State::WaitAsync(future) => {
+				ready!(Pin::new(future).poll(cx))
+					.expect("`Promise` returned by `Atomics.waitAsync` should never throw");
+				self.0.take();
+				Poll::Ready(())
+			}
+			State::Polyfill(shared) => {
+				if shared.finished.get() {
+					self.0.take();
+					Poll::Ready(())
+				} else {
+					*shared.waker.borrow_mut() = Some(cx.waker().clone());
+					Poll::Pending
+				}
+			}
+		}
+	}
+}
 
 impl WaitAsync {
 	/// Mimics the interface we need from [`Atomics::wait_async`].
-	pub(super) async fn wait(value: &AtomicI32, check: i32) {
+	pub(super) fn wait(value: &AtomicI32, check: i32) -> Self {
 		thread_local! {
 			static HAS_WAIT_ASYNC: bool = !js::HAS_WAIT_ASYNC.is_undefined();
 		}
 
 		// Short-circuit before having to go through FFI.
 		if value.load(Ordering::Relaxed) != check {
-			return;
+			return Self(Some(State::Ready));
 		}
 
 		let index = super::i32_to_buffer_index(value.as_ptr());
@@ -42,73 +97,66 @@ impl WaitAsync {
 				.expect("`Atomics.waitAsync` is not expected to fail")
 				.unchecked_into();
 
-			if result.async_() {
-				JsFuture::from(result.value())
-					.await
-					.expect("`Promise` returned by `Atomics.waitAsync` should never throw");
-			}
+			Self(Some(if result.async_() {
+				State::WaitAsync(JsFuture::from(result.value()))
+			} else {
+				State::Ready
+			}))
 		} else {
-			wait(index, check).await;
+			Self::wait_polyfill(index, check)
 		}
 	}
-}
 
-/// Polyfills [`Atomics::wait_async`] if not available.
-async fn wait(index: u32, check: i32) {
-	thread_local! {
-		/// Object URL to the worker script.
-		static URL: ScriptUrl = ScriptUrl::new(include_str!("wait_async.js"));
-		/// Holds cached workers.
-		static WORKERS: RefCell<Vec<Worker>> = const { RefCell::new(Vec::new()) };
-	}
-
-	let worker = WORKERS.with(|workers| {
-		if let Some(worker) = workers.borrow_mut().pop() {
-			return worker;
+	/// Polyfills [`Atomics::wait_async`] if not available.
+	fn wait_polyfill(index: u32, check: i32) -> Self {
+		thread_local! {
+			/// Object URL to the worker script.
+			static URL: ScriptUrl = ScriptUrl::new(include_str!("wait_async.js"));
+			/// Holds cached workers.
+			static WORKERS: RefCell<Vec<Worker>> = const { RefCell::new(Vec::new()) };
 		}
 
-		URL.with(|url| Worker::new(url.as_raw()))
-			.expect("`new Worker()` is not expected to fail with a local script")
-	});
-
-	let finished = Rc::new(Cell::new(false));
-	let waker: Rc<RefCell<Option<Waker>>> = Rc::new(RefCell::new(None));
-
-	let onmessage_callback = Closure::once_into_js({
-		let finished = Rc::clone(&finished);
-		let waker = Rc::clone(&waker);
-		let worker = worker.clone();
-
-		move || {
-			WORKERS.with(move |workers| {
-				let mut workers = workers.borrow_mut();
-				workers.push(worker);
-				workers.truncate(POLYFILL_WORKER_CACHE);
-			});
-
-			finished.set(true);
-
-			if let Some(waker) = waker.borrow_mut().take() {
-				waker.wake();
+		let worker = WORKERS.with(|workers| {
+			if let Some(worker) = workers.borrow_mut().pop() {
+				return worker;
 			}
-		}
-	});
-	worker.set_onmessage(Some(onmessage_callback.unchecked_ref()));
 
-	let message =
-		MEMORY.with(|memory| Array::of3(memory, &JsValue::from(index), &JsValue::from(check)));
+			URL.with(|url| Worker::new(url.as_raw()))
+				.expect("`new Worker()` is not expected to fail with a local script")
+		});
 
-	worker
-		.post_message(&message)
-		.expect("`Worker.postMessage` is not expected to fail without a `transfer` object");
+		let shared = Rc::new(Shared {
+			finished: Cell::new(false),
+			waker: RefCell::new(None),
+		});
 
-	future::poll_fn(|cx| {
-		if finished.get() {
-			Poll::Ready(())
-		} else {
-			*waker.borrow_mut() = Some(cx.waker().clone());
-			Poll::Pending
-		}
-	})
-	.await;
+		let onmessage_callback = Closure::once_into_js({
+			let shared = Rc::clone(&shared);
+			let worker = worker.clone();
+
+			move || {
+				WORKERS.with(move |workers| {
+					let mut workers = workers.borrow_mut();
+					workers.push(worker);
+					workers.truncate(POLYFILL_WORKER_CACHE);
+				});
+
+				shared.finished.set(true);
+
+				if let Some(waker) = shared.waker.borrow_mut().take() {
+					waker.wake();
+				}
+			}
+		});
+		worker.set_onmessage(Some(onmessage_callback.unchecked_ref()));
+
+		let message =
+			MEMORY.with(|memory| Array::of3(memory, &JsValue::from(index), &JsValue::from(check)));
+
+		worker
+			.post_message(&message)
+			.expect("`Worker.postMessage` is not expected to fail without a `transfer` object");
+
+		Self(Some(State::Polyfill(shared)))
+	}
 }

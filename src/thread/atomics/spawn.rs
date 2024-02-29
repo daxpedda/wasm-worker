@@ -14,8 +14,11 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 use web_sys::{Worker, WorkerOptions, WorkerType};
 
+#[cfg(feature = "audio-worklet")]
+use super::audio_worklet::register::THREAD_LOCK_INDEXES;
 use super::channel::Sender;
 use super::js::META;
+use super::memory::ThreadMemory;
 use super::url::ScriptUrl;
 use super::wait_async::WaitAsync;
 use super::{channel, oneshot, JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
@@ -48,6 +51,8 @@ enum Command {
 		id: ThreadId,
 		/// Value to use `Atomics.waitAsync` on.
 		value: Pin<Box<AtomicI32>>,
+		/// Memory to destroy the thread.
+		memory: ThreadMemory,
 	},
 }
 
@@ -84,9 +89,13 @@ pub(super) fn init_main_thread() {
 					Command::Spawn(SpawnData { id, task, name }) => {
 						spawn_internal(id, task, name.as_deref());
 					}
-					Command::Terminate { id, value } => {
+					Command::Terminate { id, value, memory } => {
 						wasm_bindgen_futures::spawn_local(async move {
 							WaitAsync::wait(&value, 0).await;
+
+							// SAFETY: We wait until the execution block has exited and block the
+							// thread afterwards.
+							unsafe { memory.destroy() };
 
 							WORKERS
 								.with(|workers| {
@@ -197,6 +206,7 @@ fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Futu
 			.send(Command::Terminate {
 				id: super::current_id(),
 				value,
+				memory: ThreadMemory::new(),
 			})
 			.expect("`Receiver` was somehow dropped from the main thread");
 
@@ -207,7 +217,10 @@ fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Futu
 /// Spawning thread regardless of being nested.
 fn spawn_internal<T>(id: ThreadId, task: T, name: Option<&str>) {
 	spawn_common(id, task, name, |worker, module, memory, task| {
+		#[cfg(not(feature = "audio-worklet"))]
 		let message = Array::of3(module, memory, &task);
+		#[cfg(feature = "audio-worklet")]
+		let message = { THREAD_LOCK_INDEXES.with(|indexes| Array::of4(module, memory, indexes, &task)) };
 		worker.post_message(&message)
 	})
 	.expect("`Worker.postMessage` is not expected to fail without a `transfer` object");
@@ -223,10 +236,15 @@ fn spawn_common<T, E>(
 	thread_local! {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(&{
+			#[cfg(not(feature = "audio-worklet"))]
+			let script = include_str!("worker.js");
+			#[cfg(feature = "audio-worklet")]
+			let script = include_str!("worker_with_audio_worklet.js");
+
 			format!(
 				"import {{initSync, __web_thread_worker_entry}} from '{}'\n\n{}",
 				META.url(),
-				include_str!("worker.js")
+				script,
 			)
 		});
 	}

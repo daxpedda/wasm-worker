@@ -4,25 +4,46 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io::{Error, ErrorKind};
 use std::pin::Pin;
+use std::sync::atomic::{AtomicI32, Ordering};
 use std::task::{Context, Poll};
 use std::{any, io};
 
 use js_sys::Array;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{AudioContextState, AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
 use super::super::js::META;
+use super::super::memory::ThreadMemory;
 use super::super::oneshot::{self, Receiver};
 use super::super::url::ScriptUrl;
+use super::super::wait_async::WaitAsync;
 use super::super::Thread;
 use super::js::BaseAudioContextExt;
-use super::memory::ThreadMemory;
 use crate::thread::atomics::is_main_thread;
 
 /// Type of the task being sent to the worklet.
 type Task<'scope> = Box<dyn 'scope + FnOnce() + Send>;
+
+/// Locks instantiating workers until worklets have finished instantiating.
+static WORKLET_LOCK: AtomicI32 = AtomicI32::new(0);
+/// Counts how many workers are currently instantiating.
+static WORKER_LOCK: AtomicI32 = AtomicI32::new(0);
+
+thread_local! {
+	/// Cached [`JsValue`] holding index to worklet lock.
+	pub(in super::super) static WORKLET_LOCK_INDEX: JsValue =
+		super::super::i32_to_buffer_index(WORKLET_LOCK.as_ptr()).into();
+	/// Cached [`Array`] holding indexes to worker and worklet locks.
+	pub(in super::super) static THREAD_LOCK_INDEXES: Array =
+		WORKLET_LOCK_INDEX.with(|worklet_index| {
+			Array::of2(
+				worklet_index,
+				&super::super::i32_to_buffer_index(WORKER_LOCK.as_ptr()).into(),
+			)
+		});
+}
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -108,6 +129,32 @@ enum State {
 		/// Receiver for the [`Package`].
 		receiver: Receiver<Package>,
 	},
+	/// Waiting for the worklet lock to be available.
+	WorkletLock {
+		/// [`Future`] waiting for the worklet lock to be available.
+		future: Option<WaitAsync>,
+		/// Corresponding [`BaseAudioContext`].
+		context: BaseAudioContext,
+		/// Receiver for the [`Package`].
+		receiver: Receiver<Package>,
+		/// [`AudioWorkletNodeOptions`] to be passed into [`AudioWorkletNode`].
+		options: AudioWorkletNodeOptions,
+		/// Pointer to [`Task`]. Used to clean up task on failure.
+		task: *mut Box<dyn FnOnce() + Send>,
+	},
+	/// Waiting for the worker lock to be available.
+	WorkerLock {
+		/// [`Future`] waiting for the worker lock to be available.
+		future: Option<WaitAsync>,
+		/// Corresponding [`BaseAudioContext`].
+		context: BaseAudioContext,
+		/// Receiver for the [`Package`].
+		receiver: Receiver<Package>,
+		/// [`AudioWorkletNodeOptions`] to be passed into [`AudioWorkletNode`].
+		options: AudioWorkletNodeOptions,
+		/// Pointer to [`Task`]. Used to clean up task on failure.
+		task: *mut Box<dyn FnOnce() + Send>,
+	},
 	/// Waiting for [`Package`].
 	Package {
 		/// Corresponding [`BaseAudioContext`].
@@ -141,6 +188,31 @@ impl Debug for State {
 				.field("task", &any::type_name_of_val(task))
 				.field("receiver", receiver)
 				.finish(),
+			Self::WorkletLock {
+				future,
+				context,
+				receiver,
+				options,
+				task,
+			}
+			| Self::WorkerLock {
+				future,
+				context,
+				receiver,
+				options,
+				task,
+			} => formatter
+				.debug_struct(match self {
+					Self::WorkletLock { .. } => "WorkletLock",
+					Self::WorkerLock { .. } => "WorkerLock",
+					_ => unreachable!(),
+				})
+				.field("future", future)
+				.field("context", context)
+				.field("receiver", receiver)
+				.field("options", options)
+				.field("task", task)
+				.finish(),
 			Self::Package { context, receiver } => formatter
 				.debug_struct("Module")
 				.field("context", context)
@@ -165,6 +237,7 @@ impl Drop for RegisterThreadFuture {
 impl Future for RegisterThreadFuture {
 	type Output = io::Result<AudioWorkletHandle>;
 
+	#[allow(clippy::too_many_lines)]
 	fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
 		loop {
 			let mut state = self.0.take().expect("polled after completion");
@@ -195,26 +268,22 @@ impl Future for RegisterThreadFuture {
 
 						let task = Box::into_raw(Box::new(task));
 						let mut options = AudioWorkletNodeOptions::new();
-						options.processor_options(Some(&Array::of3(
-							&wasm_bindgen::module(),
-							&wasm_bindgen::memory(),
-							&task.into(),
-						)));
+						options.processor_options(Some(&WORKLET_LOCK_INDEX.with(|index| {
+							Array::of4(
+								&wasm_bindgen::module(),
+								&wasm_bindgen::memory(),
+								index,
+								&task.into(),
+							)
+						})));
 
-						match AudioWorkletNode::new_with_options(
-							&context,
-							"__web_thread_worklet",
-							&options,
-						) {
-							Ok(_) => self.0 = Some(State::Package { context, receiver }),
-							Err(error) => {
-								// SAFETY: We just made this pointer above and `new
-								// AudioWorkletNode` has to guarantee that on error transmission
-								// failed to avoid double-free.
-								drop(unsafe { Box::from_raw(task) });
-								return Poll::Ready(Err(super::error_from_exception(error)));
-							}
-						}
+						self.0 = Some(State::WorkletLock {
+							future: None,
+							context,
+							receiver,
+							options,
+							task,
+						});
 					}
 					Poll::Ready(Err(error)) => {
 						return Poll::Ready(Err(super::error_from_exception(error)))
@@ -224,6 +293,96 @@ impl Future for RegisterThreadFuture {
 						return Poll::Pending;
 					}
 				},
+				State::WorkletLock {
+					future,
+					context,
+					receiver,
+					options,
+					task,
+				} => {
+					if let Some(mut future) = future {
+						if Pin::new(&mut future).poll(cx).is_pending() {
+							self.0 = Some(State::WorkletLock {
+								future: Some(future),
+								context,
+								receiver,
+								options,
+								task,
+							});
+							return Poll::Pending;
+						}
+					}
+
+					if WORKLET_LOCK
+						.compare_exchange_weak(0, 1, Ordering::Relaxed, Ordering::Relaxed)
+						.is_err()
+					{
+						self.0 = Some(State::WorkletLock {
+							future: Some(WaitAsync::wait(&WORKLET_LOCK, 1)),
+							context,
+							receiver,
+							options,
+							task,
+						});
+						continue;
+					}
+
+					self.0 = Some(State::WorkerLock {
+						future: None,
+						context,
+						receiver,
+						options,
+						task,
+					});
+				}
+				State::WorkerLock {
+					future,
+					context,
+					receiver,
+					options,
+					task,
+				} => {
+					if let Some(mut future) = future {
+						if Pin::new(&mut future).poll(cx).is_pending() {
+							self.0 = Some(State::WorkerLock {
+								future: Some(future),
+								context,
+								receiver,
+								options,
+								task,
+							});
+							return Poll::Pending;
+						}
+					}
+
+					let worker_lock = WORKER_LOCK.load(Ordering::Relaxed);
+
+					if worker_lock != 0 {
+						self.0 = Some(State::WorkerLock {
+							future: Some(WaitAsync::wait(&WORKER_LOCK, worker_lock)),
+							context,
+							receiver,
+							options,
+							task,
+						});
+						continue;
+					}
+
+					match AudioWorkletNode::new_with_options(
+						&context,
+						"__web_thread_worklet",
+						&options,
+					) {
+						Ok(_) => self.0 = Some(State::Package { context, receiver }),
+						Err(error) => {
+							// SAFETY: We just made this pointer above and `new
+							// AudioWorkletNode` has to guarantee that on error transmission
+							// failed to avoid double-free.
+							drop(unsafe { Box::from_raw(task) });
+							return Poll::Ready(Err(super::error_from_exception(error)));
+						}
+					}
+				}
 				State::Package {
 					context,
 					mut receiver,

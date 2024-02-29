@@ -1,9 +1,8 @@
 //! Audio worklet extension implementations.
 
 mod js;
-mod memory;
 mod processor;
-mod register;
+pub(super) mod register;
 
 use std::any::{Any, TypeId};
 use std::borrow::Cow;

@@ -19,10 +19,19 @@ globalThis.registerProcessor('__web_thread_worklet', class extends AudioWorkletP
     constructor(__web_thread_options) {
         super()
 
-        const [__web_thread_module, __web_thread_memory, __web_thread_data] = __web_thread_options.processorOptions
+        const [
+            __web_thread_module,
+            __web_thread_memory,
+            __web_thread_worklet_lock,
+            __web_thread_task,
+        ] = __web_thread_options.processorOptions
 
         initSync(__web_thread_module, __web_thread_memory)
-        __web_thread_worklet_entry(__web_thread_data)
+        const __web_thread_memory_array = new Int32Array(__web_thread_memory.buffer)
+        Atomics.store(__web_thread_memory_array, __web_thread_worklet_lock, 0)
+        Atomics.notify(__web_thread_memory_array, __web_thread_worklet_lock)
+
+        __web_thread_worklet_entry(__web_thread_task)
     }
 
     process() { }
