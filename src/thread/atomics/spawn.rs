@@ -1,11 +1,9 @@
 //! Thread spawning implementation.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::{io, mem};
 
 use js_sys::Array;
@@ -16,114 +14,26 @@ use web_sys::{Worker, WorkerOptions, WorkerType};
 
 #[cfg(feature = "audio-worklet")]
 use super::audio_worklet::register::THREAD_LOCK_INDEXES;
-use super::channel::Sender;
 use super::js::META;
+use super::main::{self, Command};
 use super::memory::ThreadMemory;
+use super::oneshot::{self, Sender};
 use super::url::ScriptUrl;
-use super::wait_async::WaitAsync;
-use super::{channel, oneshot, JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
-
-/// [`Sender`] to the main thread.
-pub(super) static THREAD_HANDLER: OnceLock<Sender<Command>> = OnceLock::new();
-
-thread_local! {
-	/// Containing all spawned workers.
-	static WORKERS: RefCell<HashMap<ThreadId, WorkerState>> = RefCell::new(HashMap::new());
-}
-
-/// State for each [`Worker`].
-struct WorkerState {
-	/// [`Worker`]
-	this: Worker,
-}
+use super::{JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
+use crate::thread::atomics::main::{WorkerState, WORKERS};
 
 /// Type of the task being sent to the worker.
-type Task<'scope> =
+pub(super) type Task<'scope> =
 	Box<dyn 'scope + FnOnce() -> Pin<Box<dyn 'scope + Future<Output = u32>>> + Send>;
-
-/// Command sent to the main thread.
-pub(super) enum Command {
-	/// Spawn a new thread.
-	Spawn(SpawnData<Task<'static>>),
-	/// Terminate thread.
-	Terminate {
-		/// [`ThreadId`] of the thread to be terminated.
-		id: ThreadId,
-		/// Value to use `Atomics.waitAsync` on.
-		value: Pin<Box<AtomicI32>>,
-		/// Memory to destroy the thread.
-		memory: ThreadMemory,
-	},
-	/// Sent by
-	/// [`AudioWorkletHandle::destroy()`](super::audio_worklet::AudioWorkletHandle::destroy)
-	/// to destroy the thread.
-	#[cfg(feature = "audio-worklet")]
-	Destroy(ThreadMemory),
-}
 
 /// Data to spawn new thread.
 pub(super) struct SpawnData<T> {
 	/// [`ThreadId`] of the thread to be spawned.
-	id: ThreadId,
+	pub(super) id: ThreadId,
 	/// Task.
-	task: T,
+	pub(super) task: T,
 	/// Name of the thread.
-	name: Option<String>,
-}
-
-/// Initializes the main thread thread handler. Make sure to call this at
-/// least once on the main thread before spawning any thread.
-///
-/// # Panics
-///
-/// This will panic if called outside the main thread.
-pub(super) fn init_main_thread() {
-	debug_assert!(
-		super::is_main_thread(),
-		"initizalizing main thread without being on the main thread"
-	);
-
-	THREAD_HANDLER.get_or_init(|| {
-		super::has_spawn_support();
-
-		let (sender, receiver) = channel::channel::<Command>();
-
-		wasm_bindgen_futures::spawn_local(async move {
-			while let Ok(command) = receiver.next().await {
-				match command {
-					Command::Spawn(SpawnData { id, task, name }) => {
-						spawn_internal(id, task, name.as_deref());
-					}
-					Command::Terminate { id, value, memory } => {
-						wasm_bindgen_futures::spawn_local(async move {
-							WaitAsync::wait(&value, 0).await;
-
-							// SAFETY: We wait until the execution block has exited and block the
-							// thread afterwards.
-							unsafe { memory.destroy() };
-
-							WORKERS
-								.with(|workers| {
-									workers
-										.borrow_mut()
-										.remove(&id)
-										.expect("`Worker` to be destroyed not found")
-								})
-								.this
-								.terminate();
-						});
-					}
-					#[cfg(feature = "audio-worklet")]
-					Command::Destroy(memory) =>
-					// SAFETY: Safety has to be uphold by the caller. See
-					// `AudioWorkletHandle::destroy()`.
-					unsafe { memory.destroy() },
-				}
-			}
-		});
-
-		sender
-	});
+	pub(super) name: Option<String>,
 }
 
 /// Internal spawn function.
@@ -151,7 +61,7 @@ where
 	});
 
 	if super::is_main_thread() {
-		init_main_thread();
+		main::init_main_thread();
 
 		spawn_internal(thread.id(), task, thread.name());
 	} else {
@@ -159,15 +69,12 @@ where
 		// prevents this thread from outliving its lifetime.
 		let task = unsafe { mem::transmute::<Task<'_>, Task<'static>>(task) };
 
-		THREAD_HANDLER
-			.get()
-			.expect("not spawning from main thread without initializing `SENDER`")
-			.send(Command::Spawn(SpawnData {
-				id: thread.id(),
-				task,
-				name: thread.0.name.clone(),
-			}))
-			.expect("`Receiver` was somehow dropped from the main thread");
+		Command::Spawn(SpawnData {
+			id: thread.id(),
+			task,
+			name: thread.0.name.clone(),
+		})
+		.send();
 	}
 
 	Ok(JoinHandle {
@@ -192,7 +99,7 @@ fn thread_init(name: Option<String>, scope: Option<&ScopeData>) -> Thread {
 /// Common functionality between threads, regardless if a message is passed.
 fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Future<Output = T>>(
 	thread: Thread,
-	sender: oneshot::Sender<T>,
+	sender: Sender<T>,
 	scope: Option<Arc<ScopeData>>,
 	task: F1,
 ) -> Pin<Box<dyn 'scope + Future<Output = u32>>> {
@@ -210,22 +117,19 @@ fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Futu
 		let value = Box::pin(AtomicI32::new(0));
 		let index = super::i32_to_buffer_index(value.as_ptr());
 
-		THREAD_HANDLER
-			.get()
-			.expect("closing thread without `SENDER` being initialized")
-			.send(Command::Terminate {
-				id: super::current_id(),
-				value,
-				memory: ThreadMemory::new(),
-			})
-			.expect("`Receiver` was somehow dropped from the main thread");
+		Command::Terminate {
+			id: super::current_id(),
+			value,
+			memory: ThreadMemory::new(),
+		}
+		.send();
 
 		index
 	})
 }
 
 /// Spawning thread regardless of being nested.
-fn spawn_internal<T>(id: ThreadId, task: T, name: Option<&str>) {
+pub(super) fn spawn_internal<T>(id: ThreadId, task: T, name: Option<&str>) {
 	spawn_common(id, task, name, |worker, module, memory, task| {
 		#[cfg(not(feature = "audio-worklet"))]
 		let message = Array::of3(module, memory, &task);

@@ -8,7 +8,7 @@ use wasm_bindgen::JsCast;
 
 use super::js::{Exports, GlobalDescriptor};
 #[cfg(feature = "audio-worklet")]
-use super::spawn::{Command, THREAD_HANDLER};
+use super::main::Command;
 
 /// Holds pointers to the memory of a thread.
 #[derive(Debug)]
@@ -64,11 +64,7 @@ impl ThreadMemory {
 			// more details.
 			unsafe { self.destroy_internal() };
 		} else {
-			THREAD_HANDLER
-				.get()
-				.expect("called `ThreadMemory::destroy()` before main thread was initizalized")
-				.send(Command::Destroy(self))
-				.expect("`Receiver` was somehow dropped from the main thread");
+			Command::Destroy(self).send();
 		}
 	}
 

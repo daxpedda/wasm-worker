@@ -19,7 +19,7 @@ use super::super::memory::ThreadMemory;
 use super::super::oneshot::{self, Receiver};
 use super::super::url::ScriptUrl;
 use super::super::wait_async::WaitAsync;
-use super::super::Thread;
+use super::super::{main, Thread};
 use super::js::BaseAudioContextExt;
 use crate::thread::atomics::is_main_thread;
 
@@ -254,7 +254,7 @@ impl Future for RegisterThreadFuture {
 							"started registering thread without being on the main thread"
 						);
 						// Before spawning a new thread make sure we initialize the main thread.
-						super::super::spawn::init_main_thread();
+						main::init_main_thread();
 
 						let State::Module {
 							context,

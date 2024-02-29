@@ -7,6 +7,7 @@
 pub(super) mod audio_worklet;
 mod channel;
 mod js;
+mod main;
 mod memory;
 mod oneshot;
 mod parker;
