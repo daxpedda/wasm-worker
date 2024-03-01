@@ -43,14 +43,9 @@ pub(super) enum Command {
 		id: ThreadId,
 		/// Value to use `Atomics.waitAsync` on.
 		value: Pin<Box<AtomicI32>>,
-		/// Memory to destroy the thread.
+		/// Handle to release thread memory.
 		memory: ThreadMemory,
 	},
-	/// Sent by
-	/// [`AudioWorkletHandle::destroy()`](super::audio_worklet::AudioWorkletHandle::destroy)
-	/// to destroy the thread.
-	#[cfg(feature = "audio-worklet")]
-	Destroy(ThreadMemory),
 }
 
 impl Command {
@@ -93,24 +88,19 @@ pub(super) fn init_main_thread() {
 
 							// SAFETY: We wait until the execution block has exited and block the
 							// thread afterwards.
-							unsafe { memory.destroy() };
+							unsafe { memory.release() }.expect("attempted to clean up main thread");
 
 							WORKERS
 								.with(|workers| {
 									workers
 										.borrow_mut()
 										.remove(&id)
-										.expect("`Worker` to be destroyed not found")
+										.expect("`Worker` to be terminated not found")
 								})
 								.this
 								.terminate();
 						});
 					}
-					#[cfg(feature = "audio-worklet")]
-					Command::Destroy(memory) =>
-					// SAFETY: Safety has to be uphold by the caller. See
-					// `AudioWorkletHandle::destroy()`.
-					unsafe { memory.destroy() },
 				}
 			}
 		});

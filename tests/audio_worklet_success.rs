@@ -128,7 +128,7 @@ async fn test_register(context: BaseAudioContext) {
 
 test!(register);
 
-async fn test_register_destroy(context: BaseAudioContext) {
+async fn test_register_release(context: BaseAudioContext) {
 	let flag = Flag::new();
 
 	let handle = context
@@ -142,10 +142,10 @@ async fn test_register_destroy(context: BaseAudioContext) {
 	flag.await;
 	// SAFETY: We are sure the thread has spawned by now and we also didn't register
 	// any events or promises that could call into the Wasm module later.
-	unsafe { handle.destroy() }
+	unsafe { handle.release() }.unwrap();
 }
 
-test!(register_destroy);
+test!(register_release);
 
 async fn test_register_drop(context: BaseAudioContext) {
 	let flag = Flag::new();

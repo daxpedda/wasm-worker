@@ -55,15 +55,15 @@ impl AudioWorkletHandle {
 	}
 
 	/// Implementation for
-	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::release()`].
 	///
 	/// # Safety
 	///
-	/// See [`AudioWorkletHandle::destroy()`](audio_worklet::AudioWorkletHandle::destroy).
-	pub(crate) unsafe fn destroy(self) {
-		// SAFETY: See `ThreadMemory::destroy()`. Other safety guarantees have to be
+	/// See [`AudioWorkletHandle::release()`](audio_worklet::AudioWorkletHandle::release).
+	pub(crate) unsafe fn release(self) -> Result<(), Self> {
+		// SAFETY: See `ThreadMemory::release()`. Other safety guarantees have to be
 		// uphold by the caller.
-		unsafe { self.0.destroy() };
+		unsafe { self.0.release() }.map_err(Self)
 	}
 }
 

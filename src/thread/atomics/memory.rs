@@ -6,13 +6,14 @@ use js_sys::WebAssembly::Global;
 use js_sys::{Number, Object};
 use wasm_bindgen::JsCast;
 
+use super::super::ThreadId;
 use super::js::{Exports, GlobalDescriptor};
-#[cfg(feature = "audio-worklet")]
-use super::main::Command;
 
 /// Holds pointers to the memory of a thread.
 #[derive(Debug)]
 pub(super) struct ThreadMemory {
+	/// Associated [`ThreadId`].
+	thread: ThreadId,
 	/// TLS memory.
 	tls_base: f64,
 	/// Stack memory.
@@ -35,46 +36,19 @@ impl ThreadMemory {
 		let stack_alloc = Number::unchecked_from_js(exports.stack_alloc().value()).value_of();
 
 		Self {
+			thread: super::current_id(),
 			tls_base,
 			stack_alloc,
 		}
 	}
 
-	/// Schedules the memory of the referenced thread to be destroyed.
+	/// Releases the memory of the referenced thread.
 	///
 	/// # Safety
 	///
 	/// The thread is not allowed to be used while or after this function is
 	/// executed.
-	pub(super) unsafe fn destroy(self) {
-		#[cfg(not(feature = "audio-worklet"))]
-		{
-			debug_assert!(
-				super::is_main_thread(),
-				"called `ThreadMemory::destroy()` from outside the main thread"
-			);
-			// SAFETY: Safety has to be uphold by the caller. See `destroy_internal()` for
-			// more details.
-			unsafe { self.destroy_internal() };
-		}
-
-		#[cfg(feature = "audio-worklet")]
-		if super::is_main_thread() {
-			// SAFETY: Safety has to be uphold by the caller. See `destroy_internal()` for
-			// more details.
-			unsafe { self.destroy_internal() };
-		} else {
-			Command::Destroy(self).send();
-		}
-	}
-
-	/// Destroys the memory of the referenced thread.
-	///
-	/// # Safety
-	///
-	/// The thread is not allowed to be used while or after this function is
-	/// executed.
-	unsafe fn destroy_internal(self) {
+	pub(super) unsafe fn release(self) -> Result<(), Self> {
 		thread_local! {
 			/// Caches the [`Exports`] object.
 			static EXPORTS: Exports = wasm_bindgen::exports().unchecked_into();
@@ -84,6 +58,10 @@ impl ThreadMemory {
 				descriptor.set_value("i32");
 				descriptor
 			};
+		}
+
+		if self.thread == super::current_id() {
+			return Err(self);
 		}
 
 		let (tls_base, stack_alloc) = DESCRIPTOR.with(|descriptor| {
@@ -97,10 +75,12 @@ impl ThreadMemory {
 
 		// SAFETY: This is guaranteed to be called only once for the corresponding
 		// thread because `Self::new()` prevents two objects to the same thread from
-		// being created and `ThreadMemory::destroy_internal()` consumes itself. Other
+		// being created and `ThreadMemory::release()` consumes itself. Other
 		// safety guarantees have to be uphold by the caller.
 		EXPORTS.with(|exports| unsafe {
 			exports.thread_destroy(&tls_base, &stack_alloc);
 		});
+
+		Ok(())
 	}
 }

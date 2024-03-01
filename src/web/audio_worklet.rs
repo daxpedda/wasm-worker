@@ -2,12 +2,13 @@
 //! to spawn and use audio worklets. See
 //! [`BaseAudioContextExt::audio_worklet_node()`] for a usage example.
 
+use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{any, error, fmt, io};
+use std::{any, fmt, io};
 
 use js_sys::{Array, Iterator, Object};
 #[cfg(all(
@@ -73,7 +74,7 @@ pub trait BaseAudioContextExt {
 	///
 	/// Unfortunately there is currently no way to determine when the thread has
 	/// fully shutdown. So this will leak memory unless
-	/// [`AudioWorkletHandle::destroy()`] is called.
+	/// [`AudioWorkletHandle::release()`] is called.
 	///
 	/// # Errors
 	///
@@ -247,11 +248,11 @@ where
 	}
 }
 
-impl<P> error::Error for AudioWorkletNodeError<P>
+impl<P> Error for AudioWorkletNodeError<P>
 where
 	P: ExtendAudioWorkletProcessor,
 {
-	fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+	fn source(&self) -> Option<&(dyn Error + 'static)> {
 		Some(&self.error)
 	}
 }
@@ -301,13 +302,17 @@ impl AudioWorkletHandle {
 		self.0.thread()
 	}
 
-	/// This cleans up memory allocated for the corresponding audio worklet
+	/// This releases memory allocated for the corresponding audio worklet
 	/// thread.
 	///
 	/// # Safety
 	///
 	/// The corresponding thread must not currently or in the future access this
 	/// Wasm module.
+	///
+	/// # Errors
+	///
+	/// If called from its corresponding audio worklet thread.
 	///
 	/// # Example
 	///
@@ -332,15 +337,31 @@ impl AudioWorkletHandle {
 	/// JsFuture::from(context.close().unwrap()).await.unwrap();
 	/// // SAFETY: We are sure we are done with the audio worklet and didn't register any
 	/// // events or promises that could call into the Wasm module later.
-	/// unsafe { handle.destroy() };
+	/// unsafe { handle.release() }.unwrap();
 	/// # }
 	/// ```
-	pub unsafe fn destroy(self) {
-		// SAFETY: See `ThreadMemory::destroy()`. Other safety guarantees have to be
+	pub unsafe fn release(self) -> Result<(), ReleaseError> {
+		// SAFETY: See `ThreadMemory::release()`. Other safety guarantees have to be
 		// uphold by the caller.
-		unsafe { self.0.destroy() };
+		unsafe { self.0.release() }
+			.map_err(Self)
+			.map_err(ReleaseError)
 	}
 }
+
+/// Returned on error in [`AudioWorkletHandle::release()`].
+#[derive(Debug)]
+pub struct ReleaseError(pub AudioWorkletHandle);
+
+impl Display for ReleaseError {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter.write_str(
+			"called `AudioWorkletHandle::release()` from its corresponding audio worklet thread",
+		)
+	}
+}
+
+impl Error for ReleaseError {}
 
 /// Extension for [`AudioWorkletGlobalScope`].
 #[cfg_attr(

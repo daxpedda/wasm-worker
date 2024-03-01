@@ -168,7 +168,7 @@ enum State {
 struct Package {
 	/// [`Thread`].
 	thread: Thread,
-	/// Threads memory to destroy when we are done.
+	/// Handle to release thread memory.
 	memory: ThreadMemory,
 }
 
@@ -425,15 +425,18 @@ impl AudioWorkletHandle {
 	}
 
 	/// Implementation for
-	/// [`crate::web::audio_worklet::AudioWorkletHandle::destroy()`].
+	/// [`crate::web::audio_worklet::AudioWorkletHandle::release()`].
 	///
 	/// # Safety
 	///
-	/// See [`ThreadMemory::destroy()`].
-	pub(crate) unsafe fn destroy(self) {
-		// SAFETY: See `ThreadMemory::destroy()`. Other safety guarantees have to be
+	/// See [`ThreadMemory::release()`].
+	pub(crate) unsafe fn release(self) -> Result<(), Self> {
+		// SAFETY: See `ThreadMemory::release()`. Other safety guarantees have to be
 		// uphold by the caller.
-		unsafe { self.memory.destroy() };
+		unsafe { self.memory.release() }.map_err(|memory| Self {
+			thread: self.thread,
+			memory,
+		})
 	}
 }
 

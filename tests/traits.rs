@@ -74,7 +74,7 @@ const fn web() {
 		use web_sys::{AudioWorkletNodeOptions, AudioWorkletProcessor};
 		use web_thread::web::audio_worklet::{
 			AudioWorkletHandle, AudioWorkletNodeError, ExtendAudioWorkletProcessor,
-			RegisterThreadFuture,
+			RegisterThreadFuture, ReleaseError,
 		};
 
 		struct TestProcessor;
@@ -99,5 +99,8 @@ const fn web() {
 
 		assert_impl_all!(AudioWorkletNodeError<TestProcessor>: Debug, Display, Error, Send, Sync, Unpin);
 		assert_not_impl_any!(AudioWorkletNodeError<TestProcessor>: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd, RefUnwindSafe, UnwindSafe);
+
+		assert_impl_all!(ReleaseError: Debug, Display, Error, Send, Sync, Unpin, RefUnwindSafe, UnwindSafe);
+		assert_not_impl_any!(ReleaseError: Clone, Copy, Hash, Eq, PartialEq, Ord, PartialOrd);
 	}
 }
