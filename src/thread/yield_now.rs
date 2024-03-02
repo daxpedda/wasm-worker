@@ -74,7 +74,10 @@ impl Drop for YieldNowFuture {
 					};
 					window.cancel_idle_callback(handle);
 				}),
-				State::Channel { port, .. } => port.close(),
+				State::Channel { port, .. } => {
+					port.set_onmessage(None);
+					port.close();
+				}
 				State::None => (),
 			}
 		}
