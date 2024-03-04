@@ -1,7 +1,8 @@
-24
+28
 1MB
 Async
 atomics
+Deserialize
 FFI
 futex
 Invariance
@@ -12,10 +13,13 @@ polyfill
 Polyfill
 Polyfills
 runtime
+serializable
 spinloop
 spinloops
 TLS
 TODO
+tuple
+tuples
 toolchain
 unparks
 unparked

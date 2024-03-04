@@ -31,7 +31,7 @@ pub(in super::super::super) fn register_processor<P: 'static + ExtendAudioWorkle
 		name,
 		__WebThreadProcessorConstructor(Box::new(ProcessorConstructorWrapper::<P>(PhantomData))),
 	)
-	.map_err(|error| super::error_from_exception(error.into()))
+	.map_err(|error| super::super::error_from_exception(error.into()))
 }
 
 /// Holds the supplied [`ExtendAudioWorkletProcessor`] while type-erasing

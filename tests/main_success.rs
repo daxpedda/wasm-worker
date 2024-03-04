@@ -11,6 +11,13 @@ mod basic_success;
 	any(not(unsupported_spawn), not(unsupported_wait_async))
 ))]
 mod basic_success_async;
+#[cfg(all(
+	target_family = "wasm",
+	target_feature = "atomics",
+	feature = "message",
+	not(unsupported_spawn)
+))]
+mod message_success;
 #[cfg(any(
 	not(target_family = "wasm"),
 	all(
