@@ -4,6 +4,8 @@ use std::future::Future;
 use std::io::{self, Error, ErrorKind};
 
 use super::{r#impl, JoinHandle, Scope, ScopedJoinHandle};
+#[cfg(feature = "message")]
+use crate::web::message::MessageSend;
 
 /// See [`std::thread::Builder`].
 #[derive(Debug)]
@@ -56,6 +58,33 @@ impl Builder {
 	{
 		if super::has_spawn_support() {
 			self.0.spawn_async_internal(task).map(JoinHandle::new)
+		} else {
+			Err(Error::new(
+				ErrorKind::Unsupported,
+				"operation not supported on this platform without the atomics target feature and \
+				 cross-origin isolation",
+			))
+		}
+	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_with_message()`](crate::web::BuilderExt::spawn_with_message).
+	#[cfg(feature = "message")]
+	pub(crate) fn spawn_with_message_internal<F1, F2, T, M>(
+		self,
+		task: F1,
+		message: M,
+	) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce(M) -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: 'static + Send,
+		M: MessageSend,
+	{
+		if super::has_spawn_support() {
+			self.0
+				.spawn_with_message_internal(task, message)
+				.map(JoinHandle::new)
 		} else {
 			Err(Error::new(
 				ErrorKind::Unsupported,

@@ -26,7 +26,11 @@ fn test() {
 	}
 
 	if let Some(args) = env::var_os("UI_TEST_ARGS").filter(|flags| !flags.is_empty()) {
-		config.dependency_builder.args.push(args);
+		let args = args.into_string().unwrap();
+
+		for arg in args.split_ascii_whitespace() {
+			config.dependency_builder.args.push(arg.into());
+		}
 	}
 
 	ui_test::run_tests(config).unwrap();

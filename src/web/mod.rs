@@ -2,6 +2,8 @@
 
 #[cfg(any(feature = "audio-worklet", docsrs))]
 pub mod audio_worklet;
+#[cfg(any(feature = "message", docsrs))]
+pub mod message;
 
 use std::fmt::{self, Debug, Formatter};
 use std::future::{Future, Ready};
@@ -9,6 +11,9 @@ use std::io;
 use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+
+#[cfg(any(feature = "message", docsrs))]
+use self::message::MessageSend;
 
 #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 mod thread {
@@ -477,6 +482,23 @@ pub trait BuilderExt {
 		F2: 'static + Future<Output = T>,
 		T: 'static + Send;
 
+	/// [`spawn_async()`] with [message](MessageSend).
+	///
+	/// For a more complete documentation see [`spawn_with_message()`].
+	///
+	/// # Errors
+	///
+	/// - If the main thread does not support spawning threads, see
+	/// [`has_spawn_support()`].
+	/// - If `message` was unable to be cloned.
+	#[cfg(any(feature = "message", docsrs))]
+	fn spawn_with_message<F1, F2, T, M>(self, f: F1, message: M) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce(M) -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: 'static + Send,
+		M: MessageSend;
+
 	/// Async version of [`Builder::spawn_scoped()`].
 	///
 	/// For a more complete documentation see [`Scope::spawn_async()`].
@@ -507,6 +529,21 @@ impl BuilderExt for Builder {
 		T: 'static + Send,
 	{
 		self.spawn_async_internal(f)
+	}
+
+	#[cfg(any(feature = "message", docsrs))]
+	fn spawn_with_message<F1, F2, T, M>(
+		self,
+		#[allow(clippy::min_ident_chars)] f: F1,
+		message: M,
+	) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce(M) -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: 'static + Send,
+		M: MessageSend,
+	{
+		self.spawn_with_message_internal(f, message)
 	}
 
 	fn spawn_scoped_async<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T>(
@@ -644,6 +681,58 @@ where
 {
 	Builder::new()
 		.spawn_async(f)
+		.expect("failed to spawn thread")
+}
+
+/// [`spawn_async()`] with [message](MessageSend).
+///
+/// For a more complete documentation see [`spawn_async()`].
+///
+/// # Panics
+///
+/// - If the main thread does not support spawning threads, see
+/// [`has_spawn_support()`].
+/// - If `message` was unable to be cloned.
+///
+/// # Example
+///
+/// ```
+/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+/// # async fn test() {
+/// # use wasm_bindgen::JsCast;
+/// use web_sys::HtmlCanvasElement;
+/// use web_thread::web::{self, JoinHandleExt};
+/// use web_thread::web::message::TransferableWrapper;
+///
+/// # let canvas = web_sys::window().unwrap().document().unwrap().create_element("canvas").unwrap().unchecked_into();
+/// let canvas: HtmlCanvasElement = canvas;
+/// let message = TransferableWrapper(canvas.transfer_control_to_offscreen().unwrap());
+/// web::spawn_with_message(
+/// 	|message| async move {
+/// 		// Do work.
+/// 	},
+/// 	message,
+/// )
+/// .join_async()
+/// .await
+/// .unwrap();
+/// # }
+/// ```
+#[cfg(any(feature = "message", docsrs))]
+pub fn spawn_with_message<F1, F2, T, M>(
+	#[allow(clippy::min_ident_chars)] f: F1,
+	message: M,
+) -> JoinHandle<T>
+where
+	F1: 'static + FnOnce(M) -> F2 + Send,
+	F2: 'static + Future<Output = T>,
+	T: 'static + Send,
+	M: MessageSend,
+{
+	Builder::new()
+		.spawn_with_message(f, message)
 		.expect("failed to spawn thread")
 }
 

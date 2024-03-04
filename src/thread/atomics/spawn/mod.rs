@@ -1,5 +1,8 @@
 //! Thread spawning implementation.
 
+#[cfg(feature = "message")]
+pub(super) mod message;
+
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicI32, Ordering};
@@ -11,29 +14,33 @@ use js_sys::WebAssembly::{Memory, Module};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
 use web_sys::{Worker, WorkerOptions, WorkerType};
+#[cfg(feature = "message")]
+use {self::message::SPAWN_SENDER, super::channel};
 
 #[cfg(feature = "audio-worklet")]
 use super::audio_worklet::register::THREAD_LOCK_INDEXES;
 use super::js::META;
 use super::main::{self, Command};
 use super::memory::ThreadMemory;
-use super::oneshot::{self, Sender};
 use super::url::ScriptUrl;
-use super::{JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
+use super::{oneshot, JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
 use crate::thread::atomics::main::{WorkerState, WORKERS};
 
 /// Type of the task being sent to the worker.
-pub(super) type Task<'scope> =
-	Box<dyn 'scope + FnOnce() -> Pin<Box<dyn 'scope + Future<Output = u32>>> + Send>;
+type Task<'scope> =
+	Box<dyn 'scope + FnOnce(JsValue) -> Pin<Box<dyn 'scope + Future<Output = u32>>> + Send>;
 
 /// Data to spawn new thread.
-pub(super) struct SpawnData<T> {
+pub(super) struct SpawnData {
 	/// [`ThreadId`] of the thread to be spawned.
 	pub(super) id: ThreadId,
-	/// Task.
-	pub(super) task: T,
 	/// Name of the thread.
 	pub(super) name: Option<String>,
+	/// [`Task`]s with messages to spawn.
+	#[cfg(feature = "message")]
+	pub(super) spawn_receiver: channel::Receiver<SpawnData>,
+	/// Task.
+	pub(super) task: Task<'static>,
 }
 
 /// Internal spawn function.
@@ -53,17 +60,50 @@ where
 	T: Send,
 {
 	let thread = thread_init(name, scope.as_deref());
-	let (sender, receiver) = oneshot::channel();
+	let (result_sender, result_receiver) = oneshot::channel();
+	#[cfg(feature = "message")]
+	let (spawn_sender, spawn_receiver) = channel::channel();
 
 	let task: Task<'_> = Box::new({
 		let thread = thread.clone();
-		move || thread_runner(thread, sender, scope, task)
+		move |_| {
+			thread_runner(
+				thread,
+				result_sender,
+				#[cfg(feature = "message")]
+				spawn_sender,
+				scope,
+				task,
+			)
+		}
 	});
 
+	Ok(spawn_without_message(
+		thread,
+		result_receiver,
+		#[cfg(feature = "message")]
+		spawn_receiver,
+		task,
+	))
+}
+
+/// Spawn if no message requires transferring through JS.
+fn spawn_without_message<T>(
+	thread: Thread,
+	result_receiver: oneshot::Receiver<T>,
+	#[cfg(feature = "message")] spawn_receiver: channel::Receiver<SpawnData>,
+	task: Task<'_>,
+) -> JoinHandle<T> {
 	if super::is_main_thread() {
 		main::init_main_thread();
 
-		spawn_internal(thread.id(), task, thread.name());
+		spawn_internal(
+			thread.id(),
+			thread.name(),
+			#[cfg(feature = "message")]
+			spawn_receiver,
+			Box::new(task),
+		);
 	} else {
 		// SAFETY: `task` has to be `'static` or `scope` has to be `Some`, which
 		// prevents this thread from outliving its lifetime.
@@ -71,16 +111,18 @@ where
 
 		Command::Spawn(SpawnData {
 			id: thread.id(),
-			task,
 			name: thread.0.name.clone(),
+			#[cfg(feature = "message")]
+			spawn_receiver,
+			task,
 		})
 		.send();
 	}
 
-	Ok(JoinHandle {
-		receiver: Some(receiver),
+	JoinHandle {
+		receiver: Some(result_receiver),
 		thread,
-	})
+	}
 }
 
 /// Common functionality between thread spawning initialization, regardless if a
@@ -99,13 +141,21 @@ fn thread_init(name: Option<String>, scope: Option<&ScopeData>) -> Thread {
 /// Common functionality between threads, regardless if a message is passed.
 fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Future<Output = T>>(
 	thread: Thread,
-	sender: Sender<T>,
+	result_sender: oneshot::Sender<T>,
+	#[cfg(feature = "message")] spawn_sender: channel::Sender<SpawnData>,
 	scope: Option<Arc<ScopeData>>,
 	task: F1,
 ) -> Pin<Box<dyn 'scope + Future<Output = u32>>> {
 	Box::pin(async move {
 		Thread::register(thread);
-		sender.send(task().await);
+
+		#[cfg(feature = "message")]
+		{
+			let old = SPAWN_SENDER.with(|cell| cell.borrow_mut().replace(spawn_sender));
+			debug_assert!(old.is_none(), "found existing `Sender` in new thread");
+		}
+
+		result_sender.send(task().await);
 
 		if let Some(scope) = scope {
 			if scope.threads.fetch_sub(1, Ordering::Release) == 1 {
@@ -113,6 +163,11 @@ fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Futu
 				scope.waker.wake();
 			}
 		}
+
+		#[cfg(feature = "message")]
+		SPAWN_SENDER
+			.with(|cell| cell.borrow_mut().take())
+			.expect("found no `Sender` in existing thread");
 
 		let value = Box::pin(AtomicI32::new(0));
 		let index = super::i32_to_buffer_index(value.as_ptr());
@@ -129,24 +184,37 @@ fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Futu
 }
 
 /// Spawning thread regardless of being nested.
-pub(super) fn spawn_internal<T>(id: ThreadId, task: T, name: Option<&str>) {
-	spawn_common(id, task, name, |worker, module, memory, task| {
-		#[cfg(not(feature = "audio-worklet"))]
-		let message = Array::of3(module, memory, &task);
-		#[cfg(feature = "audio-worklet")]
-		let message = { THREAD_LOCK_INDEXES.with(|indexes| Array::of4(module, memory, indexes, &task)) };
-		worker.post_message(&message)
-	})
-	.expect("`Worker.postMessage` is not expected to fail without a `transfer` object");
+pub(super) fn spawn_internal(
+	id: ThreadId,
+	name: Option<&str>,
+	#[cfg(feature = "message")] spawn_receiver: channel::Receiver<SpawnData>,
+	task: Task<'_>,
+) {
+	spawn_common(
+		id,
+		name,
+		#[cfg(feature = "message")]
+		spawn_receiver,
+		task,
+		|worker, module, memory, task| {
+			#[cfg(not(feature = "audio-worklet"))]
+			let message = Array::of3(module, memory, &task);
+			#[cfg(feature = "audio-worklet")]
+			let message = { THREAD_LOCK_INDEXES.with(|indexes| Array::of4(module, memory, indexes, &task)) };
+			worker.post_message(&message)
+		},
+	)
+	.expect("`Worker.postMessage()` is not expected to fail without a `transfer` object");
 }
 
 /// [`spawn_internal`] regardless if a message is passed or not.
-fn spawn_common<T, E>(
+fn spawn_common(
 	id: ThreadId,
-	task: T,
 	name: Option<&str>,
-	post: impl FnOnce(&Worker, &Module, &Memory, JsValue) -> Result<(), E>,
-) -> Result<(), E> {
+	#[cfg(feature = "message")] spawn_receiver: channel::Receiver<SpawnData>,
+	task: Task<'_>,
+	post: impl FnOnce(&Worker, &Module, &Memory, JsValue) -> Result<(), JsValue>,
+) -> Result<(), JsValue> {
 	thread_local! {
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(&{
@@ -174,21 +242,30 @@ fn spawn_common<T, E>(
 		.with(|url| Worker::new_with_options(url.as_raw(), &options))
 		.expect("`new Worker()` is not expected to fail with a local script");
 
+	#[cfg(feature = "message")]
+	let message_handler = message::setup_message_handler(&worker, spawn_receiver);
+
 	let task = Box::into_raw(Box::new(task));
 
 	if let Err(err) =
 		MODULE.with(|module| MEMORY.with(|memory| post(&worker, module, memory, task.into())))
 	{
 		// SAFETY: We just made this pointer above and `post` has to guarantee that on
-		// error transmission failed to avoid double-free.
+		// error transmission has failed to avoid double-free.
 		drop(unsafe { Box::from_raw(task) });
+		worker.terminate();
 		return Err(err);
 	};
 
 	let previous = WORKERS.with(|workers| {
-		workers
-			.borrow_mut()
-			.insert(id, WorkerState { this: worker })
+		workers.borrow_mut().insert(
+			id,
+			WorkerState {
+				this: worker,
+				#[cfg(feature = "message")]
+				_message_handler: message_handler,
+			},
+		)
 	});
 	debug_assert!(
 		previous.is_none(),
@@ -208,10 +285,10 @@ type TaskStatic = Task<'static>;
 /// `task` has to be a valid pointer to [`Task`].
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
-pub async unsafe fn __web_thread_worker_entry(task: *mut TaskStatic) -> u32 {
+pub async unsafe fn __web_thread_worker_entry(task: *mut TaskStatic, message: JsValue) -> u32 {
 	// SAFETY: Has to be a valid pointer to a `Task`. We only call
 	// `__web_thread_worker_entry` from `worker.js`. The data sent to it comes only
 	// from `spawn_internal()`.
 	let task = *unsafe { Box::from_raw(task) };
-	task().await
+	task(message).await
 }

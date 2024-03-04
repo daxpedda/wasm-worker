@@ -105,7 +105,7 @@ where
 					receiver,
 				}
 			}
-			Err(error) => State::Error(super::error_from_exception(error)),
+			Err(error) => State::Error(super::super::error_from_exception(error)),
 		},
 	))
 }
@@ -286,7 +286,7 @@ impl Future for RegisterThreadFuture {
 						});
 					}
 					Poll::Ready(Err(error)) => {
-						return Poll::Ready(Err(super::error_from_exception(error)))
+						return Poll::Ready(Err(super::super::error_from_exception(error)))
 					}
 					Poll::Pending => {
 						self.0 = Some(state);
@@ -379,7 +379,7 @@ impl Future for RegisterThreadFuture {
 							// AudioWorkletNode` has to guarantee that on error transmission
 							// failed to avoid double-free.
 							drop(unsafe { Box::from_raw(task) });
-							return Poll::Ready(Err(super::error_from_exception(error)));
+							return Poll::Ready(Err(super::super::error_from_exception(error)));
 						}
 					}
 				}
