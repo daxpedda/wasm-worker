@@ -9,7 +9,7 @@ fn main() {
 
 #[cfg(target_family = "wasm")]
 fn main() {
-	self::web::main();
+	web::main();
 }
 
 /// Implementation for the Web platform.

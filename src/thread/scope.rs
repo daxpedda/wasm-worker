@@ -129,7 +129,7 @@ impl<T> Debug for ScopedJoinHandle<'_, T> {
 
 impl<#[allow(single_use_lifetimes)] 'scope, T> ScopedJoinHandle<'scope, T> {
 	/// Creates a new [`ScopedJoinHandle`].
-	#[cfg_attr(not(target_feature = "atomics"), allow(dead_code))]
+	#[cfg(target_feature = "atomics")]
 	pub(super) const fn new(handle: JoinHandle<T>) -> Self {
 		Self {
 			handle,

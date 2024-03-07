@@ -257,8 +257,7 @@ impl Scope {
 
 /// Implementation of [`std::thread::sleep()`].
 pub(super) fn sleep(dur: Duration) {
-	#[allow(clippy::absolute_paths)]
-	std::thread::sleep(dur);
+	thread::sleep(dur);
 }
 
 /// Tests if blocking is supported.
