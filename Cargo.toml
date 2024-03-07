@@ -23,11 +23,11 @@ audio-worklet = [
 ]
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
-js-sys = "0.3.68"
+js-sys = "0.3.69"
 pin-project = "1"
-wasm-bindgen = { version = "0.2.91", default-features = false }
-wasm-bindgen-futures = "0.4.41"
-web-sys = { version = "0.3.68", features = [
+wasm-bindgen = { version = "0.2.92", default-features = false }
+wasm-bindgen-futures = "0.4.42"
+web-sys = { version = "0.3.69", features = [
 	"AbortController",
 	"AbortSignal",
 	"DedicatedWorkerGlobalScope",

@@ -54,7 +54,7 @@ extern "C" {
 
 	/// Returns our custom `data` property.
 	#[wasm_bindgen(method, getter, js_name = __web_thread_data)]
-	pub(super) fn data(this: &ProcessorOptions) -> Option<usize>;
+	pub(super) fn data(this: &ProcessorOptions) -> Option<*mut Data>;
 
 	/// Sets our custom `data` property.
 	#[wasm_bindgen(method, setter, js_name = __web_thread_data)]

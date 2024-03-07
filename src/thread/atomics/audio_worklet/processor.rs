@@ -95,8 +95,7 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 			if let Some(data) = processor_options.data() {
 				// SAFETY: We only store `*mut Data` in `__web_thread_data` at
 				// `super::audio_worklet_node()`.
-				#[allow(clippy::as_conversions)]
-				let data = unsafe { Box::<Data>::from_raw(data as *mut Data) };
+				let data = unsafe { Box::<Data>::from_raw(data) };
 
 				if data.type_id == TypeId::of::<P>() {
 					processor_data = Some(
