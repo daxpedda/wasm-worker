@@ -48,8 +48,7 @@ impl Parker {
 
 /// Wait a specified duration.
 fn wait(timeout: Option<Duration>) {
-	#[allow(clippy::as_conversions, clippy::cast_precision_loss)]
-	let timeout = timeout.map_or(f64::INFINITY, |timeout| timeout.as_millis() as f64);
+	let timeout = timeout.map_or(f64::INFINITY, super::duration_to_f64_millis);
 
 	let result = ZERO_ARRAY
 		.with(|array| Atomics::wait_with_timeout(array, 0, 0, timeout))

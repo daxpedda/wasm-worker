@@ -146,8 +146,7 @@ impl Scope {
 
 /// Implementation of [`std::thread::sleep()`].
 pub(super) fn sleep(dur: Duration) {
-	#[allow(clippy::as_conversions, clippy::cast_precision_loss)]
-	let timeout = dur.as_millis() as f64;
+	let timeout = duration_to_f64_millis(dur);
 	let result = ZERO_ARRAY
 		.with(|array| Atomics::wait_with_timeout(array, 0, 0, timeout))
 		.expect("`Atomics.wait` is not expected to fail");
@@ -185,4 +184,11 @@ thread_local! {
 			Int32Array::new(&memory.buffer())
 		}
 	};
+}
+
+/// Converts [`Duration`] to amount of milliseconds as [`f64`].
+fn duration_to_f64_millis(duration: Duration) -> f64 {
+	duration
+		.checked_mul(1000)
+		.map_or(f64::INFINITY, |duration| duration.as_secs_f64())
 }
