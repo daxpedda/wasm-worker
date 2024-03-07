@@ -93,7 +93,7 @@ impl Builder {
 	/// Implementation for
 	/// [`BuilderExt::spawn_with_message()`](crate::web::BuilderExt::spawn_with_message).
 	#[cfg(feature = "message")]
-	pub(super) fn spawn_with_message_internal<F1, F2, T, M: MessageSend>(
+	pub(super) fn spawn_with_message_internal<F1, F2, T, M: 'static + MessageSend>(
 		self,
 		task: F1,
 		message: M,
@@ -155,7 +155,7 @@ impl Builder {
 		F1: 'scope + FnOnce(M) -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send,
-		M: MessageSend,
+		M: 'scope + MessageSend,
 	{
 		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
 		let result =

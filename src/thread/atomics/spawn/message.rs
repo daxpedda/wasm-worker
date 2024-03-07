@@ -26,7 +26,7 @@ thread_local! {
 ///
 /// # Safety
 ///
-/// `task` has to outlive the thread.
+/// `task` and `message` have to outlive the thread.
 pub(in super::super) unsafe fn spawn<F1, F2, T, M>(
 	task: F1,
 	name: Option<String>,
