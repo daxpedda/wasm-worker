@@ -497,7 +497,7 @@ pub trait BuilderExt {
 		F1: 'static + FnOnce(M) -> F2 + Send,
 		F2: 'static + Future<Output = T>,
 		T: 'static + Send,
-		M: MessageSend;
+		M: 'static + MessageSend;
 
 	/// Async version of [`Builder::spawn_scoped()`].
 	///
@@ -537,7 +537,7 @@ pub trait BuilderExt {
 		F1: 'scope + FnOnce(M) -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send,
-		M: MessageSend;
+		M: 'scope + MessageSend;
 }
 
 impl BuilderExt for Builder {
@@ -563,7 +563,7 @@ impl BuilderExt for Builder {
 		F1: 'static + FnOnce(M) -> F2 + Send,
 		F2: 'static + Future<Output = T>,
 		T: 'static + Send,
-		M: MessageSend,
+		M: 'static + MessageSend,
 	{
 		self.spawn_with_message_internal(f, message)
 	}
@@ -592,7 +592,7 @@ impl BuilderExt for Builder {
 		F1: 'scope + FnOnce(M) -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send,
-		M: MessageSend,
+		M: 'scope + MessageSend,
 	{
 		self.spawn_scoped_with_message_internal(scope, f, message)
 	}
@@ -672,7 +672,7 @@ pub trait ScopeExt<'scope> {
 		F1: 'scope + FnOnce(M) -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send,
-		M: MessageSend;
+		M: 'scope + MessageSend;
 }
 
 impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
@@ -698,7 +698,7 @@ impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
 		F1: 'scope + FnOnce(M) -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send,
-		M: MessageSend,
+		M: 'scope + MessageSend,
 	{
 		self.spawn_with_message_internal(f, message)
 	}
@@ -804,7 +804,7 @@ where
 	F1: 'static + FnOnce(M) -> F2 + Send,
 	F2: 'static + Future<Output = T>,
 	T: 'static + Send,
-	M: MessageSend,
+	M: 'static + MessageSend,
 {
 	Builder::new()
 		.spawn_with_message(f, message)

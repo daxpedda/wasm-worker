@@ -122,7 +122,7 @@ impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
 		F1: 'scope + FnOnce(M) -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send,
-		M: MessageSend,
+		M: 'scope + MessageSend,
 	{
 		Builder::new()
 			.spawn_scoped_with_message_internal(self, task, message)

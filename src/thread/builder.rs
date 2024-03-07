@@ -79,7 +79,7 @@ impl Builder {
 		F1: 'static + FnOnce(M) -> F2 + Send,
 		F2: 'static + Future<Output = T>,
 		T: 'static + Send,
-		M: MessageSend,
+		M: 'static + MessageSend,
 	{
 		if super::has_spawn_support() {
 			self.0
@@ -156,7 +156,7 @@ impl Builder {
 		F1: 'scope + FnOnce(M) -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send,
-		M: MessageSend,
+		M: 'scope + MessageSend,
 	{
 		if super::has_spawn_support() {
 			self.0
