@@ -141,6 +141,28 @@ impl Builder {
 
 		result.map(|handle| ScopedJoinHandle::new(handle))
 	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_scoped_with_message()`](crate::web::BuilderExt::spawn_scoped_with_message).
+	#[cfg(feature = "message")]
+	pub(super) fn spawn_scoped_with_message_internal<'scope, F1, F2, T, M>(
+		self,
+		scope: &Scope,
+		task: F1,
+		message: M,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce(M) -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+		M: MessageSend,
+	{
+		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
+		let result =
+			unsafe { spawn::message::spawn(task, self.name, Some(Arc::clone(&scope.0)), message) };
+
+		result.map(|handle| ScopedJoinHandle::new(handle))
+	}
 }
 
 /// Implementation of [`std::thread::JoinHandle`].

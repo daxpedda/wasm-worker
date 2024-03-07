@@ -516,6 +516,28 @@ pub trait BuilderExt {
 		F1: 'scope + FnOnce() -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send;
+
+	/// [`BuilderExt::spawn_scoped_async()`] with [message](MessageSend).
+	///
+	/// For a more complete documentation see [`Scope::spawn_with_message()`].
+	///
+	/// # Errors
+	///
+	/// - If the main thread does not support spawning threads, see
+	/// [`has_spawn_support()`].
+	/// - If `message` was unable to be cloned.
+	#[cfg(any(feature = "message", docsrs))]
+	fn spawn_scoped_with_message<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T, M>(
+		self,
+		scope: &'scope Scope<'scope, 'env>,
+		f: F1,
+		message: M,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce(M) -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+		M: MessageSend;
 }
 
 impl BuilderExt for Builder {
@@ -557,6 +579,22 @@ impl BuilderExt for Builder {
 		T: 'scope + Send,
 	{
 		self.spawn_scoped_async_internal(scope, f)
+	}
+
+	#[cfg(any(feature = "message", docsrs))]
+	fn spawn_scoped_with_message<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T, M>(
+		self,
+		scope: &'scope Scope<'scope, 'env>,
+		#[allow(clippy::min_ident_chars)] f: F1,
+		message: M,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce(M) -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+		M: MessageSend,
+	{
+		self.spawn_scoped_with_message_internal(scope, f, message)
 	}
 }
 
@@ -613,6 +651,28 @@ pub trait ScopeExt<'scope> {
 		F1: 'scope + FnOnce() -> F2 + Send,
 		F2: 'scope + Future<Output = T>,
 		T: 'scope + Send;
+
+	/// [`ScopeExt::spawn_async()`] with [message](MessageSend).
+	///
+	/// For a more complete documentation see [`ScopeExt::spawn_async()`] and
+	/// [`spawn_with_message()`].
+	///
+	/// # Panics
+	///
+	/// - If the main thread does not support spawning threads, see
+	/// [`has_spawn_support()`].
+	/// - If `message` was unable to be cloned.
+	#[cfg(any(feature = "message", docsrs))]
+	fn spawn_with_message<F1, F2, T, M>(
+		&'scope self,
+		f: F1,
+		message: M,
+	) -> ScopedJoinHandle<'scope, T>
+	where
+		F1: 'scope + FnOnce(M) -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+		M: MessageSend;
 }
 
 impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
@@ -626,6 +686,21 @@ impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
 		T: 'scope + Send,
 	{
 		self.spawn_async_internal(f)
+	}
+
+	#[cfg(any(feature = "message", docsrs))]
+	fn spawn_with_message<F1, F2, T, M>(
+		&'scope self,
+		#[allow(clippy::min_ident_chars)] f: F1,
+		message: M,
+	) -> ScopedJoinHandle<'scope, T>
+	where
+		F1: 'scope + FnOnce(M) -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+		M: MessageSend,
+	{
+		self.spawn_with_message_internal(f, message)
 	}
 }
 

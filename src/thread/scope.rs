@@ -12,6 +12,8 @@ use pin_project::{pin_project, pinned_drop};
 
 use super::r#impl::JoinHandle;
 use super::{r#impl, Builder, Thread};
+#[cfg(feature = "message")]
+use crate::web::message::MessageSend;
 
 /// See [`std::thread::scope()`].
 ///
@@ -105,6 +107,25 @@ impl<'scope, #[allow(single_use_lifetimes)] 'env> Scope<'scope, 'env> {
 	{
 		Builder::new()
 			.spawn_scoped_async_internal(self, task)
+			.expect("failed to spawn thread")
+	}
+
+	/// Implementation for
+	/// [`ScopeExt::spawn_async()`](crate::web::ScopeExt::spawn_async).
+	#[cfg(feature = "message")]
+	pub(crate) fn spawn_with_message_internal<F1, F2, T, M>(
+		&'scope self,
+		task: F1,
+		message: M,
+	) -> ScopedJoinHandle<'scope, T>
+	where
+		F1: 'scope + FnOnce(M) -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+		M: MessageSend,
+	{
+		Builder::new()
+			.spawn_scoped_with_message_internal(self, task, message)
 			.expect("failed to spawn thread")
 	}
 }
