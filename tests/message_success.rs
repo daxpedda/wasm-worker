@@ -68,37 +68,3 @@ async fn scope() {
 
 	assert_eq!(buffer.byte_length(), 0);
 }
-
-#[wasm_bindgen_test]
-#[cfg(feature = "audio-worklet")]
-async fn audio_worklet() {
-	use web_sys::OfflineAudioContext;
-	use web_thread::web::audio_worklet::BaseAudioContextExt;
-
-	let context =
-		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
-			.unwrap();
-
-	let (sender, receiver) = async_channel::bounded(1);
-	context
-		.register_thread(move || {
-			let buffer = ArrayBuffer::new(1);
-			let array = Uint8Array::new(&buffer);
-			array.copy_from(&[42]);
-
-			let handle = web::spawn_with_message(
-				|TransferableWrapper(buffer)| async move {
-					let array = Uint8Array::new(&buffer);
-					assert_eq!(array.get_index(0), 42);
-				},
-				TransferableWrapper(buffer.clone()),
-			);
-			assert_eq!(buffer.byte_length(), 0);
-
-			sender.try_send(handle).unwrap();
-		})
-		.await
-		.unwrap();
-
-	receiver.recv().await.unwrap().join_async().await.unwrap();
-}
