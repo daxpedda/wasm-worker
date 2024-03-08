@@ -1,6 +1,8 @@
 //! Audio worklet extension implementations.
 
 mod js;
+#[cfg(feature = "message")]
+pub(super) mod main;
 mod processor;
 pub(super) mod register;
 

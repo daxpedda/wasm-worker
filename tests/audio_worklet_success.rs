@@ -6,7 +6,6 @@ use std::future::Future;
 
 use js_sys::{Array, Iterator, Object, Reflect};
 use paste::paste;
-use utf32_lit::utf32;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;

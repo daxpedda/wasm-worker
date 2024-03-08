@@ -5,10 +5,10 @@ use std::future::Future;
 use std::sync::Arc;
 use std::{io, mem};
 
-use js_sys::Array;
+use js_sys::{Array, Function};
 use wasm_bindgen::closure::Closure;
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{MessageEvent, Worker};
+use web_sys::{DedicatedWorkerGlobalScope, MessageEvent, Worker};
 
 use super::super::super::global::Global;
 #[cfg(feature = "audio-worklet")]
@@ -19,7 +19,7 @@ use crate::thread::atomics::channel::Receiver;
 use crate::web::message::{MessageSend, RawMessageSerialize};
 
 thread_local! {
-	pub(super) static SPAWN_SENDER: RefCell<Option<channel::Sender<SpawnData>>> = const { RefCell::new(None) };
+	pub(in super::super) static SPAWN_SENDER: RefCell<Option<channel::Sender<SpawnData>>> = const { RefCell::new(None) };
 }
 
 /// Internal spawn function.
@@ -89,35 +89,14 @@ where
 				.expect("`Receiver` in main thread dropped");
 
 			Global::with(|global| match global {
-				Global::Dedicated(global) => {
-					let result = match serialize {
-						RawMessageSerialize {
-							serialize,
-							transfer: None,
-						} => global.post_message(&Array::of1(&serialize)),
-						RawMessageSerialize {
-							serialize,
-							transfer: Some(transfer),
-						} => global.post_message_with_transfer(
-							&Array::of2(&serialize, &transfer),
-							&transfer,
-						),
-					};
-
-					if let Err(error) = result {
-						global.post_message(&JsValue::UNDEFINED).expect(
-							"`DedicatedWorkerGlobalScope.postMessage()` is not expected to fail \
-							 without a `transfer` object",
-						);
-						Err(super::super::error_from_exception(error))
-					} else {
-						Ok(())
-					}
-				}
-				#[allow(clippy::unimplemented)]
-				Global::Worklet => {
-					unimplemented!("spawning threads with messages from audio worklets")
-				}
+				Global::Dedicated(global) => send_message(global, serialize),
+				#[cfg(feature = "audio-worklet")]
+				Global::Worklet => super::super::audio_worklet::register::message::MESSAGE_PORT.with(|port| {
+					let port = port
+						.get()
+						.expect("found audio worklet with uninitialized port");
+					send_message(port, serialize)
+				}),
 				_ => unreachable!("spawning from thread not registered by `web-thread`"),
 			})?;
 		}
@@ -133,6 +112,33 @@ where
 			spawn_receiver,
 			task,
 		))
+	}
+}
+
+/// Send [`RawMessageSerialize`] over any [`HasMessagePortInterface`].
+fn send_message(
+	port: &impl HasMessagePortInterface,
+	serialize: RawMessageSerialize,
+) -> io::Result<()> {
+	let result = match serialize {
+		RawMessageSerialize {
+			serialize,
+			transfer: None,
+		} => port.post_message(&Array::of1(&serialize)),
+		RawMessageSerialize {
+			serialize,
+			transfer: Some(transfer),
+		} => port.post_message_with_transfer(&Array::of2(&serialize, &transfer), &transfer),
+	};
+
+	if let Err(error) = result {
+		port.post_message(&JsValue::UNDEFINED).expect(
+			"`DedicatedWorkerGlobalScope.postMessage()` is not expected to fail without a \
+			 `transfer` object",
+		);
+		Err(super::super::error_from_exception(error))
+	} else {
+		Ok(())
 	}
 }
 
@@ -188,9 +194,62 @@ fn spawn_internal(
 	}
 }
 
+/// Trait over any type having an interface like
+/// [`MessagePort`](web_sys::MessagePort).
+pub(in super::super) trait HasMessagePortInterface {
+	/// Setter for the [`message`](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/message_event) event handler.
+	fn set_onmessage(&self, value: Option<&Function>);
+
+	/// [`MessagePort.postMessage()`](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage).
+	fn post_message(&self, message: &JsValue) -> Result<(), JsValue>;
+
+	/// [`MessagePort.postMessage()`](https://developer.mozilla.org/en-US/docs/Web/API/MessagePort/postMessage).
+	fn post_message_with_transfer(
+		&self,
+		message: &JsValue,
+		transfer: &JsValue,
+	) -> Result<(), JsValue>;
+}
+
+impl HasMessagePortInterface for Worker {
+	fn set_onmessage(&self, value: Option<&Function>) {
+		self.set_onmessage(value);
+	}
+
+	fn post_message(&self, message: &JsValue) -> Result<(), JsValue> {
+		self.post_message(message)
+	}
+
+	fn post_message_with_transfer(
+		&self,
+		message: &JsValue,
+		transfer: &JsValue,
+	) -> Result<(), JsValue> {
+		self.post_message_with_transfer(message, transfer)
+	}
+}
+
+impl HasMessagePortInterface for DedicatedWorkerGlobalScope {
+	fn set_onmessage(&self, value: Option<&Function>) {
+		self.set_onmessage(value);
+	}
+
+	fn post_message(&self, message: &JsValue) -> Result<(), JsValue> {
+		self.post_message(message)
+	}
+
+	fn post_message_with_transfer(
+		&self,
+		message: &JsValue,
+		transfer: &JsValue,
+	) -> Result<(), JsValue> {
+		self.post_message_with_transfer(message, transfer)
+	}
+}
+
 /// Setup `message` event handler.
-pub(super) fn setup_message_handler(
-	worker: &Worker,
+pub(in super::super) fn setup_message_handler(
+	this: &impl HasMessagePortInterface,
 	spawn_receiver: Receiver<SpawnData>,
 ) -> Closure<dyn Fn(MessageEvent)> {
 	let message_handler = Closure::new(move |event: MessageEvent| {
@@ -218,7 +277,7 @@ pub(super) fn setup_message_handler(
 		)
 		.expect("unexpected serialization error when serialization succeeded when sending this");
 	});
-	worker.set_onmessage(Some(message_handler.as_ref().unchecked_ref()));
+	this.set_onmessage(Some(message_handler.as_ref().unchecked_ref()));
 
 	message_handler
 }
