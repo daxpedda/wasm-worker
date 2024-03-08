@@ -139,6 +139,11 @@ path = "tests/audio_worklet_fail_async.rs"
 test = false
 
 [[test]]
+name = "audio_worklet_message_success"
+path = "tests/audio_worklet_message_success.rs"
+test = false
+
+[[test]]
 name = "audio_worklet_success"
 path = "tests/audio_worklet_success.rs"
 test = false
