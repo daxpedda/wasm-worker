@@ -30,6 +30,7 @@
 //!   - Firefox: ?
 //!   - Safari: ?
 //! - Headless Firefox can't run `AudioContext` without a real audio device: <https://bugzilla.mozilla.org/show_bug.cgi?id=1881904>.
+//! - Chrome fails to send `WebAssembly.Module` over `AudioWorkletNode.port`: <https://issues.chromium.org/issues/40855462>.
 
 #![cfg_attr(
 	all(

@@ -21,11 +21,11 @@ static COMMAND_SENDER: OnceLock<Sender<Command>> = OnceLock::new();
 
 thread_local! {
 	/// Containing all spawned workers.
-	pub(super) static WORKERS: RefCell<HashMap<ThreadId, WorkerState>> = RefCell::new(HashMap::new());
+	pub(super) static WORKERS: RefCell<HashMap<ThreadId, State>> = RefCell::new(HashMap::new());
 }
 
 /// State for each [`Worker`].
-pub(super) struct WorkerState {
+pub(super) struct State {
 	/// [`Worker`]
 	pub(super) this: Worker,
 	/// Callback handling messages.
@@ -53,13 +53,13 @@ impl Command {
 	pub(super) fn send(self) {
 		COMMAND_SENDER
 			.get()
-			.expect("sending `Command` before `SENDER` is initialized")
+			.expect("sending `Command` before `COMMAND_SENDER` is initialized")
 			.send(self)
 			.expect("`Receiver` was somehow dropped from the main thread");
 	}
 }
 
-/// Initializes the main thread thread handler. Make sure to call this at
+/// Initializes the main thread worker handler. Make sure to call this at
 /// least once on the main thread before spawning any thread.
 ///
 /// # Panics
@@ -116,6 +116,9 @@ pub(super) fn init_main_thread() {
 				}
 			}
 		});
+
+		#[cfg(all(feature = "audio-worklet", feature = "message"))]
+		super::audio_worklet::main::init_main_thread();
 
 		sender
 	});

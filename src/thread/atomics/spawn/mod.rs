@@ -24,7 +24,7 @@ use super::main::{self, Command};
 use super::memory::ThreadMemory;
 use super::url::ScriptUrl;
 use super::{oneshot, JoinHandle, ScopeData, Thread, ThreadId, MEMORY, MODULE};
-use crate::thread::atomics::main::{WorkerState, WORKERS};
+use crate::thread::atomics::main::{State, WORKERS};
 
 /// Type of the task being sent to the worker.
 type Task<'scope> =
@@ -260,7 +260,7 @@ fn spawn_common(
 	let previous = WORKERS.with(|workers| {
 		workers.borrow_mut().insert(
 			id,
-			WorkerState {
+			State {
 				this: worker,
 				#[cfg(feature = "message")]
 				_message_handler: message_handler,
