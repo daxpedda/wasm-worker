@@ -644,19 +644,26 @@ impl AudioWorkletHandle {
 	///
 	/// See [`ThreadMemory::release()`].
 	pub(crate) unsafe fn release(self) -> Result<(), Self> {
-		#[cfg(feature = "message")]
-		super::main::DESTROY_SENDER
-			.get()
-			.expect("sending `ThreadId` before `DESTROY_SENDER` is initialized")
-			.send(self.thread.id())
-			.expect("`Receiver` was somehow dropped from the main thread");
-
 		// SAFETY: See `ThreadMemory::release()`. Other safety guarantees have to be
 		// uphold by the caller.
-		unsafe { self.memory.release() }.map_err(|memory| Self {
-			thread: self.thread,
-			memory,
-		})
+		let result = unsafe { self.memory.release() };
+
+		match result {
+			Ok(()) => {
+				#[cfg(feature = "message")]
+				super::main::DESTROY_SENDER
+					.get()
+					.expect("sending `ThreadId` before `DESTROY_SENDER` is initialized")
+					.send(self.thread.id())
+					.expect("`Receiver` was somehow dropped from the main thread");
+
+				Ok(())
+			}
+			Err(memory) => Err(Self {
+				thread: self.thread,
+				memory,
+			}),
+		}
 	}
 }
 
