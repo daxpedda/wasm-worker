@@ -70,13 +70,13 @@ where
 			let script = format!(
 				"import {{initSync, __web_thread_worklet_entry}} from '{}'\n\n{}",
 				META.url(),
-				include_str!("worklet.js"),
+				include_str!("worklet.min.js"),
 			);
 			#[cfg(feature = "message")]
 			let script = format!(
 				"import {{initSync, __web_thread_worklet_register, __web_thread_worklet_entry}} from '{}'\n\n{}",
 				META.url(),
-				include_str!("worklet_with_message.js"),
+				include_str!("worklet_with_message.min.js"),
 			);
 
 			ScriptUrl::new(&script)
