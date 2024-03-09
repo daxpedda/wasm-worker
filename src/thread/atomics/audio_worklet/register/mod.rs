@@ -472,9 +472,9 @@ impl Future for RegisterThreadFuture {
 					};
 
 					#[cfg(not(feature = "message"))]
-					let data = Box::into_raw(Box::new(task));
+					let data: *mut Task = Box::into_raw(Box::new(task));
 					#[cfg(feature = "message")]
-					let data = Box::into_raw(Box::new(Data {
+					let data: *mut Data = Box::into_raw(Box::new(Data {
 						thread: thread.clone(),
 						memory_sender,
 					}));
@@ -511,7 +511,12 @@ impl Future for RegisterThreadFuture {
 							// SAFETY: We just made this pointer above and `new
 							// AudioWorkletNode` has to guarantee that on error transmission
 							// failed to avoid double-free.
-							drop(unsafe { Box::from_raw(data) });
+							let data = unsafe { *Box::from_raw(data) };
+							#[cfg(not(feature = "message"))]
+							let data: Task = data;
+							#[cfg(feature = "message")]
+							let data: Data = data;
+							drop(data);
 							return Poll::Ready(Err(super::super::error_from_exception(error)));
 						}
 					}
@@ -549,7 +554,7 @@ impl Future for RegisterThreadFuture {
 									&port,
 									spawn_receiver,
 								);
-							let task = Box::into_raw(Box::new(task));
+							let task: *mut Task = Box::into_raw(Box::new(task));
 							let result = node_port.post_message_with_transferable(
 								&Array::of1(&task.into()),
 								&Array::of1(&channel.port2()),
@@ -580,7 +585,8 @@ impl Future for RegisterThreadFuture {
 									// SAFETY: We just made this pointer above and
 									// `MessagePort.postMessage()` has to guarantee that on error
 									// transmission failed to avoid double-free.
-									drop(unsafe { Box::from_raw(task) });
+									let task: Task = *unsafe { Box::from_raw(task) };
+									drop(task);
 									// SAFETY: We just spawned this audio worklet and
 									// `MessagePort.postMessage()` has to guarantee that on error
 									// transmission failed so that this worklet will never run
@@ -675,6 +681,6 @@ pub unsafe fn __web_thread_worklet_entry(
 	// SAFETY: Has to be a valid pointer to a `Task`. We only call
 	// `__web_thread_worklet_entry` from `worklet.js`. The data sent to it comes
 	// only from `RegisterThreadFuture::poll()`.
-	let task = *unsafe { Box::from_raw(task) };
+	let task: Task = *unsafe { Box::from_raw(task) };
 	task(message);
 }
