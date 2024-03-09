@@ -1,37 +1,32 @@
-globalThis.__web_thread_register_processor = (__web_thread_name, __web_thread_processor) => {
-    globalThis.registerProcessor(__web_thread_name, class extends AudioWorkletProcessor {
-        constructor(__web_thread_options) {
+globalThis.__web_thread_register_processor = (name, processor) => {
+    globalThis.registerProcessor(name, class extends AudioWorkletProcessor {
+        constructor(options) {
             super()
-            this.__web_thread_this = __web_thread_processor.instantiate(this, __web_thread_options)
+            this.__web_thread_this = processor.instantiate(this, options)
         }
 
-        process(__web_thread_inputs, __web_thread_outputs, __web_thread_parameters) {
-            return this.__web_thread_this.process(__web_thread_inputs, __web_thread_outputs, __web_thread_parameters)
+        process(inputs, outputs, parameters) {
+            return this.__web_thread_this.process(inputs, outputs, parameters)
         }
 
         static get parameterDescriptors() {
-            return __web_thread_processor.parameterDescriptors()
+            return processor.parameterDescriptors()
         }
     })
 }
 
 globalThis.registerProcessor('__web_thread_worklet', class extends AudioWorkletProcessor {
-    constructor(__web_thread_options) {
+    constructor(options) {
         super()
 
-        const [
-            __web_thread_module,
-            __web_thread_memory,
-            __web_thread_worklet_lock,
-            __web_thread_task,
-        ] = __web_thread_options.processorOptions
+        const [module, memory, workletLock, task] = options.processorOptions
 
-        initSync(__web_thread_module, __web_thread_memory)
-        const __web_thread_memory_array = new Int32Array(__web_thread_memory.buffer)
-        Atomics.store(__web_thread_memory_array, __web_thread_worklet_lock, 0)
-        Atomics.notify(__web_thread_memory_array, __web_thread_worklet_lock)
+        initSync(module, memory)
+        const memoryArray = new Int32Array(memory.buffer)
+        Atomics.store(memoryArray, workletLock, 0)
+        Atomics.notify(memoryArray, workletLock)
 
-        __web_thread_worklet_entry(__web_thread_task)
+        __web_thread_worklet_entry(task)
     }
 
     process() { }
