@@ -54,7 +54,7 @@ pub unsafe fn __web_thread_worklet_register(data: *mut Data) {
 	// SAFETY: Has to be a valid pointer to a `Data`. We only call
 	// `__web_thread_worklet_register` from `worklet_with_message.js`. The data sent
 	// to it comes only from `RegisterThreadFuture::poll()`.
-	let data = *unsafe { Box::from_raw(data) };
+	let data: Data = *unsafe { Box::from_raw(data) };
 
 	Thread::register(data.thread);
 	data.memory_sender.send(ThreadMemory::new());

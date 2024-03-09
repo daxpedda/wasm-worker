@@ -14,7 +14,7 @@ use web_sys::{
 	BaseAudioContext, OfflineAudioContext,
 };
 use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContextExt};
-use web_thread::web::{self, YieldTime};
+use web_thread::web::{self, JoinHandleExt, YieldTime};
 
 use super::test_processor::{
 	AudioParameter, AudioWorkletNodeOptionsExt2, TestProcessor, GLOBAL_DATA,
@@ -32,94 +32,28 @@ macro_rules! test {
 
 			#[wasm_bindgen_test]
 			async fn [<offline_ $name>]() {
-				[<test_ $name>](
-					OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
-						1, 1, 8000.,
-					)
-					.unwrap()
-					.into(),
+				let context = OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
+					1, 1, 8000.,
 				)
-				.await;
+				.unwrap();
+				[<test_ $name>](context.into()).await;
 			}
 		}
 	};
 }
 
-async fn test_nested<C, F>(context: C, post: impl FnOnce(C) -> F)
-where
-	C: Clone + BaseAudioContextExt + AsRef<BaseAudioContext>,
-	F: Future<Output = ()>,
-{
-	let start = Flag::new();
-	let end = Flag::new();
+async fn test_nested(context: BaseAudioContext) {
+	let (sender, receiver) = async_channel::bounded(1);
 	context
 		.clone()
-		.register_thread({
-			let start = start.clone();
-			move || {
-				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
-				global
-					.register_processor_ext::<TestProcessor>("test")
-					.unwrap();
-				start.signal();
-			}
-		})
+		.register_thread(move || sender.try_send(web_thread::spawn(|| ())).unwrap())
 		.await
 		.unwrap();
 
-	// Wait until processor is registered.
-	start.await;
-	web::yield_now_async(YieldTime::UserBlocking).await;
-
-	context
-		.audio_worklet_node::<TestProcessor>(
-			"test",
-			Box::new({
-				let end = end.clone();
-				move |_| {
-					let handle = web_thread::spawn(|| ());
-					Some(Box::new(move || {
-						if handle.is_finished() {
-							end.signal();
-							false
-						} else {
-							true
-						}
-					}))
-				}
-			}),
-			None,
-		)
-		.unwrap();
-	post(context).await;
-	end.await;
+	receiver.recv().await.unwrap().join_async().await.unwrap();
 }
 
-#[wasm_bindgen_test]
-// Firefox doesn't support running `AudioContext` without an actual audio device.
-// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1881904>.
-#[cfg(not(unsupported_headless_audiocontext))]
-async fn nested() {
-	test_nested(AudioContext::new().unwrap(), |_| async {}).await;
-}
-
-#[wasm_bindgen_test]
-async fn offline_nested() {
-	test_nested(
-		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
-			1,
-			100_000_000,
-			8000.,
-		)
-		.unwrap(),
-		|context| async move {
-			JsFuture::from(context.start_rendering().unwrap())
-				.await
-				.unwrap();
-		},
-	)
-	.await;
-}
+test!(nested);
 
 async fn test_register(context: BaseAudioContext) {
 	context.register_thread(|| ()).await.unwrap();
@@ -729,7 +663,7 @@ async fn test_parameters(context: BaseAudioContext) {
 
 	let options = AudioWorkletNodeOptionsExt2::new();
 	let parameters = Array::new();
-	Reflect::set(&parameters, &js_string!("test"), &42.0.into()).unwrap();
+	Reflect::set(&parameters, &"test".into(), &42.0.into()).unwrap();
 	options.set_parameter_data(Some(&parameters));
 	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
 	end.await;

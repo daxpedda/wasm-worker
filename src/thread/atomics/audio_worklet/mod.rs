@@ -101,7 +101,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		empty: !has_processor_options,
 	});
 	let processor_options = processor_options.unwrap_or_default();
-	let data = Box::into_raw(data);
+	let data: *mut Data = Box::into_raw(data);
 	processor_options.set_data(data);
 
 	if !has_processor_options {
