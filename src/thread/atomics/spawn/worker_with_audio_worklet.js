@@ -1,3 +1,5 @@
+/* global initSync, __web_thread_worker_entry */
+
 self.onmessage = async event => {
 	self.onmessage = undefined
 	const [

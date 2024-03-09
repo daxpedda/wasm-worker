@@ -111,3 +111,20 @@ jobs:
           RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
         run: |
           cargo doc --no-deps --document-private-items --lib --examples ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+
+  eslint:
+    name: ESLint
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install ESLint
+        run: sudo npm i -g eslint
+      - name: Run ESLint
+        run: |
+          eslint src/thread/atomics/spawn/worker.js
+          eslint src/thread/atomics/spawn/worker_with_audio_worklet.js
+          eslint src/thread/atomics/audio_worklet/register/worklet.js
+          eslint src/thread/atomics/audio_worklet/register/worklet_with_message.js
