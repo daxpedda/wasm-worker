@@ -111,7 +111,7 @@ impl WaitAsync {
 	fn wait_polyfill(index: u32, check: i32) -> Self {
 		thread_local! {
 			/// Object URL to the worker script.
-			static URL: ScriptUrl = ScriptUrl::new(include_str!("wait_async.js"));
+			static URL: ScriptUrl = ScriptUrl::new(include_str!("wait_async.min.js"));
 			/// Holds cached workers.
 			static WORKERS: RefCell<Vec<Worker>> = const { RefCell::new(Vec::new()) };
 		}
