@@ -3,6 +3,7 @@
 #[cfg(feature = "message")]
 pub(in super::super) mod message;
 
+use std::arch::wasm32;
 use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io::{Error, ErrorKind};
@@ -517,6 +518,14 @@ impl Future for RegisterThreadFuture {
 							#[cfg(feature = "message")]
 							let data: Data = data;
 							drop(data);
+
+							WORKLET_LOCK.store(0, Ordering::Relaxed);
+							// SAFETY: This is safe because `AtomicI32::as_ptr()` returns a valid
+							// pointer.
+							unsafe {
+								wasm32::memory_atomic_notify(WORKLET_LOCK.as_ptr(), u32::MAX)
+							};
+
 							return Poll::Ready(Err(super::super::error_from_exception(error)));
 						}
 					}
