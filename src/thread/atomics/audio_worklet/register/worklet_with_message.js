@@ -1,3 +1,5 @@
+/* global initSync, __web_thread_worklet_register, __web_thread_worklet_entry */
+
 globalThis.__web_thread_register_processor = (name, processor) => {
     globalThis.registerProcessor(name, class extends AudioWorkletProcessor {
         constructor(options) {
