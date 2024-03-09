@@ -1,0 +1,16 @@
+{
+  "module": {
+    "type": "es6"
+  },
+  "isModule": true,
+  "minify": true,
+  "jsc": {
+    "target": "es2022",
+    "minify": {
+      "compress": {
+        "unused": true
+      },
+      "mangle": true
+    }
+  }
+}

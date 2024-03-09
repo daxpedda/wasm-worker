@@ -42,3 +42,23 @@ jobs:
           tool: taplo-cli
       - name: Run Taplo
         run: taplo fmt --check
+
+  swc:
+    name: SWC
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install SWC
+        run: sudo npm i -g @swc/cli
+      - name: Run SWC
+        run: |
+          swc src/thread/atomics/spawn/worker.js -o src/thread/atomics/spawn/worker.min.js
+          swc src/thread/atomics/spawn/worker_with_audio_worklet.js -o src/thread/atomics/spawn/worker_with_audio_worklet.min.js
+          swc src/thread/atomics/audio_worklet/register/worklet.js -o src/thread/atomics/audio_worklet/register/worklet.min.js
+          swc src/thread/atomics/audio_worklet/register/worklet_with_message.js -o src/thread/atomics/audio_worklet/register/worklet_with_message.min.js
+      - name: Check for diff
+        run: |
+          [[ -z $(git status -s) ]]

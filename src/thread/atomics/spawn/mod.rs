@@ -219,9 +219,9 @@ fn spawn_common(
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = ScriptUrl::new(&{
 			#[cfg(not(feature = "audio-worklet"))]
-			let script = include_str!("worker.js");
+			let script = include_str!("worker.min.js");
 			#[cfg(feature = "audio-worklet")]
-			let script = include_str!("worker_with_audio_worklet.js");
+			let script = include_str!("worker_with_audio_worklet.min.js");
 
 			format!(
 				"import {{initSync, __web_thread_worker_entry}} from '{}'\n\n{}",
