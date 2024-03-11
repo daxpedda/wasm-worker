@@ -16,7 +16,7 @@ use super::super::audio_worklet::register::THREAD_LOCK_INDEXES;
 use super::super::{channel, main, oneshot, JoinHandle, ScopeData, ThreadId};
 use super::{SpawnData, Task};
 use crate::thread::atomics::channel::Receiver;
-use crate::web::message::{MessageSend, RawMessageSerialize};
+use crate::web::message::{ArrayBuilder, MessageSend};
 
 thread_local! {
 	pub(in super::super) static SPAWN_SENDER: RefCell<Option<channel::Sender<SpawnData>>> = const { RefCell::new(None) };
@@ -43,7 +43,9 @@ where
 	let (result_sender, result_receiver) = oneshot::channel();
 	let (spawn_sender, spawn_receiver) = channel::channel();
 
-	let raw_message = message.send();
+	let mut transfer_builder = ArrayBuilder::new();
+	let raw_message = message.send(&mut transfer_builder);
+	let transfer = transfer_builder.finish();
 
 	let task: Task<'_> = Box::new({
 		let thread = thread.clone();
@@ -64,7 +66,8 @@ where
 				thread.id(),
 				thread.name(),
 				spawn_receiver,
-				serialize,
+				&serialize,
+				transfer,
 				Box::new(task),
 			)?;
 		} else {
@@ -89,13 +92,13 @@ where
 				.expect("`Receiver` in main thread dropped");
 
 			Global::with(|global| match global {
-				Global::Dedicated(global) => send_message(global, serialize),
+				Global::Dedicated(global) => send_message(global, &serialize, transfer),
 				#[cfg(feature = "audio-worklet")]
 				Global::Worklet => super::super::audio_worklet::register::message::MESSAGE_PORT.with(|port| {
 					let port = port
 						.get()
 						.expect("found audio worklet with uninitialized port");
-					send_message(port, serialize)
+					send_message(port, &serialize, transfer)
 				}),
 				_ => unreachable!("spawning from thread not registered by `web-thread`"),
 			})?;
@@ -115,20 +118,16 @@ where
 	}
 }
 
-/// Send [`RawMessageSerialize`] over any [`HasMessagePortInterface`].
+/// Send [`MessageSend`] over any [`HasMessagePortInterface`].
 fn send_message(
 	port: &impl HasMessagePortInterface,
-	serialize: RawMessageSerialize,
+	serialize: &JsValue,
+	transfer: Option<Array>,
 ) -> io::Result<()> {
-	let result = match serialize {
-		RawMessageSerialize {
-			serialize,
-			transfer: None,
-		} => port.post_message(&Array::of1(&serialize)),
-		RawMessageSerialize {
-			serialize,
-			transfer: Some(transfer),
-		} => port.post_message_with_transfer(&Array::of2(&serialize, &transfer), &transfer),
+	let result = if let Some(transfer) = transfer {
+		port.post_message_with_transfer(&Array::of2(serialize, &transfer), &transfer)
+	} else {
+		port.post_message(&Array::of1(serialize))
 	};
 
 	if let Err(error) = result {
@@ -147,7 +146,8 @@ fn spawn_internal(
 	id: ThreadId,
 	name: Option<&str>,
 	spawn_receiver: Receiver<SpawnData>,
-	serialize: RawMessageSerialize,
+	serialize: &JsValue,
+	transfer: Option<Array>,
 	task: Task<'_>,
 ) -> io::Result<()> {
 	let result = super::spawn_common(
@@ -156,33 +156,27 @@ fn spawn_internal(
 		spawn_receiver,
 		task,
 		#[cfg(not(feature = "audio-worklet"))]
-		|worker: &Worker, module, memory, task| match serialize {
-			RawMessageSerialize {
-				serialize,
-				transfer: None,
-			} => worker.post_message(&Array::of4(module, memory, &task, &serialize)),
-			RawMessageSerialize {
-				serialize,
-				transfer: Some(transfer),
-			} => worker.post_message_with_transfer(
-				&Array::of4(module, memory, &task, &serialize),
-				&transfer,
-			),
+		|worker: &Worker, module, memory, task| {
+			if let Some(transfer) = transfer {
+				worker.post_message_with_transfer(
+					&Array::of4(module, memory, &task, serialize),
+					&transfer,
+				)
+			} else {
+				worker.post_message(&Array::of4(module, memory, &task, serialize))
+			}
 		},
 		#[cfg(feature = "audio-worklet")]
 		|worker: &Worker, module, memory, task| {
-			THREAD_LOCK_INDEXES.with(|indexes| match serialize {
-				RawMessageSerialize {
-					serialize,
-					transfer: None,
-				} => worker.post_message(&Array::of5(module, memory, indexes, &task, &serialize)),
-				RawMessageSerialize {
-					serialize,
-					transfer: Some(transfer),
-				} => worker.post_message_with_transfer(
-					&Array::of5(module, memory, indexes, &task, &serialize),
-					&transfer,
-				),
+			THREAD_LOCK_INDEXES.with(|indexes| {
+				if let Some(transfer) = transfer {
+					worker.post_message_with_transfer(
+						&Array::of5(module, memory, indexes, &task, serialize),
+						&transfer,
+					)
+				} else {
+					worker.post_message(&Array::of5(module, memory, indexes, &task, serialize))
+				}
 			})
 		},
 	);
@@ -263,16 +257,15 @@ pub(in super::super) fn setup_message_handler(
 		}
 
 		let mut values = message.unchecked_into::<Array>().into_iter();
-		let serialize = RawMessageSerialize {
-			serialize: values.next().expect("no serialized data found"),
-			transfer: values.next().map(Array::unchecked_from_js),
-		};
+		let serialize = values.next().expect("no serialized data found");
+		let transfer = values.next().map(Array::unchecked_from_js);
 
 		spawn_internal(
 			data.id,
 			data.name.as_deref(),
 			data.spawn_receiver,
-			serialize,
+			&serialize,
+			transfer,
 			Box::new(data.task),
 		)
 		.expect("unexpected serialization error when serialization succeeded when sending this");

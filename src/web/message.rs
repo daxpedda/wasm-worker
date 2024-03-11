@@ -79,7 +79,7 @@ macro_rules! impl_for_tuples {
 /// use wasm_bindgen::{JsCast, JsValue};
 /// use web_sys::{HtmlCanvasElement, OffscreenCanvas};
 /// use web_thread::web::{self, JoinHandleExt};
-/// use web_thread::web::message::{MessageSend, RawMessage, RawMessageSerialize};
+/// use web_thread::web::message::{MessageSend, RawMessage};
 ///
 /// struct Struct {
 /// 	a: u8,
@@ -90,13 +90,13 @@ macro_rules! impl_for_tuples {
 /// impl MessageSend for Struct {
 /// 	type Send = u8;
 ///
-/// 	fn send(self) -> RawMessage<Self::Send> {
+/// 	fn send<E: Extend<JsValue>>(self, transfer: &mut E) -> RawMessage<Self::Send> {
+/// 		let serialize = Array::of2(&self.b, &self.c);
+/// 		transfer.extend([self.c.into()]);
+///
 /// 		RawMessage {
 /// 			send: Some(self.a),
-/// 			serialize: Some(RawMessageSerialize {
-/// 				serialize: Array::of2(&self.b, &self.c).into(),
-/// 				transfer: Some(Array::of1(&self.c)),
-/// 			}),
+/// 			serialize: Some(serialize.into()),
 /// 		}
 /// 	}
 ///
@@ -137,49 +137,31 @@ pub trait MessageSend {
 	type Send: Send;
 
 	/// Serialize into [`RawMessage`] to send.
-	fn send(self) -> RawMessage<Self::Send>;
+	fn send<E: Extend<JsValue>>(self, transfer: &mut E) -> RawMessage<Self::Send>;
 
-	/// Deserialize from [`RawMessageSerialize::serialize`] and
-	/// [`RawMessage::send`].
+	/// Deserialize from [`RawMessage::serialize`] and [`RawMessage::send`].
 	fn receive(serialized: Option<JsValue>, sent: Option<Self::Send>) -> Self;
 }
 
 /// Contains data necessary to send [`MessageSend`] to another thread.
 #[derive(Debug, PartialEq)]
 pub struct RawMessage<T> {
+	/// Value to be [serialized](https://developer.mozilla.org/en-US/docs/Glossary/Serializable_object).
+	pub serialize: Option<JsValue>,
 	/// [`Send`] value.
 	pub send: Option<T>,
-	/// Values that have to be [serialized] or [transferred].
-	///
-	/// [serialized]: https://developer.mozilla.org/en-US/docs/Glossary/Serializable_object
-	/// [transferred]: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects
-	pub serialize: Option<RawMessageSerialize>,
-}
-
-/// Contains data that has to be [serialized] or [transferred] to send
-/// [`MessageSend`] to another thread.
-///
-/// [serialized]: https://developer.mozilla.org/en-US/docs/Glossary/Serializable_object
-/// [transferred]: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects
-#[derive(Debug, PartialEq)]
-pub struct RawMessageSerialize {
-	/// Has to be [serialized](https://developer.mozilla.org/en-US/docs/Glossary/Serializable_object).
-	pub serialize: JsValue,
-	/// Has to be [transferred](https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects).
-	pub transfer: Option<Array>,
 }
 
 impl<const SIZE: usize, T: MessageSend> MessageSend for [T; SIZE] {
 	type Send = [Option<T::Send>; SIZE];
 
-	fn send(self) -> RawMessage<Self::Send> {
+	fn send<E: Extend<JsValue>>(self, transfer: &mut E) -> RawMessage<Self::Send> {
 		let mut serialize_builder = None;
-		let mut transfer_builder = ArrayBuilder::new();
 
 		let mut empty_serialize_count = 0;
 		let mut has_send = false;
 		let send = self.map(|message| {
-			let message = message.send();
+			let message = message.send(transfer);
 
 			if let Some(serialize) = message.serialize {
 				serialize_builder
@@ -188,11 +170,7 @@ impl<const SIZE: usize, T: MessageSend> MessageSend for [T; SIZE] {
 						builder.extend(iter::repeat(JsValue::NULL).take(empty_serialize_count));
 						builder
 					})
-					.push(serialize.serialize);
-
-				if let Some(transfer) = serialize.transfer {
-					transfer_builder.push(transfer.into());
-				}
+					.push(serialize);
 			} else {
 				empty_serialize_count += 1;
 			}
@@ -205,13 +183,10 @@ impl<const SIZE: usize, T: MessageSend> MessageSend for [T; SIZE] {
 		});
 
 		RawMessage {
-			send: has_send.then_some(send),
 			serialize: serialize_builder
 				.and_then(ArrayBuilder::finish)
-				.map(|serialize| RawMessageSerialize {
-					serialize: serialize.unchecked_into(),
-					transfer: transfer_builder.finish(),
-				}),
+				.map(Array::unchecked_into),
+			send: has_send.then_some(send),
 		}
 	}
 
@@ -246,14 +221,13 @@ macro_rules! message_send_for_tuple {
 		impl<$($generic: MessageSend),+> MessageSend for ($($generic,)+) {
 			type Send = ($(Option<$generic::Send>,)+);
 
-			fn send(self) -> RawMessage<Self::Send> {
+			fn send<E: Extend<JsValue>>(self, transfer: &mut E) -> RawMessage<Self::Send> {
 				let mut serialize_builder = None;
-				let mut transfer_builder = ArrayBuilder::new();
 
 				let mut empty_serialize_count = 0;
 				let mut has_send = false;
 				let send = ($({
-					let message = self.$index.send();
+					let message = self.$index.send(transfer);
 
 					#[allow(clippy::mixed_read_write_in_expression, unused_assignments)]
 					if let Some(serialize) = message.serialize {
@@ -263,11 +237,7 @@ macro_rules! message_send_for_tuple {
 								builder.extend(iter::repeat(JsValue::NULL).take(empty_serialize_count));
 								builder
 							})
-							.push(serialize.serialize);
-
-						if let Some(transfer) = serialize.transfer {
-							transfer_builder.push(transfer.into());
-						}
+							.push(serialize);
 					} else {
 						empty_serialize_count += 1;
 					}
@@ -282,12 +252,9 @@ macro_rules! message_send_for_tuple {
 				RawMessage {
 					send: has_send.then_some(send),
 					serialize: serialize_builder
-					.and_then(ArrayBuilder::finish)
-					.map(|serialize| RawMessageSerialize {
-						serialize: serialize.unchecked_into(),
-						transfer: transfer_builder.finish(),
-					}),
-					}
+						.and_then(ArrayBuilder::finish)
+						.map(Array::unchecked_into),
+				}
 			}
 
 			fn receive(serialized: Option<JsValue>, mut sent: Option<Self::Send>) -> Self {
@@ -485,13 +452,10 @@ impl<T: Into<JsValue> + JsCast + Serializable> From<T> for SerializableWrapper<T
 impl<T: Into<JsValue> + JsCast + Serializable> MessageSend for SerializableWrapper<T> {
 	type Send = ();
 
-	fn send(self) -> RawMessage<Self::Send> {
+	fn send<E: Extend<JsValue>>(self, _: &mut E) -> RawMessage<Self::Send> {
 		RawMessage {
+			serialize: Some(self.0.into()),
 			send: None,
-			serialize: Some(RawMessageSerialize {
-				serialize: self.0.into(),
-				transfer: None,
-			}),
 		}
 	}
 
@@ -564,16 +528,13 @@ impl<T: Into<JsValue> + JsCast + Transferable> From<T> for TransferableWrapper<T
 impl<T: Into<JsValue> + JsCast + Transferable> MessageSend for TransferableWrapper<T> {
 	type Send = ();
 
-	fn send(self) -> RawMessage<Self::Send> {
+	fn send<E: Extend<JsValue>>(self, transfer: &mut E) -> RawMessage<Self::Send> {
 		let serialize = self.0.into();
-		let transfer = Array::of1(&serialize);
+		transfer.extend([serialize.clone()]);
 
 		RawMessage {
+			serialize: Some(serialize),
 			send: None,
-			serialize: Some(RawMessageSerialize {
-				serialize,
-				transfer: Some(transfer),
-			}),
 		}
 	}
 
@@ -630,10 +591,10 @@ impl<T: Send> From<T> for SendWrapper<T> {
 impl<T: Send> MessageSend for SendWrapper<T> {
 	type Send = T;
 
-	fn send(self) -> RawMessage<Self::Send> {
+	fn send<E: Extend<JsValue>>(self, _: &mut E) -> RawMessage<Self::Send> {
 		RawMessage {
-			send: Some(self.0),
 			serialize: None,
+			send: Some(self.0),
 		}
 	}
 
@@ -645,7 +606,7 @@ impl<T: Send> MessageSend for SendWrapper<T> {
 }
 
 /// Helper type to minimize FFI calls when building [`Array`]s.
-struct ArrayBuilder {
+pub(crate) struct ArrayBuilder {
 	/// The [`Array`].
 	this: Option<Array>,
 	/// Caching [`JsValue`]s.
@@ -670,7 +631,7 @@ enum Buffer {
 
 impl ArrayBuilder {
 	/// Creates a new [`ArrayBuilder`].
-	const fn new() -> Self {
+	pub(crate) const fn new() -> Self {
 		Self {
 			this: None,
 			buffer: Buffer::None,
@@ -704,7 +665,7 @@ impl ArrayBuilder {
 
 	/// Finish building the [`Array`]. Returns [`None`] if no [`JsValue`]s were
 	/// supplied.
-	fn finish(mut self) -> Option<Array> {
+	pub(crate) fn finish(mut self) -> Option<Array> {
 		Some(match self.buffer {
 			Buffer::None => return self.this,
 			Buffer::One([value_1]) => {
@@ -768,7 +729,7 @@ pub mod __internal {
 			pub trait $name<T> {
 				type Send;
 
-				fn __web_thread_send(self) -> RawMessage<Self::Send>;
+				fn __web_thread_send<E: Extend<JsValue>>(self, extend: &mut E) -> RawMessage<Self::Send>;
 
 				fn __web_thread_receive(self, serialized: Option<JsValue>, sent: Option<Self::Send>) -> T;
 			}
@@ -777,8 +738,8 @@ pub mod __internal {
 			impl<T: $($bound+)+> $name<T> for $priority {
 				type Send = <$wrapper<T> as MessageSend>::Send;
 
-				fn __web_thread_send(self) -> RawMessage<Self::Send> {
-					$wrapper(self.take().expect("found empty `Option` while sending")).send()
+				fn __web_thread_send<E: Extend<JsValue>>(self, extend: &mut E) -> RawMessage<Self::Send> {
+					$wrapper(self.take().expect("found empty `Option` while sending")).send(extend)
 				}
 
 				fn __web_thread_receive(self, serialized: Option<JsValue>, sent: Option<Self::Send>) -> T {
