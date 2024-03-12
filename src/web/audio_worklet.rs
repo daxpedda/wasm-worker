@@ -493,7 +493,9 @@ pub trait ExtendAudioWorkletProcessor {
 	/// [`BaseAudioContextExt::audio_worklet_node()`].
 	type Data: 'static + Send;
 
-	/// Equivalent to constructor.
+	/// Equivalent to [`AudioWorkletProcessor()`].
+	///
+	/// [`AudioWorkletProcessor()`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletProcessor/AudioWorkletProcessor
 	fn new(
 		this: AudioWorkletProcessor,
 		data: Option<Self::Data>,
