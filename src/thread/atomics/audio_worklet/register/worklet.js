@@ -1,4 +1,4 @@
-/* global initSync, __web_thread_worklet_entry */
+import {initSync, __web_thread_worklet_entry} from '@shim.js'
 
 globalThis.__web_thread_register_processor = (name, processor) => {
     globalThis.registerProcessor(name, class extends AudioWorkletProcessor {
@@ -17,7 +17,7 @@ globalThis.__web_thread_register_processor = (name, processor) => {
     })
 }
 
-globalThis.registerProcessor('__web_thread_worklet', class extends AudioWorkletProcessor {
+registerProcessor('__web_thread_worklet', class extends AudioWorkletProcessor {
     constructor(options) {
         super()
 

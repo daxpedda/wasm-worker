@@ -217,18 +217,14 @@ fn spawn_common(
 ) -> Result<(), JsValue> {
 	thread_local! {
 		/// Object URL to the worker script.
-		static URL: ScriptUrl = ScriptUrl::new(&{
+		static URL: ScriptUrl = {
 			#[cfg(not(feature = "audio-worklet"))]
-			let script = include_str!("worker.min.js");
+			let template = include_str!("worker.min.js");
 			#[cfg(feature = "audio-worklet")]
-			let script = include_str!("worker_with_audio_worklet.min.js");
+			let template = include_str!("worker_with_audio_worklet.min.js");
 
-			format!(
-				"import {{initSync, __web_thread_worker_entry}} from '{}'\n\n{}",
-				META.url(),
-				script,
-			)
-		});
+			ScriptUrl::new(&template.replacen("@shim.js", &META.url(), 1))
+		};
 	}
 
 	let mut options = WorkerOptions::new();
