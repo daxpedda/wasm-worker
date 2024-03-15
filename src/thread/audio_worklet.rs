@@ -13,6 +13,8 @@ use super::atomics::audio_worklet;
 use super::unsupported::audio_worklet;
 use super::Thread;
 use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
+#[cfg(feature = "message")]
+use crate::web::message::MessageSend;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
@@ -22,6 +24,29 @@ where
 {
 	RegisterThreadFuture(if super::has_spawn_support() {
 		audio_worklet::register_thread(context, task)
+	} else {
+		audio_worklet::RegisterThreadFuture::error(Error::new(
+			ErrorKind::Unsupported,
+			"operation not supported on this platform without the atomics target feature and \
+			 cross-origin isolation",
+		))
+	})
+}
+
+/// Implementation for
+/// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread_with_message()`].
+#[cfg(feature = "message")]
+pub(crate) fn register_thread_with_message<F, M>(
+	context: BaseAudioContext,
+	task: F,
+	message: M,
+) -> RegisterThreadFuture
+where
+	F: 'static + FnOnce(M) + Send,
+	M: 'static + MessageSend,
+{
+	RegisterThreadFuture(if super::has_spawn_support() {
+		audio_worklet::register_thread_with_message(context, task, message)
 	} else {
 		audio_worklet::RegisterThreadFuture::error(Error::new(
 			ErrorKind::Unsupported,

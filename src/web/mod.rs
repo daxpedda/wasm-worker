@@ -777,7 +777,7 @@ where
 /// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
 /// # async fn test() {
 /// # use wasm_bindgen::JsCast;
-/// use web_sys::HtmlCanvasElement;
+/// use web_sys::{HtmlCanvasElement, OffscreenCanvas};
 /// use web_thread::web::{self, JoinHandleExt};
 /// use web_thread::web::message::TransferableWrapper;
 ///
@@ -786,6 +786,7 @@ where
 /// let message = TransferableWrapper(canvas.transfer_control_to_offscreen().unwrap());
 /// web::spawn_with_message(
 /// 	|message| async move {
+/// 		let canvas: OffscreenCanvas = message.0;
 /// 		// Do work.
 /// 	},
 /// 	message,

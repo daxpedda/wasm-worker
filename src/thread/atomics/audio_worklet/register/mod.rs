@@ -21,8 +21,12 @@ use web_sys::{
 };
 #[cfg(feature = "message")]
 use {
-	self::message::Data, super::super::channel, super::super::spawn::message::SPAWN_SENDER,
-	super::super::spawn::SpawnData, super::main::WORKLETS, web_sys::MessageChannel,
+	self::message::{Data, MessageState},
+	super::super::channel,
+	super::super::spawn::message::SPAWN_SENDER,
+	super::super::spawn::SpawnData,
+	super::main::WORKLETS,
+	web_sys::MessageChannel,
 };
 
 use super::super::js::META;
@@ -64,6 +68,20 @@ pub(in super::super::super) fn register_thread<F>(
 where
 	F: 'static + FnOnce() + Send,
 {
+	register_thread_internal(
+		context,
+		|_| task(),
+		#[cfg(feature = "message")]
+		None,
+	)
+}
+
+/// Register thread regardless of message.
+fn register_thread_internal(
+	context: BaseAudioContext,
+	task: impl 'static + FnOnce(JsValue) + Send,
+	#[cfg(feature = "message")] message: Option<MessageState>,
+) -> RegisterThreadFuture {
 	thread_local! {
 		/// Object URL to the worklet script.
 		static URL: ScriptUrl = {
@@ -108,7 +126,7 @@ where
 				let task = Box::new({
 					#[cfg(not(feature = "message"))]
 					let thread = thread.clone();
-					move |_| {
+					move |message| {
 						#[cfg(not(feature = "message"))]
 						{
 							Thread::register(thread);
@@ -120,7 +138,7 @@ where
 								SPAWN_SENDER.with(|cell| cell.borrow_mut().replace(spawn_sender));
 							debug_assert!(old.is_none(), "found existing `Sender` in new thread");
 						}
-						task();
+						task(message);
 					}
 				});
 
@@ -134,6 +152,8 @@ where
 					memory_receiver,
 					#[cfg(feature = "message")]
 					spawn_receiver,
+					#[cfg(feature = "message")]
+					message,
 				}
 			}
 			Err(error) => State::Error(super::super::error_from_exception(error)),
@@ -167,6 +187,9 @@ enum State {
 		/// [`Receiver`](channel::Receiver) for [`SpawnData`].
 		#[cfg(feature = "message")]
 		spawn_receiver: channel::Receiver<SpawnData>,
+		/// Message to be sent.
+		#[cfg(feature = "message")]
+		message: Option<MessageState>,
 	},
 	/// Waiting for the worklet lock to be available.
 	WorkletLock {
@@ -186,6 +209,9 @@ enum State {
 		/// [`Receiver`](channel::Receiver) for [`SpawnData`].
 		#[cfg(feature = "message")]
 		spawn_receiver: channel::Receiver<SpawnData>,
+		/// Message to be sent.
+		#[cfg(feature = "message")]
+		message: Option<MessageState>,
 	},
 	/// Waiting for the worker lock to be available.
 	WorkerLock {
@@ -205,6 +231,9 @@ enum State {
 		/// [`Receiver`](channel::Receiver) for [`SpawnData`].
 		#[cfg(feature = "message")]
 		spawn_receiver: channel::Receiver<SpawnData>,
+		/// Message to be sent.
+		#[cfg(feature = "message")]
+		message: Option<MessageState>,
 	},
 	/// Waiting for [`ThreadMemory`].
 	Memory {
@@ -223,10 +252,14 @@ enum State {
 		/// [`Receiver`](channel::Receiver) for [`SpawnData`].
 		#[cfg(feature = "message")]
 		spawn_receiver: channel::Receiver<SpawnData>,
+		/// Message to be sent.
+		#[cfg(feature = "message")]
+		message: Option<MessageState>,
 	},
 }
 
 impl Debug for State {
+	#[allow(clippy::too_many_lines)]
 	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
 		match self {
 			Self::Error(error) => formatter.debug_tuple("Error").field(error).finish(),
@@ -240,6 +273,8 @@ impl Debug for State {
 				memory_receiver,
 				#[cfg(feature = "message")]
 				spawn_receiver,
+				#[cfg(feature = "message")]
+				message,
 			} => {
 				let mut debug_struct = formatter.debug_struct("Module");
 				debug_struct
@@ -251,7 +286,9 @@ impl Debug for State {
 				debug_struct.field("memory_sender", memory_sender);
 				debug_struct.field("memory_receiver", memory_receiver);
 				#[cfg(feature = "message")]
-				debug_struct.field("spawn_receiver", spawn_receiver);
+				debug_struct
+					.field("spawn_receiver", spawn_receiver)
+					.field("message", message);
 				debug_struct.finish()
 			}
 			Self::WorkletLock {
@@ -264,6 +301,8 @@ impl Debug for State {
 				memory_receiver,
 				#[cfg(feature = "message")]
 				spawn_receiver,
+				#[cfg(feature = "message")]
+				message,
 			}
 			| Self::WorkerLock {
 				future,
@@ -275,6 +314,8 @@ impl Debug for State {
 				memory_receiver,
 				#[cfg(feature = "message")]
 				spawn_receiver,
+				#[cfg(feature = "message")]
+				message,
 			} => {
 				let mut debug_struct = formatter.debug_struct(match self {
 					Self::WorkletLock { .. } => "WorkletLock",
@@ -290,7 +331,9 @@ impl Debug for State {
 				debug_struct.field("memory_sender", memory_sender);
 				debug_struct.field("memory_receiver", memory_receiver);
 				#[cfg(feature = "message")]
-				debug_struct.field("spawn_receiver", spawn_receiver);
+				debug_struct
+					.field("spawn_receiver", spawn_receiver)
+					.field("message", message);
 				debug_struct.finish()
 			}
 			Self::Memory {
@@ -303,6 +346,8 @@ impl Debug for State {
 				node,
 				#[cfg(feature = "message")]
 				spawn_receiver,
+				#[cfg(feature = "message")]
+				message,
 			} => {
 				let mut debug_struct = formatter.debug_struct("Module");
 				debug_struct
@@ -313,7 +358,8 @@ impl Debug for State {
 				debug_struct
 					.field("task", &any::type_name_of_val(task))
 					.field("node", node)
-					.field("spawn_receiver", spawn_receiver);
+					.field("spawn_receiver", spawn_receiver)
+					.field("message", message);
 				debug_struct.finish()
 			}
 		}
@@ -363,6 +409,8 @@ impl Future for RegisterThreadFuture {
 							memory_receiver,
 							#[cfg(feature = "message")]
 							spawn_receiver,
+							#[cfg(feature = "message")]
+							message,
 							..
 						} = state
 						else {
@@ -379,6 +427,8 @@ impl Future for RegisterThreadFuture {
 							memory_receiver,
 							#[cfg(feature = "message")]
 							spawn_receiver,
+							#[cfg(feature = "message")]
+							message,
 						});
 					}
 					Poll::Ready(Err(error)) => {
@@ -415,6 +465,8 @@ impl Future for RegisterThreadFuture {
 						memory_receiver,
 						#[cfg(feature = "message")]
 						spawn_receiver,
+						#[cfg(feature = "message")]
+						message,
 						..
 					} = state
 					else {
@@ -431,6 +483,8 @@ impl Future for RegisterThreadFuture {
 						memory_receiver,
 						#[cfg(feature = "message")]
 						spawn_receiver,
+						#[cfg(feature = "message")]
+						message,
 					});
 				}
 				State::WorkerLock { ref mut future, .. } => {
@@ -458,6 +512,8 @@ impl Future for RegisterThreadFuture {
 						memory_receiver,
 						#[cfg(feature = "message")]
 						spawn_receiver,
+						#[cfg(feature = "message")]
+						message,
 						..
 					} = state
 					else {
@@ -498,6 +554,8 @@ impl Future for RegisterThreadFuture {
 								node,
 								#[cfg(feature = "message")]
 								spawn_receiver,
+								#[cfg(feature = "message")]
+								message,
 							});
 						}
 						Err(error) => {
@@ -535,6 +593,8 @@ impl Future for RegisterThreadFuture {
 							node,
 							#[cfg(feature = "message")]
 							spawn_receiver,
+							#[cfg(feature = "message")]
+							message,
 							..
 						} = state
 						else {
@@ -556,10 +616,25 @@ impl Future for RegisterThreadFuture {
 									spawn_receiver,
 								);
 							let task: *mut Task = Box::into_raw(Box::new(task));
-							let result = node_port.post_message_with_transferable(
-								&Array::of1(&task.into()),
-								&Array::of1(&channel.port2()),
-							);
+							let (serialize, transfer) = match message {
+								Some(MessageState {
+									serialize,
+									transfer: Some(transfer),
+								}) => {
+									transfer.splice(0, 0, &channel.port2());
+									(Array::of2(&task.into(), &serialize), transfer)
+								}
+								Some(MessageState {
+									serialize,
+									transfer: None,
+								}) => (
+									Array::of2(&task.into(), &serialize),
+									Array::of1(&channel.port2()),
+								),
+								None => (Array::of1(&task.into()), Array::of1(&channel.port2())),
+							};
+							let result =
+								node_port.post_message_with_transferable(&serialize, &transfer);
 
 							match result {
 								Ok(()) => {

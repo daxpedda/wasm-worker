@@ -16,6 +16,8 @@ use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
 use self::js::{AudioWorkletNodeOptionsExt, BaseAudioContextExt};
 pub(in super::super) use self::processor::register_processor;
+#[cfg(feature = "message")]
+pub(in super::super) use self::register::message::register_thread_with_message;
 pub(in super::super) use self::register::{
 	register_thread, AudioWorkletHandle, RegisterThreadFuture,
 };

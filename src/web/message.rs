@@ -68,6 +68,12 @@ macro_rules! impl_for_tuples {
 /// Allows a [`Serializable`] and/or [`Transferable`] value to be sent to
 /// another threads. See [`spawn_with_message()`](super::spawn_with_message).
 ///
+/// # Notes
+///
+/// - Sending a [`JsValue::UNDEFINED`] might be interpreted at the receiving end
+/// as [`None`].
+/// - No values will be [transferred] if [`RawMessage::serialize`] is [`None`].
+///
 /// # Example
 ///
 /// ```
@@ -132,6 +138,11 @@ macro_rules! impl_for_tuples {
 ///
 /// [`Serializable`]: https://developer.mozilla.org/en-US/docs/Glossary/Serializable_object
 /// [`Transferable`]: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects
+/// [transferred]: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Transferable_objects
+#[cfg_attr(
+	not(all(target_family = "wasm", target_os = "unknown", feature = "message")),
+	doc = "[`JsValue::UNDEFINED`]: https://docs.rs/wasm-bindgen/0.2.92/wasm_bindgen/struct.JsValue.html#associatedconstant.UNDEFINED"
+)]
 pub trait MessageSend {
 	/// [`Send`] type.
 	type Send: Send;
