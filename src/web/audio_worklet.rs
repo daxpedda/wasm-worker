@@ -19,6 +19,8 @@ use js_sys::{Array, Iterator, Object};
 use web_sys::{AudioWorkletGlobalScope, BaseAudioContext};
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, AudioWorkletProcessor};
 
+#[cfg(any(feature = "message", docsrs))]
+use super::message::MessageSend;
 #[cfg(all(
 	target_family = "wasm",
 	target_os = "unknown",
@@ -113,6 +115,64 @@ pub trait BaseAudioContextExt {
 	where
 		F: 'static + FnOnce() + Send;
 
+	/// Registers a thread at this [`BaseAudioContext`].
+	///
+	/// # Notes
+	///
+	/// Unfortunately there is currently no way to determine when the thread has
+	/// fully shutdown. So this will leak memory unless
+	/// [`AudioWorkletHandle::release()`] is called.
+	///
+	/// # Errors
+	///
+	/// - If a thread was already registered at this [`BaseAudioContext`].
+	/// - If the [`BaseAudioContext`] is [`closed`].
+	/// - If the main thread does not support spawning threads, see
+	///   [`has_spawn_support()`](super::has_spawn_support).
+	///
+	/// # Example
+	///
+	/// ```
+	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # async fn test() {
+	/// use js_sys::ArrayBuffer;
+	/// use web_sys::AudioContext;
+	/// use web_thread::web::audio_worklet::BaseAudioContextExt;
+	/// use web_thread::web::message::TransferableWrapper;
+	///
+	/// let context = AudioContext::new().unwrap();
+	/// let buffer = TransferableWrapper(ArrayBuffer::new(1024));
+	/// context
+	/// 	.clone()
+	/// 	.register_thread_with_message(
+	/// 		|message| {
+	/// 			let buffer: ArrayBuffer = message.0;
+	/// 			// Do work.
+	/// 		},
+	/// 		buffer,
+	/// 	)
+	/// 	.await
+	/// 	.unwrap();
+	/// # }
+	/// ```
+	///
+	/// [`closed`]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#closed
+	#[cfg_attr(
+		not(all(
+			target_family = "wasm",
+			target_os = "unknown",
+			feature = "audio-worklet"
+		)),
+		doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.68/web_sys/struct.BaseAudioContext.html"
+	)]
+	#[cfg(any(feature = "message", docsrs))]
+	fn register_thread_with_message<F, M>(self, f: F, message: M) -> RegisterThreadFuture
+	where
+		F: 'static + FnOnce(M) + Send,
+		M: 'static + MessageSend;
+
 	/// Instantiates a [`AudioWorkletProcessor`]. No `data` will be delivered if
 	/// `name` corresponds to a different type registered with
 	/// [`AudioWorkletGlobalScopeExt::register_processor_ext()`]. If `name`
@@ -198,6 +258,23 @@ where
 		F: 'static + FnOnce() + Send,
 	{
 		RegisterThreadFuture(audio_worklet::register_thread(self.into(), f))
+	}
+
+	#[cfg(any(feature = "message", docsrs))]
+	fn register_thread_with_message<F, M>(
+		self,
+		#[allow(clippy::min_ident_chars)] f: F,
+		message: M,
+	) -> RegisterThreadFuture
+	where
+		F: 'static + FnOnce(M) + Send,
+		M: 'static + MessageSend,
+	{
+		RegisterThreadFuture(audio_worklet::register_thread_with_message(
+			self.into(),
+			f,
+			message,
+		))
 	}
 
 	fn audio_worklet_node<P>(
