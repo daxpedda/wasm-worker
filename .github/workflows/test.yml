@@ -25,68 +25,58 @@ jobs:
       matrix:
         target:
           - {
-              target: x86_64-unknown-linux-gnu,
-              description: Build & Test Native,
-              web: false,
-            }
-          - {
               target: wasm32-unknown-unknown,
               description: Build Web,
               web: true,
             }
         rust:
           - { version: stable }
+          - {
+            version: nightly,
+            description: with Atomics,
+            component: --component rust-src,
+            flags: "-Ctarget-feature=+atomics,+bulk-memory",
+            args: "-Zbuild-std=panic_abort,std",
+          }
         features:
           - { features: "" }
+          - { features: --features audio-worklet, description: (`audio-worklet`) }
+          - { features: --features message, description: (`message`) }
+          - { features: --features message, description: (`message` + `web_sys_unstable_apis`), flags: --cfg=web_sys_unstable_apis }
           - { features: --all-features, description: (all features) }
+          - { features: --all-features, description: (all features + `web_sys_unstable_apis`), flags: --cfg=web_sys_unstable_apis }
         include:
-          - rust: {
-              version: nightly,
-              description: with Atomics,
-              component: --component rust-src,
-              flags: "-Ctarget-feature=+atomics,+bulk-memory",
-              args: "-Zbuild-std=panic_abort,std",
+          - target: {
+              target: x86_64-unknown-linux-gnu,
+              description: Build & Test Native,
+              web: false,
             }
-            target: {
-              target: wasm32-unknown-unknown,
-              description: Build Web,
-              web: true,
-            }
+            rust: { version: stable }
             features: { features: "" }
-          - rust: {
-              version: nightly,
-              description: with Atomics,
-              component: --component rust-src,
-              flags: "-Ctarget-feature=+atomics,+bulk-memory",
-              args: "-Zbuild-std=panic_abort,std",
+          - target: {
+              target: x86_64-unknown-linux-gnu,
+              description: Build & Test Native,
+              web: false,
             }
-            target: {
-              target: wasm32-unknown-unknown,
-              description: Build Web,
-              web: true,
-            }
+            rust: { version: stable }
             features: { features: --all-features, description: (all features) }
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: taiki-e/cache-cargo-install-action@v1
-        if: matrix.target.web
-        with:
-          tool: wasm-bindgen-cli
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
           rustup default ${{ matrix.rust.version }}
       - name: Build
         env:
-          RUSTFLAGS: ${{ matrix.rust.flags }}
+          RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
         run: |
           cargo build ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Documentation
         env:
-          RUSTDOCFLAGS: ${{ matrix.rust.flags }}
-          RUSTFLAGS: ${{ matrix.rust.flags }}
+          RUSTDOCFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
+          RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
         run: |
           cargo doc --no-deps ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
       - name: Test
@@ -120,6 +110,8 @@ jobs:
             }
         features:
           - { features: "" }
+          - { features: --features audio-worklet, description: (`audio-worklet`) }
+          - { features: --features message, description: (`message`) }
           - { features: --all-features, description: (all features) }
         cross-origin-isolation:
           - { state: true }
@@ -150,6 +142,64 @@ jobs:
               value: safaridriver,
               flags: --cfg=unsupported_spawn_then_block --cfg=unsupported_shared_block
             }
+        exclude:
+          - rust: { version: stable, pre_description: Test }
+            features: { features: "" }
+          - rust: { version: stable, pre_description: Test }
+            features: { features: --features audio-worklet, description: (`audio-worklet`) }
+          - rust: { version: stable, pre_description: Test }
+            features: { features: --features message, description: (`message`) }
+          - rust: { version: nightly, pre_description: Doctest }
+            features: { features: "" }
+          - rust: { version: nightly, pre_description: Doctest }
+            features: { features: --features audio-worklet, description: (`audio-worklet`) }
+          - rust: { version: nightly, pre_description: Doctest }
+            features: { features: --features message, description: (`message`) }
+          - rust: {
+              version: nightly,
+              pre_description: Test & Doctest,
+              post_description: with Atomics,
+              atomics: true,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            features: { features: "" }
+            cross-origin-isolation: {
+              state: false,
+              description: (no COOP+COEP),
+              flags: --cfg=unsupported_spawn,
+            }
+          - rust: {
+              version: nightly,
+              pre_description: Test & Doctest,
+              post_description: with Atomics,
+              atomics: true,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            features: { features: --features audio-worklet, description: (`audio-worklet`) }
+            cross-origin-isolation: {
+              state: false,
+              description: (no COOP+COEP),
+              flags: --cfg=unsupported_spawn,
+            }
+          - rust: {
+              version: nightly,
+              pre_description: Test & Doctest,
+              post_description: with Atomics,
+              atomics: true,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+            features: { features: --features message, description: (`message`) }
+            cross-origin-isolation: {
+              state: false,
+              description: (no COOP+COEP),
+              flags: --cfg=unsupported_spawn,
+            }
 
     steps:
       - name: Checkout
@@ -169,14 +219,14 @@ jobs:
       - name: Test
         if: matrix.rust.version != 'nightly' || matrix.rust.atomics
         env:
-          RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
+          RUSTFLAGS: --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
         run: |
           cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }}
       - name: Documentation tests
         if: matrix.rust.version == 'nightly'
         env:
-          RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
-          RUSTDOCFLAGS: ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
+          RUSTFLAGS: --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
+          RUSTDOCFLAGS: --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
         run: |
           cargo +nightly test --doc --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile -- --test-threads 1
 
@@ -197,7 +247,7 @@ jobs:
               description: with Atomics,
               component: --component rust-src,
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
-              args: "-Zbuild-std=panic_abort,std",
+              args: "-Zbuild-std=panic_abort,std --features message",
             }
 
     steps:
@@ -225,36 +275,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        target:
+          - { target: wasm32-unknown-unknown, description: Web }
         rust:
           - { version: "1.70", description: MSRV }
           - { version: stable, description: Stable }
-        target:
-          - { target: x86_64-unknown-linux-gnu, description: Native }
-          - { target: wasm32-unknown-unknown, description: Web }
+          - {
+            version: nightly,
+            description: Nightly (Atomics),
+            component: --component rust-src,
+            flags: "-Ctarget-feature=+atomics,+bulk-memory",
+            args: "-Zbuild-std=panic_abort,std",
+          }
         features:
           - { features: "" }
+          - { features: --features audio-worklet, description: (`audio-worklet`) }
+          - { features: --features message, description: (`message`) }
           - { features: --all-features, description: (all features) }
         include:
-          - rust: {
-              version: nightly,
-              description: Nightly (Atomics),
-              component: --component rust-src,
-              flags: "-Ctarget-feature=+atomics,+bulk-memory",
-              args: "-Zbuild-std=panic_abort,std",
-            }
-            target: { target: wasm32-unknown-unknown, description: Web }
-            features: { features: "" }
-          - rust: {
-              version: nightly,
-              description: Nightly (Atomics),
-              component: --component rust-src,
-              flags: "-Ctarget-feature=+atomics,+bulk-memory",
-              args: "-Zbuild-std=panic_abort,std",
-            }
-            target: { target: wasm32-unknown-unknown, description: Web }
+          - target: { target: x86_64-unknown-linux-gnu, description: Native }
+            rust: { version: "1.70", description: MSRV }
             features: { features: --all-features, description: (all features) }
-        exclude:
-          - rust: { target: x86_64-unknown-linux-gnu, description: Native }
+          - target: { target: x86_64-unknown-linux-gnu, description: Native }
+            rust: { version: stable, description: Stable }
             features: { features: --all-features, description: (all features) }
 
     steps:

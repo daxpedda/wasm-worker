@@ -39,7 +39,10 @@ impl Builder {
 
 	/// Implementation of [`std::thread::Builder::spawn()`].
 	#[allow(clippy::unused_self)]
-	pub(super) fn spawn<F, T>(self, _: F) -> io::Result<JoinHandle<T>> {
+	pub(super) fn spawn<F, T>(self, _: F) -> io::Result<JoinHandle<T>>
+	where
+		F: FnOnce() -> T,
+	{
 		unreachable!("reached `spawn()` without atomics target feature")
 	}
 
@@ -48,10 +51,26 @@ impl Builder {
 	#[allow(clippy::unused_self)]
 	pub(super) fn spawn_async_internal<F1, F2, T>(self, _: F1) -> io::Result<JoinHandle<T>>
 	where
-		F1: 'static + FnOnce() -> F2 + Send,
-		F2: 'static + Future<Output = T>,
+		F1: FnOnce() -> F2,
+		F2: Future<Output = T>,
 	{
 		unreachable!("reached `spawn()` without atomics target feature")
+	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_with_message()`](crate::web::BuilderExt::spawn_with_message).
+	#[cfg(feature = "message")]
+	#[allow(clippy::unused_self)]
+	pub(super) fn spawn_with_message_internal<F1, F2, T, M>(
+		self,
+		_: F1,
+		_: M,
+	) -> io::Result<JoinHandle<T>>
+	where
+		F1: FnOnce(M) -> F2,
+		F2: Future<Output = T>,
+	{
+		unreachable!("reached `spawn_with_message_internal()` without atomics target feature")
 	}
 
 	/// Implementation of [`std::thread::Builder::spawn_scoped()`].
@@ -69,10 +88,29 @@ impl Builder {
 		_: F1,
 	) -> io::Result<ScopedJoinHandle<'_, T>>
 	where
-		F1: FnOnce() -> F2 + Send,
+		F1: FnOnce() -> F2,
 		F2: Future<Output = T>,
 	{
 		unreachable!("reached `spawn()` without atomics target feature")
+	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_scoped_with_message()`](crate::web::BuilderExt::spawn_scoped_with_message).
+	#[cfg(feature = "message")]
+	#[allow(clippy::unused_self)]
+	pub(super) fn spawn_scoped_with_message_internal<F1, F2, T, M>(
+		self,
+		_: &Scope,
+		_: F1,
+		_: M,
+	) -> io::Result<ScopedJoinHandle<'_, T>>
+	where
+		F1: FnOnce(M) -> F2,
+		F2: Future<Output = T>,
+	{
+		unreachable!(
+			"reached `spawn_scoped_with_message_internal()` without atomics target feature"
+		)
 	}
 }
 

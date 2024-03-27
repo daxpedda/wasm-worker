@@ -107,7 +107,7 @@ impl AudioWorkletNodeOptionsExt2 {
 #[macro_export]
 macro_rules! js_string {
 	($string:literal) => {
-		js_sys::JsString::from_code_point(bytemuck::cast_slice(utf32!($string)))
+		js_sys::JsString::from_code_point(bytemuck::cast_slice(utf32_lit::utf32!($string)))
 			.expect("found invalid Unicode")
 	};
 }

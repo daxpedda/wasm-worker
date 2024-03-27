@@ -17,6 +17,17 @@ pub(in super::super) fn register_thread<F>(_: BaseAudioContext, _: F) -> Registe
 	unreachable!("reached `register_thread()` without atomics target feature")
 }
 
+/// Implementation for
+/// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread_with_message()`].
+#[cfg(feature = "message")]
+pub(in super::super) fn register_thread_with_message<F, M>(
+	_: BaseAudioContext,
+	_: F,
+	_: M,
+) -> RegisterThreadFuture {
+	unreachable!("reached `register_thread()` without atomics target feature")
+}
+
 /// Implementation for [`crate::web::audio_worklet::RegisterThreadFuture`].
 #[derive(Debug)]
 pub(in super::super) struct RegisterThreadFuture {

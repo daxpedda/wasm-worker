@@ -21,6 +21,32 @@ audio-worklet = [
 	"web-sys/BaseAudioContext",
 	"web-sys/DomException",
 ]
+message = [
+	"web-sys/AudioData",
+	"web-sys/CryptoKey",
+	"web-sys/DomException",
+	"web-sys/DomMatrix",
+	"web-sys/DomPoint",
+	"web-sys/DomQuad",
+	"web-sys/DomRect",
+	"web-sys/File",
+	"web-sys/FileList",
+	"web-sys/FileSystemDirectoryHandle",
+	"web-sys/FileSystemFileHandle",
+	"web-sys/FileSystemHandle",
+	"web-sys/GpuCompilationInfo",
+	"web-sys/GpuCompilationMessage",
+	"web-sys/ImageBitmap",
+	"web-sys/ImageData",
+	"web-sys/MessageEvent",
+	"web-sys/OffscreenCanvas",
+	"web-sys/ReadableStream",
+	"web-sys/RtcCertificate",
+	"web-sys/RtcDataChannel",
+	"web-sys/TransformStream",
+	"web-sys/VideoFrame",
+	"web-sys/WritableStream",
+]
 
 [target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
 js-sys = "0.3.69"
@@ -72,6 +98,7 @@ web-sys = { version = "0.3", features = [
 	"CssStyleDeclaration",
 	"Document",
 	"HtmlButtonElement",
+	"HtmlCanvasElement",
 	"HtmlElement",
 	"HtmlInputElement",
 	"HtmlTableElement",
@@ -112,6 +139,11 @@ path = "tests/audio_worklet_fail_async.rs"
 test = false
 
 [[test]]
+name = "audio_worklet_message_success"
+path = "tests/audio_worklet_message_success.rs"
+test = false
+
+[[test]]
 name = "audio_worklet_success"
 path = "tests/audio_worklet_success.rs"
 test = false
@@ -134,6 +166,11 @@ test = false
 [[test]]
 name = "basic_success_async"
 path = "tests/basic_success_async.rs"
+test = false
+
+[[test]]
+name = "message_success"
+path = "tests/message_success.rs"
 test = false
 
 [[test]]
@@ -216,6 +253,7 @@ dbg_macro = "warn"
 decimal_literal_representation = "warn"
 default_union_representation = "warn"
 empty_drop = "warn"
+empty_enum_variants_with_brackets = "warn"
 empty_structs_with_brackets = "warn"
 error_impl_error = "warn"
 exit = "warn"
@@ -272,6 +310,7 @@ verbose_file_reads = "warn"
 empty_docs = "allow"
 equatable_if_let = "allow"
 explicit_deref_methods = "allow"
+from_iter_instead_of_collect = "allow"
 future_not_send = "allow"
 module_inception = "allow"
 module_name_repetitions = "allow"

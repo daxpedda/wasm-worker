@@ -29,11 +29,15 @@ use atomic_waker::AtomicWaker;
 use js_sys::WebAssembly::{Memory, Module};
 use js_sys::{Atomics, Int32Array};
 use wasm_bindgen::JsCast;
+#[cfg(any(feature = "audio-worklet", feature = "message"))]
+use {std::io::Error, wasm_bindgen::JsValue, web_sys::DomException};
 
 use self::oneshot::Receiver;
 pub(super) use self::parker::Parker;
 use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
 use super::{ScopedJoinHandle, Thread, ThreadId, THREAD};
+#[cfg(feature = "message")]
+use crate::web::message::MessageSend;
 
 thread_local! {
 	/// [`Memory`] of the Wasm module.
@@ -86,6 +90,23 @@ impl Builder {
 		unsafe { spawn::spawn(task, self.name, None) }
 	}
 
+	/// Implementation for
+	/// [`BuilderExt::spawn_with_message()`](crate::web::BuilderExt::spawn_with_message).
+	#[cfg(feature = "message")]
+	pub(super) fn spawn_with_message_internal<F1, F2, T, M: 'static + MessageSend>(
+		self,
+		task: F1,
+		message: M,
+	) -> io::Result<JoinHandle<T>>
+	where
+		F1: 'static + FnOnce(M) -> F2 + Send,
+		F2: 'static + Future<Output = T>,
+		T: 'static + Send,
+	{
+		// SAFETY: `F` and `T` are `'static`.
+		unsafe { spawn::message::spawn(task, self.name, None, message) }
+	}
+
 	/// Implementation of [`std::thread::Builder::spawn_scoped()`].
 	pub(super) fn spawn_scoped<'scope, F, T>(
 		self,
@@ -117,6 +138,28 @@ impl Builder {
 	{
 		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
 		let result = unsafe { spawn::spawn(task, self.name, Some(Arc::clone(&scope.0))) };
+
+		result.map(|handle| ScopedJoinHandle::new(handle))
+	}
+
+	/// Implementation for
+	/// [`BuilderExt::spawn_scoped_with_message()`](crate::web::BuilderExt::spawn_scoped_with_message).
+	#[cfg(feature = "message")]
+	pub(super) fn spawn_scoped_with_message_internal<'scope, F1, F2, T, M>(
+		self,
+		scope: &Scope,
+		task: F1,
+		message: M,
+	) -> io::Result<ScopedJoinHandle<'scope, T>>
+	where
+		F1: 'scope + FnOnce(M) -> F2 + Send,
+		F2: 'scope + Future<Output = T>,
+		T: 'scope + Send,
+		M: 'scope + MessageSend,
+	{
+		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
+		let result =
+			unsafe { spawn::message::spawn(task, self.name, Some(Arc::clone(&scope.0)), message) };
 
 		result.map(|handle| ScopedJoinHandle::new(handle))
 	}
@@ -306,4 +349,12 @@ fn i32_to_buffer_index(ptr: *const i32) -> u32 {
 	#[allow(clippy::as_conversions)]
 	let index = ptr as u32 / 4;
 	index
+}
+
+/// Convert a [`JsValue`] to an [`DomException`] and then to an [`Error`].
+#[cfg(any(feature = "audio-worklet", feature = "message"))]
+fn error_from_exception(error: JsValue) -> Error {
+	let error: DomException = error.unchecked_into();
+
+	Error::other(format!("{}: {}", error.name(), error.message()))
 }

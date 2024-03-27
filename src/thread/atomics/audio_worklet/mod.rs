@@ -1,20 +1,23 @@
 //! Audio worklet extension implementations.
 
 mod js;
+#[cfg(feature = "message")]
+pub(super) mod main;
 mod processor;
 pub(super) mod register;
 
 use std::any::{Any, TypeId};
 use std::borrow::Cow;
-use std::io::Error;
 use std::sync::OnceLock;
 
 use js_sys::{JsString, Object, Reflect};
-use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext, DomException};
+use wasm_bindgen::JsCast;
+use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
 use self::js::{AudioWorkletNodeOptionsExt, BaseAudioContextExt};
 pub(in super::super) use self::processor::register_processor;
+#[cfg(feature = "message")]
+pub(in super::super) use self::register::message::register_thread_with_message;
 pub(in super::super) use self::register::{
 	register_thread, AudioWorkletHandle, RegisterThreadFuture,
 };
@@ -100,7 +103,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		empty: !has_processor_options,
 	});
 	let processor_options = processor_options.unwrap_or_default();
-	let data = Box::into_raw(data);
+	let data: *mut Data = Box::into_raw(data);
 	processor_options.set_data(data);
 
 	if !has_processor_options {
@@ -128,7 +131,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 				.value
 				.downcast()
 				.expect("wrong type encoded"),
-			error: error_from_exception(error),
+			error: super::error_from_exception(error),
 		}),
 	}
 }
@@ -146,11 +149,4 @@ struct Data {
 	///
 	/// [`AudioWorkletNodeOptions.processorOptions`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions
 	empty: bool,
-}
-
-/// Convert a [`JsValue`] to an [`DomException`] and then to an [`Error`].
-fn error_from_exception(error: JsValue) -> Error {
-	let error: DomException = error.unchecked_into();
-
-	Error::other(format!("{}: {}", error.name(), error.message()))
 }

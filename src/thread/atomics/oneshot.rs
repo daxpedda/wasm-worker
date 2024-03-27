@@ -72,6 +72,12 @@ impl<T> State<T> {
 /// Sender.
 pub(super) struct Sender<T>(Option<Weak<Shared<T>>>);
 
+impl<T> Debug for Sender<T> {
+	fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+		formatter.debug_tuple("Sender").field(&self.0).finish()
+	}
+}
+
 impl<T> Drop for Sender<T> {
 	fn drop(&mut self) {
 		#[allow(clippy::significant_drop_in_scrutinee)]

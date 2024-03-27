@@ -81,6 +81,12 @@ impl<T> Debug for Receiver<T> {
 }
 
 impl<T> Receiver<T> {
+	/// Attempts to return a pending value on this receiver without blocking.
+	#[cfg(feature = "message")]
+	pub(super) fn try_recv(&self) -> Result<T, TryRecvError> {
+		self.receiver.try_recv()
+	}
+
 	/// Wait for the next event sent by the [`Sender`].
 	pub(super) async fn next(&self) -> Result<T, RecvError> {
 		future::poll_fn(|cx| match self.receiver.try_recv() {

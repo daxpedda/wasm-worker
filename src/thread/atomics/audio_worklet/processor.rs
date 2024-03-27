@@ -31,7 +31,7 @@ pub(in super::super::super) fn register_processor<P: 'static + ExtendAudioWorkle
 		name,
 		__WebThreadProcessorConstructor(Box::new(ProcessorConstructorWrapper::<P>(PhantomData))),
 	)
-	.map_err(|error| super::error_from_exception(error.into()))
+	.map_err(|error| super::super::error_from_exception(error.into()))
 }
 
 /// Holds the supplied [`ExtendAudioWorkletProcessor`] while type-erasing
@@ -95,7 +95,7 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 			if let Some(data) = processor_options.data() {
 				// SAFETY: We only store `*mut Data` in `__web_thread_data` at
 				// `super::audio_worklet_node()`.
-				let data = unsafe { Box::<Data>::from_raw(data) };
+				let data: Data = *unsafe { Box::<Data>::from_raw(data) };
 
 				if data.type_id == TypeId::of::<P>() {
 					processor_data = Some(
