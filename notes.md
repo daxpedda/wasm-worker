@@ -23,7 +23,7 @@ WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg
 
 ## Single-Threaded Compile Tests
 
-UI_TEST_TARGET=wasm32-unknown-unknown UI_TEST_ARGS=--features message cargo test --test compile_test
+UI_TEST_TARGET=wasm32-unknown-unknown UI_TEST_ARGS="--features message" cargo test --test compile_test
 
 ## Multi-Threaded
 

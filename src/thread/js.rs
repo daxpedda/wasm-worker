@@ -51,7 +51,7 @@ extern "C" {
 	/// Extension for [`Window`] or [`WorkerGlobalScope`].
 	///
 	/// [`Window`]: https://developer.mozilla.org/en-US/docs/Web/API/Window
-	/// [`Window`]: https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope
+	/// [`WorkerGlobalScope`]: https://developer.mozilla.org/en-US/docs/Web/API/WorkerGlobalScope
 	#[wasm_bindgen]
 	pub(super) type WindowOrWorkerExt;
 
