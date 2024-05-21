@@ -122,10 +122,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Install ESLint
         run: sudo npm i -g eslint
+      - name: Setup NPM
+        run: npm install
       - name: Run ESLint
-        run: |
-          eslint src/thread/atomics/wait_async.js
-          eslint src/thread/atomics/spawn/worker.js
-          eslint src/thread/atomics/spawn/worker_with_audio_worklet.js
-          eslint src/thread/atomics/audio_worklet/register/worklet.js
-          eslint src/thread/atomics/audio_worklet/register/worklet_with_message.js
+        run: eslint
