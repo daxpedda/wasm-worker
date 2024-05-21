@@ -3,25 +3,24 @@
 use std::env;
 use std::ffi::OsString;
 
-use ui_test::spanned::Spanned;
-use ui_test::{Config, Mode, OutputConflictHandling, RustfixMode};
+use ui_test::custom_flags::rustfix::RustfixMode;
+use ui_test::dependencies::DependencyBuilder;
+use ui_test::{Config, OutputConflictHandling};
 
 #[test]
 fn test() {
 	let mut config = Config {
-		dependencies_crate_manifest_path: Some("Cargo.toml".into()),
 		output_conflict_handling: OutputConflictHandling::Ignore,
 		target: env::var_os("UI_TEST_TARGET").map(|target| target.into_string().unwrap()),
 		..Config::rustc("tests/compile-fail")
 	};
-	config.comment_defaults.base().mode = Spanned::dummy(Mode::Fail {
-		require_patterns: true,
-		rustfix: RustfixMode::Disabled,
-	})
-	.into();
+	let revisioned = config.comment_defaults.base();
+	revisioned.set_custom("rustfix", RustfixMode::Disabled);
+
+	let mut dependency_builder = DependencyBuilder::default();
 
 	if let Some(flags) = env::var_os("UI_TEST_RUSTFLAGS").filter(|flags| !flags.is_empty()) {
-		add_flags(&mut config.dependency_builder.envs, flags.clone());
+		add_flags(&mut dependency_builder.program.envs, flags.clone());
 		add_flags(&mut config.program.envs, flags);
 	}
 
@@ -29,9 +28,11 @@ fn test() {
 		let args = args.into_string().unwrap();
 
 		for arg in args.split_ascii_whitespace() {
-			config.dependency_builder.args.push(arg.into());
+			dependency_builder.program.args.push(arg.into());
 		}
 	}
+
+	revisioned.set_custom("dependencies", dependency_builder);
 
 	ui_test::run_tests(config).unwrap();
 }
