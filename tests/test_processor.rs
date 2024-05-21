@@ -87,9 +87,6 @@ extern "C" {
 	#[wasm_bindgen(getter, method, js_name = processorOptions)]
 	pub fn get_processor_options(this: &AudioWorkletNodeOptionsExt2) -> Option<Object>;
 
-	#[wasm_bindgen(setter, method, js_name = processorOptions)]
-	pub fn set_processor_options(this: &AudioWorkletNodeOptionsExt2, value: Option<&Object>);
-
 	#[wasm_bindgen(getter, method, js_name = parameterData)]
 	pub fn get_parameter_data(this: &AudioWorkletNodeOptionsExt2) -> Option<Array>;
 

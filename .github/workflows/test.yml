@@ -207,6 +207,8 @@ jobs:
       - uses: taiki-e/cache-cargo-install-action@v1
         with:
           tool: wasm-bindgen-cli
+          git: https://github.com/daxpedda/wasm-bindgen
+          rev: aa61115455096564da56eac5876cfd181cf49ef8
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown

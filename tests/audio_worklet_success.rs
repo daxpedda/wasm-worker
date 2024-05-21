@@ -364,8 +364,8 @@ async fn test_zero_options(context: BaseAudioContext) {
 	start.await;
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
-	let options = AudioWorkletNodeOptionsExt2::new();
-	options.set_processor_options(Some(&Object::new()));
+	let mut options = AudioWorkletNodeOptionsExt2::new();
+	options.processor_options(Some(&Object::new()));
 	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
 	end.await;
 }
@@ -478,8 +478,8 @@ async fn test_data_zero_options(context: BaseAudioContext) {
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
 	let end = Flag::new();
-	let options = AudioWorkletNodeOptionsExt2::new();
-	options.set_processor_options(Some(&Object::new()));
+	let mut options = AudioWorkletNodeOptionsExt2::new();
+	options.processor_options(Some(&Object::new()));
 	context
 		.audio_worklet_node::<TestProcessor>(
 			"test",

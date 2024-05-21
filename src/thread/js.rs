@@ -1,9 +1,15 @@
 //! Bindings to the JS API.
 
-use js_sys::{Function, Promise};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
-use web_sys::{AbortSignal, Window};
+use web_sys::Window;
+#[cfg(web_sys_unstable_apis)]
+pub(super) use web_sys::{Scheduler, SchedulerPostTaskOptions, TaskPriority};
+#[cfg(not(web_sys_unstable_apis))]
+use {
+	js_sys::{Function, Promise},
+	web_sys::AbortSignal,
+};
 
 #[wasm_bindgen]
 extern "C" {
@@ -57,6 +63,14 @@ extern "C" {
 	#[wasm_bindgen(method, getter)]
 	pub(super) fn scheduler(this: &WindowOrWorkerExt) -> Scheduler;
 
+	/// Returns [`crossOriginIsolated`](https://developer.mozilla.org/en-US/docs/Web/API/crossOriginIsolated) global property.
+	#[wasm_bindgen(js_name = crossOriginIsolated)]
+	pub(super) static CROSS_ORIGIN_ISOLATED: bool;
+}
+
+#[cfg(not(web_sys_unstable_apis))]
+#[wasm_bindgen]
+extern "C" {
 	/// [`Scheduler`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler) interface.
 	pub(super) type Scheduler;
 
@@ -73,17 +87,31 @@ extern "C" {
 
 	/// Setter for [`SchedulerPostTaskOptions.signal`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask#signal) property.
 	#[wasm_bindgen(method, setter, js_name = signal)]
-	pub(super) fn set_signal(this: &SchedulerPostTaskOptions, signal: &AbortSignal);
+	fn signal_shim(this: &SchedulerPostTaskOptions, signal: &AbortSignal);
 
 	/// Setter for [`SchedulerPostTaskOptions.priority`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask#priority) property.
 	#[wasm_bindgen(method, setter, js_name = priority)]
-	pub(super) fn set_priority(this: &SchedulerPostTaskOptions, priority: TaskPriority);
-
-	/// Returns [`crossOriginIsolated`](https://developer.mozilla.org/en-US/docs/Web/API/crossOriginIsolated) global property.
-	#[wasm_bindgen(js_name = crossOriginIsolated)]
-	pub(super) static CROSS_ORIGIN_ISOLATED: bool;
+	fn priority_shim(this: &SchedulerPostTaskOptions, priority: TaskPriority);
 }
 
+#[cfg(not(web_sys_unstable_apis))]
+impl SchedulerPostTaskOptions {
+	/// Method emulating `web-sys` over
+	/// [`SchedulerPostTaskOptions::signal_shim()`].
+	pub(super) fn signal(&mut self, signal: &AbortSignal) -> &mut Self {
+		self.signal_shim(signal);
+		self
+	}
+
+	/// Method emulating `web-sys` over
+	/// [`SchedulerPostTaskOptions::priority_shim()`].
+	pub(super) fn priority(&mut self, priority: TaskPriority) -> &mut Self {
+		self.priority_shim(priority);
+		self
+	}
+}
+
+#[cfg(not(web_sys_unstable_apis))]
 /// Dictionary type of [`TaskPriority`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask#priority).
 #[wasm_bindgen]
 pub(super) enum TaskPriority {
