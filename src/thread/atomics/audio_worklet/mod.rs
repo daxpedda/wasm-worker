@@ -8,6 +8,7 @@ pub(super) mod register;
 
 use std::any::{Any, TypeId};
 use std::borrow::Cow;
+use std::ptr::NonNull;
 use std::sync::OnceLock;
 
 use js_sys::{JsString, Object, Reflect};
@@ -103,7 +104,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		empty: !has_processor_options,
 	});
 	let processor_options = processor_options.unwrap_or_default();
-	let data: *mut Data = Box::into_raw(data);
+	let data: NonNull<Data> = NonNull::from(Box::leak(data));
 	processor_options.set_data(data);
 
 	if !has_processor_options {
@@ -127,7 +128,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		Err(error) => Err(AudioWorkletNodeError {
 			// SAFETY: We just made this pointer above and `new AudioWorkletNode` has to guarantee
 			// that on error transmission failed to avoid double-free.
-			data: *unsafe { Box::from_raw(data) }
+			data: *unsafe { Box::from_raw(data.as_ptr()) }
 				.value
 				.downcast()
 				.expect("wrong type encoded"),

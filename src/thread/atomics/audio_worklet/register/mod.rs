@@ -8,6 +8,7 @@ use std::fmt::{self, Debug, Formatter};
 use std::future::Future;
 use std::io::{Error, ErrorKind};
 use std::pin::Pin;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::task::{Context, Poll};
 use std::{any, io};
@@ -521,12 +522,12 @@ impl Future for RegisterThreadFuture {
 					};
 
 					#[cfg(not(feature = "message"))]
-					let data: *mut Task = Box::into_raw(Box::new(task));
+					let data: NonNull<Task> = NonNull::from(Box::leak(Box::new(task)));
 					#[cfg(feature = "message")]
-					let data: *mut Data = Box::into_raw(Box::new(Data {
+					let data: NonNull<Data> = NonNull::from(Box::leak(Box::new(Data {
 						thread: thread.clone(),
 						memory_sender,
-					}));
+					})));
 
 					let mut options = AudioWorkletNodeOptions::new();
 					options.processor_options(Some(&MODULE.with(|module| {
@@ -562,7 +563,7 @@ impl Future for RegisterThreadFuture {
 							// SAFETY: We just made this pointer above and `new
 							// AudioWorkletNode` has to guarantee that on error transmission
 							// failed to avoid double-free.
-							let data = unsafe { *Box::from_raw(data) };
+							let data = unsafe { *Box::from_raw(data.as_ptr()) };
 							#[cfg(not(feature = "message"))]
 							let data: Task = data;
 							#[cfg(feature = "message")]
@@ -615,7 +616,7 @@ impl Future for RegisterThreadFuture {
 									&port,
 									spawn_receiver,
 								);
-							let task: *mut Task = Box::into_raw(Box::new(task));
+							let task: NonNull<Task> = NonNull::from(Box::leak(Box::new(task)));
 							let (serialize, transfer) = match message {
 								Some(MessageState {
 									serialize,
@@ -661,7 +662,7 @@ impl Future for RegisterThreadFuture {
 									// SAFETY: We just made this pointer above and
 									// `MessagePort.postMessage()` has to guarantee that on error
 									// transmission failed to avoid double-free.
-									let task: Task = *unsafe { Box::from_raw(task) };
+									let task: Task = *unsafe { Box::from_raw(task.as_ptr()) };
 									drop(task);
 									// SAFETY: We just spawned this audio worklet and
 									// `MessagePort.postMessage()` has to guarantee that on error
@@ -752,7 +753,7 @@ impl AudioWorkletHandle {
 #[allow(unreachable_pub)]
 #[cfg_attr(not(feature = "message"), allow(clippy::needless_pass_by_value))]
 pub unsafe fn __web_thread_worklet_entry(
-	task: *mut Task,
+	task: NonNull<Task>,
 	message: JsValue,
 	#[cfg_attr(not(feature = "message"), allow(unused))] port: MessagePort,
 ) {
@@ -764,6 +765,6 @@ pub unsafe fn __web_thread_worklet_entry(
 	// SAFETY: Has to be a valid pointer to a `Task`. We only call
 	// `__web_thread_worklet_entry` from `worklet.js`. The data sent to it comes
 	// only from `RegisterThreadFuture::poll()`.
-	let task: Task = *unsafe { Box::from_raw(task) };
+	let task: Task = *unsafe { Box::from_raw(task.as_ptr()) };
 	task(message);
 }

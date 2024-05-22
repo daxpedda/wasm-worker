@@ -10,3 +10,9 @@ message = ["web-thread/message"]
 
 [dependencies]
 web-thread = { path = ".." }
+
+[patch.crates-io]
+js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }

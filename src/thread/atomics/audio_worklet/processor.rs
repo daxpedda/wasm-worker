@@ -93,9 +93,9 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 			.get_processor_options()
 		{
 			if let Some(data) = processor_options.data() {
-				// SAFETY: We only store `*mut Data` in `__web_thread_data` at
+				// SAFETY: We only store `NonNull<Data>` in `__web_thread_data` at
 				// `super::audio_worklet_node()`.
-				let data: Data = *unsafe { Box::<Data>::from_raw(data) };
+				let data: Data = *unsafe { Box::<Data>::from_raw(data.as_ptr()) };
 
 				if data.type_id == TypeId::of::<P>() {
 					processor_data = Some(

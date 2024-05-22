@@ -1,5 +1,7 @@
 //! Bindings to the JS API.
 
+use std::ptr::NonNull;
+
 use js_sys::{Function, Object};
 use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsValue;
@@ -54,9 +56,9 @@ extern "C" {
 
 	/// Returns our custom `data` property.
 	#[wasm_bindgen(method, getter, js_name = __web_thread_data)]
-	pub(super) fn data(this: &ProcessorOptions) -> Option<*mut Data>;
+	pub(super) fn data(this: &ProcessorOptions) -> Option<NonNull<Data>>;
 
 	/// Sets our custom `data` property.
 	#[wasm_bindgen(method, setter, js_name = __web_thread_data)]
-	pub(super) fn set_data(this: &ProcessorOptions, value: *mut Data);
+	pub(super) fn set_data(this: &ProcessorOptions, value: NonNull<Data>);
 }

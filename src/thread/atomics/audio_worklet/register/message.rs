@@ -1,6 +1,7 @@
 //! Handling message related functionality.
 
 use std::cell::OnceCell;
+use std::ptr::NonNull;
 
 use js_sys::{Array, Function};
 use wasm_bindgen::prelude::{wasm_bindgen, JsValue};
@@ -91,11 +92,11 @@ pub(super) struct Data {
 /// `data` has to be a valid pointer to [`Data`].
 #[wasm_bindgen]
 #[allow(private_interfaces, unreachable_pub)]
-pub unsafe fn __web_thread_worklet_register(data: *mut Data) {
+pub unsafe fn __web_thread_worklet_register(data: NonNull<Data>) {
 	// SAFETY: Has to be a valid pointer to a `Data`. We only call
 	// `__web_thread_worklet_register` from `worklet_with_message.js`. The data sent
 	// to it comes only from `RegisterThreadFuture::poll()`.
-	let data: Data = *unsafe { Box::from_raw(data) };
+	let data: Data = *unsafe { Box::from_raw(data.as_ptr()) };
 
 	Thread::register(data.thread);
 	data.memory_sender.send(ThreadMemory::new());

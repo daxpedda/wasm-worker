@@ -5,6 +5,7 @@ pub(super) mod message;
 
 use std::future::Future;
 use std::pin::Pin;
+use std::ptr::NonNull;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::sync::Arc;
 use std::{io, mem};
@@ -241,14 +242,14 @@ fn spawn_common(
 	#[cfg(feature = "message")]
 	let message_handler = message::setup_message_handler(&worker, spawn_receiver);
 
-	let task: *mut Task<'_> = Box::into_raw(Box::new(task));
+	let task: NonNull<Task<'_>> = NonNull::from(Box::leak(Box::new(task)));
 
 	if let Err(err) =
 		MODULE.with(|module| MEMORY.with(|memory| post(&worker, module, memory, task.into())))
 	{
 		// SAFETY: We just made this pointer above and `post` has to guarantee that on
 		// error transmission has failed to avoid double-free.
-		let task: Task<'_> = *unsafe { Box::from_raw(task) };
+		let task: Task<'_> = *unsafe { Box::from_raw(task.as_ptr()) };
 		drop(task);
 		worker.terminate();
 		return Err(err);
@@ -282,10 +283,10 @@ type TaskStatic = Task<'static>;
 /// `task` has to be a valid pointer to [`Task`].
 #[wasm_bindgen]
 #[allow(unreachable_pub)]
-pub async unsafe fn __web_thread_worker_entry(task: *mut TaskStatic, message: JsValue) -> u32 {
+pub async unsafe fn __web_thread_worker_entry(task: NonNull<TaskStatic>, message: JsValue) -> u32 {
 	// SAFETY: Has to be a valid pointer to a `Task`. We only call
 	// `__web_thread_worker_entry` from `worker.js`. The data sent to it comes only
 	// from `spawn_internal()`.
-	let task: Task<'_> = *unsafe { Box::from_raw(task) };
+	let task: Task<'_> = *unsafe { Box::from_raw(task.as_ptr()) };
 	task(message).await
 }
