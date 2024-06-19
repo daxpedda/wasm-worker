@@ -94,8 +94,8 @@ async fn check_failing_spawn() {
 		  process() { } })"
 			.into(),
 	);
-	let mut property = BlobPropertyBag::new();
-	property.type_("text/javascript");
+	let property = BlobPropertyBag::new();
+	property.set_type_("text/javascript");
 	let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap();
 	let url = Url::create_object_url_with_blob(&blob).unwrap();
 
@@ -103,8 +103,8 @@ async fn check_failing_spawn() {
 		.await
 		.unwrap();
 
-	let mut options = AudioWorkletNodeOptions::new();
-	options.processor_options(Some(&Array::of1(&wasm_bindgen::memory())));
+	let options = AudioWorkletNodeOptions::new();
+	options.set_processor_options(Some(&Array::of1(&wasm_bindgen::memory())));
 
 	AudioWorkletNode::new_with_options(&context, "'test'", &options).unwrap_err();
 }

@@ -37,7 +37,7 @@ WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1 GECKODRIVER=geckodriver RUSTFLAGS="--cfg
 
 ## Multi-Threaded Compile Tests
 
-UI_TEST_TARGET=wasm32-unknown-unknown UI_TEST_RUSTFLAGS=-Ctarget-feature=+atomics,+bulk-memory UI_TEST_ARGS="--features message -Zbuild-std=panic_abort,std" cargo +nightly test --test compile_test
+UI_TEST_TARGET=wasm32-unknown-unknown UI_TEST_RUSTFLAGS=-Ctarget-feature=+atomics,+bulk-memory UI_TEST_ARGS="--features message" UI_TEST_BUILD_STD=1 cargo +nightly test --test compile_test
 
 # Lint
 cargo clippy --all-targets

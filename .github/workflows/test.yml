@@ -208,7 +208,7 @@ jobs:
         with:
           tool: wasm-bindgen-cli
           git: https://github.com/daxpedda/wasm-bindgen
-          rev: aa61115455096564da56eac5876cfd181cf49ef8
+          rev: 3f6d88571a247553c55a487dcc1785c9d67798da
       - name: Install Rust
         run: |
           rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
@@ -243,13 +243,17 @@ jobs:
       fail-fast: false
       matrix:
         rust:
-          - { version: stable }
+          - {
+              version: stable,
+              build_std: 0,
+            }
           - {
               version: nightly,
               description: with Atomics,
               component: --component rust-src,
               flags: "-Ctarget-feature=+atomics,+bulk-memory",
-              args: "-Zbuild-std=panic_abort,std --features message",
+              args: --features message,
+              build_std: 1,
             }
 
     steps:
@@ -264,6 +268,7 @@ jobs:
           UI_TEST_TARGET: wasm32-unknown-unknown
           UI_TEST_RUSTFLAGS: ${{ matrix.rust.flags }}
           UI_TEST_ARGS: ${{ matrix.rust.args }}
+          UI_TEST_BUILD_STD: ${{ matrix.rust.build_std }}
         run: cargo test --test compile_test
 
   minimal-versions:

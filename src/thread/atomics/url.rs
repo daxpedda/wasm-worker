@@ -17,8 +17,8 @@ impl ScriptUrl {
 	/// Creates a new [`Url`].
 	pub(super) fn new(script: &str) -> Self {
 		let sequence = Array::of1(&script.into());
-		let mut property = BlobPropertyBag::new();
-		property.type_("text/javascript");
+		let property = BlobPropertyBag::new();
+		property.set_type_("text/javascript");
 		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property)
 			.expect("`new Blob()` should never throw");
 

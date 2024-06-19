@@ -17,7 +17,7 @@ use web_thread::web::audio_worklet::{AudioWorkletGlobalScopeExt, BaseAudioContex
 use web_thread::web::{self, JoinHandleExt, YieldTime};
 
 use super::test_processor::{
-	AudioParameter, AudioWorkletNodeOptionsExt2, TestProcessor, GLOBAL_DATA,
+	AudioParameter, AudioWorkletNodeOptionsExt, TestProcessor, GLOBAL_DATA,
 };
 use super::util::Flag;
 use crate::js_string;
@@ -364,8 +364,8 @@ async fn test_zero_options(context: BaseAudioContext) {
 	start.await;
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
-	let mut options = AudioWorkletNodeOptionsExt2::new();
-	options.processor_options(Some(&Object::new()));
+	let options = AudioWorkletNodeOptions::new();
+	options.set_processor_options(Some(&Object::new()));
 	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
 	end.await;
 }
@@ -435,7 +435,7 @@ async fn test_data_empty_options(context: BaseAudioContext) {
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
 	let end = Flag::new();
-	let options = AudioWorkletNodeOptionsExt2::new();
+	let options = AudioWorkletNodeOptions::new();
 	context
 		.audio_worklet_node::<TestProcessor>(
 			"test",
@@ -478,8 +478,8 @@ async fn test_data_zero_options(context: BaseAudioContext) {
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
 	let end = Flag::new();
-	let mut options = AudioWorkletNodeOptionsExt2::new();
-	options.processor_options(Some(&Object::new()));
+	let options = AudioWorkletNodeOptions::new();
+	options.set_processor_options(Some(&Object::new()));
 	context
 		.audio_worklet_node::<TestProcessor>(
 			"test",
@@ -545,14 +545,11 @@ async fn test_options(context: BaseAudioContext) {
 	start.await;
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
-	let options = Object::new();
-	Reflect::set_u32(&options, 0, &42.into()).unwrap();
-	AudioWorkletNode::new_with_options(
-		&context,
-		"test",
-		AudioWorkletNodeOptions::new().processor_options(Some(&options)),
-	)
-	.unwrap();
+	let processor_options = Object::new();
+	Reflect::set_u32(&processor_options, 0, &42.into()).unwrap();
+	let options = AudioWorkletNodeOptions::new();
+	options.set_processor_options(Some(&processor_options));
+	AudioWorkletNode::new_with_options(&context, "test", &options).unwrap();
 	end.await;
 }
 
@@ -582,8 +579,8 @@ async fn test_options_data(context: BaseAudioContext) {
 	let end = Flag::new();
 	let inner_options = Object::new();
 	Reflect::set_u32(&inner_options, 0, &42.into()).unwrap();
-	let mut options = AudioWorkletNodeOptions::new();
-	options.processor_options(Some(&inner_options));
+	let options = AudioWorkletNodeOptions::new();
+	options.set_processor_options(Some(&inner_options));
 	context
 		.audio_worklet_node::<TestProcessor>(
 			"test",
@@ -661,7 +658,7 @@ async fn test_parameters(context: BaseAudioContext) {
 	start.await;
 	web::yield_now_async(YieldTime::UserBlocking).await;
 
-	let options = AudioWorkletNodeOptionsExt2::new();
+	let options: AudioWorkletNodeOptionsExt = AudioWorkletNodeOptions::new().unchecked_into();
 	let parameters = Array::new();
 	Reflect::set(&parameters, &"test".into(), &42.0.into()).unwrap();
 	options.set_parameter_data(Some(&parameters));

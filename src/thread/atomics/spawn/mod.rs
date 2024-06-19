@@ -228,11 +228,11 @@ fn spawn_common(
 		};
 	}
 
-	let mut options = WorkerOptions::new();
-	options.type_(WorkerType::Module);
+	let options = WorkerOptions::new();
+	options.set_type_(WorkerType::Module);
 
 	if let Some(name) = name {
-		options.name(name);
+		options.set_name(name);
 	}
 
 	let worker = URL

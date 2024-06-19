@@ -128,18 +128,18 @@ impl YieldNowFuture {
 				if HAS_SCHEDULER.with(bool::clone) =>
 			{
 				Global::with_window_or_worker(|global| {
-					let mut options: SchedulerPostTaskOptions = Object::new().unchecked_into();
+					let options: SchedulerPostTaskOptions = Object::new().unchecked_into();
 					let controller = AbortController::new()
 						.expect("`new AbortController` is not expected to fail");
-					options.signal(&controller.signal());
+					options.set_signal(&controller.signal());
 
 					match time {
 						YieldTime::UserBlocking => {
-							options.priority(TaskPriority::UserBlocking);
+							options.set_priority(TaskPriority::UserBlocking);
 						}
 						YieldTime::UserVisible => (),
 						YieldTime::Background => {
-							options.priority(TaskPriority::Background);
+							options.set_priority(TaskPriority::Background);
 						}
 						YieldTime::Idle => unreachable!("found invalid `YieldTime`"),
 					}

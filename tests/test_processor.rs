@@ -16,7 +16,7 @@ use web_thread::web::audio_worklet::ExtendAudioWorkletProcessor;
 
 thread_local! {
 	#[allow(clippy::type_complexity)]
-	pub static GLOBAL_DATA: OnceCell<RefCell<Option<Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnMut() -> bool>>>>>> = OnceCell::new();
+	pub static GLOBAL_DATA: OnceCell<RefCell<Option<Box<dyn FnOnce(AudioWorkletNodeOptionsExt) -> Option<Box<dyn FnMut() -> bool>>>>>> = OnceCell::new();
 }
 
 pub struct TestProcessor<P: AudioParameter = ()> {
@@ -26,7 +26,7 @@ pub struct TestProcessor<P: AudioParameter = ()> {
 
 impl<P: AudioParameter> ExtendAudioWorkletProcessor for TestProcessor<P> {
 	type Data =
-		Box<dyn FnOnce(AudioWorkletNodeOptionsExt2) -> Option<Box<dyn FnMut() -> bool>> + Send>;
+		Box<dyn FnOnce(AudioWorkletNodeOptionsExt) -> Option<Box<dyn FnMut() -> bool>> + Send>;
 
 	fn new(
 		_: AudioWorkletProcessor,
@@ -82,23 +82,13 @@ impl AudioParameter for () {
 extern "C" {
 	#[wasm_bindgen(extends = AudioWorkletNodeOptions)]
 	#[derive(Default)]
-	pub type AudioWorkletNodeOptionsExt2;
-
-	#[wasm_bindgen(getter, method, js_name = processorOptions)]
-	pub fn get_processor_options(this: &AudioWorkletNodeOptionsExt2) -> Option<Object>;
+	pub type AudioWorkletNodeOptionsExt;
 
 	#[wasm_bindgen(getter, method, js_name = parameterData)]
-	pub fn get_parameter_data(this: &AudioWorkletNodeOptionsExt2) -> Option<Array>;
+	pub fn get_parameter_data(this: &AudioWorkletNodeOptionsExt) -> Option<Array>;
 
 	#[wasm_bindgen(setter, method, js_name = parameterData)]
-	pub fn set_parameter_data(this: &AudioWorkletNodeOptionsExt2, value: Option<&Array>);
-}
-
-impl AudioWorkletNodeOptionsExt2 {
-	#[must_use]
-	pub fn new() -> Self {
-		Object::new().unchecked_into()
-	}
+	pub fn set_parameter_data(this: &AudioWorkletNodeOptionsExt, value: Option<&Array>);
 }
 
 #[macro_export]

@@ -87,32 +87,15 @@ extern "C" {
 
 	/// Setter for [`SchedulerPostTaskOptions.signal`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask#signal) property.
 	#[wasm_bindgen(method, setter, js_name = signal)]
-	fn signal_shim(this: &SchedulerPostTaskOptions, signal: &AbortSignal);
+	pub(super) fn set_signal(this: &SchedulerPostTaskOptions, signal: &AbortSignal);
 
 	/// Setter for [`SchedulerPostTaskOptions.priority`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask#priority) property.
 	#[wasm_bindgen(method, setter, js_name = priority)]
-	fn priority_shim(this: &SchedulerPostTaskOptions, priority: TaskPriority);
+	pub(super) fn set_priority(this: &SchedulerPostTaskOptions, priority: TaskPriority);
 }
 
-#[cfg(not(web_sys_unstable_apis))]
-impl SchedulerPostTaskOptions {
-	/// Method emulating `web-sys` over
-	/// [`SchedulerPostTaskOptions::signal_shim()`].
-	pub(super) fn signal(&mut self, signal: &AbortSignal) -> &mut Self {
-		self.signal_shim(signal);
-		self
-	}
-
-	/// Method emulating `web-sys` over
-	/// [`SchedulerPostTaskOptions::priority_shim()`].
-	pub(super) fn priority(&mut self, priority: TaskPriority) -> &mut Self {
-		self.priority_shim(priority);
-		self
-	}
-}
-
-#[cfg(not(web_sys_unstable_apis))]
 /// Dictionary type of [`TaskPriority`](https://developer.mozilla.org/en-US/docs/Web/API/Scheduler/postTask#priority).
+#[cfg(not(web_sys_unstable_apis))]
 #[wasm_bindgen]
 pub(super) enum TaskPriority {
 	UserBlocking = "user-blocking",

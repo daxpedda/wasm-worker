@@ -211,8 +211,8 @@ mod web {
 				.collect(),
 			piano: Arc::clone(&piano.value),
 		};
-		let mut options = AudioWorkletNodeOptions::new();
-		options.output_channel_count(&Array::of1(&channel_count.into()));
+		let options = AudioWorkletNodeOptions::new();
+		options.set_output_channel_count(&Array::of1(&channel_count.into()));
 		let worklet = context
 			.audio_worklet_node::<ExampleProcessor>("example", data, Some(&options))
 			.unwrap();
@@ -775,8 +775,8 @@ mod web {
 	/// Create an object URL from a JS script.
 	fn url(script: &str) -> String {
 		let sequence = Array::of1(&script.into());
-		let mut property = BlobPropertyBag::new();
-		property.type_("text/javascript");
+		let property = BlobPropertyBag::new();
+		property.set_type_("text/javascript");
 		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property)
 			.expect("`new Blob()` should never throw");
 

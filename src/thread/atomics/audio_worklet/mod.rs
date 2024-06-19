@@ -7,7 +7,6 @@ mod processor;
 pub(super) mod register;
 
 use std::any::{Any, TypeId};
-use std::borrow::Cow;
 use std::ptr::NonNull;
 use std::sync::OnceLock;
 
@@ -15,7 +14,7 @@ use js_sys::{JsString, Object, Reflect};
 use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
-use self::js::{AudioWorkletNodeOptionsExt, BaseAudioContextExt};
+use self::js::{BaseAudioContextExt, ProcessorOptions};
 pub(in super::super) use self::processor::register_processor;
 #[cfg(feature = "message")]
 pub(in super::super) use self::register::message::register_thread_with_message;
@@ -91,10 +90,10 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 	options: Option<&AudioWorkletNodeOptions>,
 ) -> Result<AudioWorkletNode, AudioWorkletNodeError<P>> {
 	// If `processor_options` is set already by the caller, don't overwrite it!
-	let options: Cow<'_, AudioWorkletNodeOptionsExt> = options.map_or_else(
-		|| Cow::Owned(Object::new().unchecked_into()),
-		|options| Cow::Borrowed(options.unchecked_ref()),
-	);
+	let options: &AudioWorkletNodeOptions = match options {
+		Some(options) => options.unchecked_ref(),
+		None => &Object::new().unchecked_into(),
+	};
 	let processor_options = options.get_processor_options();
 	let has_processor_options = processor_options.is_some();
 
@@ -103,7 +102,8 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		value: Box::new(data),
 		empty: !has_processor_options,
 	});
-	let processor_options = processor_options.unwrap_or_default();
+	let processor_options: ProcessorOptions =
+		processor_options.unwrap_or_default().unchecked_into();
 	let data: NonNull<Data> = NonNull::from(Box::leak(data));
 	processor_options.set_data(data);
 
@@ -111,7 +111,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 		options.set_processor_options(Some(&processor_options));
 	}
 
-	let result = AudioWorkletNode::new_with_options(context, name, &options);
+	let result = AudioWorkletNode::new_with_options(context, name, options);
 
 	if has_processor_options {
 		DATA_PROPERTY_NAME
@@ -119,7 +119,7 @@ pub(in super::super) fn audio_worklet_node<P: 'static + ExtendAudioWorkletProces
 			.expect("expected `processor_options` to be an `Object`");
 	} else {
 		PROCESSOR_OPTIONS_PROPERTY_NAME
-			.with(|name| Reflect::delete_property(&options, name))
+			.with(|name| Reflect::delete_property(options, name))
 			.expect("expected `AudioWorkletNodeOptions` to be an `Object`");
 	}
 

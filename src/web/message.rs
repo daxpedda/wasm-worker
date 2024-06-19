@@ -71,7 +71,7 @@ macro_rules! impl_for_tuples {
 /// # Notes
 ///
 /// - Sending a [`JsValue::UNDEFINED`] might be interpreted at the receiving end
-/// as [`None`].
+///   as [`None`].
 /// - No values will be [transferred] if [`RawMessage::serialize`] is [`None`].
 ///
 /// # Example

@@ -489,7 +489,7 @@ pub trait BuilderExt {
 	/// # Errors
 	///
 	/// - If the main thread does not support spawning threads, see
-	/// [`has_spawn_support()`].
+	///   [`has_spawn_support()`].
 	/// - If `message` was unable to be cloned.
 	#[cfg(any(feature = "message", docsrs))]
 	fn spawn_with_message<F1, F2, T, M>(self, f: F1, message: M) -> io::Result<JoinHandle<T>>
@@ -524,7 +524,7 @@ pub trait BuilderExt {
 	/// # Errors
 	///
 	/// - If the main thread does not support spawning threads, see
-	/// [`has_spawn_support()`].
+	///   [`has_spawn_support()`].
 	/// - If `message` was unable to be cloned.
 	#[cfg(any(feature = "message", docsrs))]
 	fn spawn_scoped_with_message<'scope, #[allow(single_use_lifetimes)] 'env, F1, F2, T, M>(
@@ -660,7 +660,7 @@ pub trait ScopeExt<'scope> {
 	/// # Panics
 	///
 	/// - If the main thread does not support spawning threads, see
-	/// [`has_spawn_support()`].
+	///   [`has_spawn_support()`].
 	/// - If `message` was unable to be cloned.
 	#[cfg(any(feature = "message", docsrs))]
 	fn spawn_with_message<F1, F2, T, M>(
@@ -766,7 +766,7 @@ where
 /// # Panics
 ///
 /// - If the main thread does not support spawning threads, see
-/// [`has_spawn_support()`].
+///   [`has_spawn_support()`].
 /// - If `message` was unable to be cloned.
 ///
 /// # Example

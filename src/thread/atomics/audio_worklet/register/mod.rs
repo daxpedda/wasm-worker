@@ -529,8 +529,8 @@ impl Future for RegisterThreadFuture {
 						memory_sender,
 					})));
 
-					let mut options = AudioWorkletNodeOptions::new();
-					options.processor_options(Some(&MODULE.with(|module| {
+					let options = AudioWorkletNodeOptions::new();
+					options.set_processor_options(Some(&MODULE.with(|module| {
 						MEMORY.with(|memory| {
 							WORKLET_LOCK_INDEX
 								.with(|index| Array::of4(module, memory, index, &data.into()))

@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNodeOptions, DomException};
 
-use super::js::AudioWorkletNodeOptionsExt;
+use super::js::ProcessorOptions;
 use super::{Data, DATA_PROPERTY_NAME, HAS_TEXT_DECODER, PROCESSOR_OPTIONS_PROPERTY_NAME};
 use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
@@ -88,10 +88,9 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 	) -> __WebThreadProcessor {
 		let mut processor_data = None;
 
-		if let Some(processor_options) = options
-			.unchecked_ref::<AudioWorkletNodeOptionsExt>()
-			.get_processor_options()
-		{
+		if let Some(processor_options) = options.get_processor_options() {
+			let processor_options: ProcessorOptions = processor_options.unchecked_into();
+
 			if let Some(data) = processor_options.data() {
 				// SAFETY: We only store `NonNull<Data>` in `__web_thread_data` at
 				// `super::audio_worklet_node()`.

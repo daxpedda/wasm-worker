@@ -24,11 +24,17 @@ fn test() {
 		add_flags(&mut config.program.envs, flags);
 	}
 
-	if let Some(args) = env::var_os("UI_TEST_ARGS").filter(|flags| !flags.is_empty()) {
+	if let Some(args) = env::var_os("UI_TEST_ARGS").filter(|args| !args.is_empty()) {
 		let args = args.into_string().unwrap();
 
 		for arg in args.split_ascii_whitespace() {
 			dependency_builder.program.args.push(arg.into());
+		}
+	}
+
+	if let Some(value) = env::var_os("UI_TEST_BUILD_STD").filter(|value| !value.is_empty()) {
+		if value.eq_ignore_ascii_case("true") || value == "1" {
+			dependency_builder.build_std = Some(String::from("panic_abort,std"));
 		}
 	}
 
