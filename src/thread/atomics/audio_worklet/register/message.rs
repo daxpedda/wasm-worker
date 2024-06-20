@@ -90,7 +90,7 @@ pub(super) struct Data {
 /// # Safety
 ///
 /// `data` has to be a valid pointer to [`Data`].
-#[wasm_bindgen]
+#[wasm_bindgen(skip_typescript)]
 #[allow(private_interfaces, unreachable_pub)]
 pub unsafe fn __web_thread_worklet_register(data: NonNull<Data>) {
 	// SAFETY: Has to be a valid pointer to a `Data`. We only call

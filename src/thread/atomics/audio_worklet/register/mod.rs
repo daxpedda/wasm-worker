@@ -749,7 +749,7 @@ impl AudioWorkletHandle {
 /// # Safety
 ///
 /// `task` has to be a valid pointer to [`Task`].
-#[wasm_bindgen]
+#[wasm_bindgen(skip_typescript)]
 #[allow(unreachable_pub)]
 #[cfg_attr(not(feature = "message"), allow(clippy::needless_pass_by_value))]
 pub unsafe fn __web_thread_worklet_entry(

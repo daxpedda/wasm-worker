@@ -36,7 +36,7 @@ pub(in super::super::super) fn register_processor<P: 'static + ExtendAudioWorkle
 
 /// Holds the supplied [`ExtendAudioWorkletProcessor`] while type-erasing
 /// it.
-#[wasm_bindgen]
+#[wasm_bindgen(skip_typescript)]
 struct __WebThreadProcessorConstructor(Box<dyn ProcessorConstructor>);
 
 #[wasm_bindgen]
@@ -127,7 +127,7 @@ impl<P: 'static + ExtendAudioWorkletProcessor> ProcessorConstructor
 
 /// Holds the supplied [`ExtendAudioWorkletProcessor`] while type-erasing
 /// it.
-#[wasm_bindgen]
+#[wasm_bindgen(skip_typescript)]
 struct __WebThreadProcessor(Box<dyn Processor>);
 
 /// Object-safe version of [`ExtendAudioWorkletProcessor`].

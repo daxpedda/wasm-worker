@@ -281,7 +281,7 @@ type TaskStatic = Task<'static>;
 /// # Safety
 ///
 /// `task` has to be a valid pointer to [`Task`].
-#[wasm_bindgen]
+#[wasm_bindgen(skip_typescript)]
 #[allow(unreachable_pub)]
 pub async unsafe fn __web_thread_worker_entry(task: NonNull<TaskStatic>, message: JsValue) -> u32 {
 	// SAFETY: Has to be a valid pointer to a `Task`. We only call
