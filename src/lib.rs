@@ -1,4 +1,11 @@
-//! TODO
+//! TODO:
+//! - Remove `TextDecoder` detection in audio worklets.
+//! - Add `MessageSend` macro.
+//! - Add `WorkletBuilder`.
+//! - Wrap `MessageChannel` into something safe.
+//! - Consider passing message into `Builder`.
+//! - Add README.
+//! - Consider moving some APIs into `web-thread-core/primitives`.
 //!
 //! Things to note:
 //! - Will fail on import when used with the `no-modules` target.
