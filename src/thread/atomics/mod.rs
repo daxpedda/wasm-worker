@@ -53,13 +53,18 @@ thread_local! {
 pub(super) struct Builder {
 	/// Name of the thread.
 	name: Option<String>,
+	/// Stack size of the thread.
+	stack_size: Option<usize>,
 }
 
 impl Builder {
 	/// Implementation of [`std::thread::Builder::new()`].
 	#[allow(clippy::missing_const_for_fn, clippy::new_without_default)]
 	pub(super) fn new() -> Self {
-		Self { name: None }
+		Self {
+			name: None,
+			stack_size: None,
+		}
 	}
 
 	/// Implementation of [`std::thread::Builder::name()`].
@@ -75,7 +80,7 @@ impl Builder {
 		T: 'static + Send,
 	{
 		// SAFETY: `F` and `T` are `'static`.
-		unsafe { spawn::spawn(|| async { task() }, self.name, None) }
+		unsafe { spawn::spawn(|| async { task() }, self.name, self.stack_size, None) }
 	}
 
 	/// Implementation for
@@ -87,7 +92,7 @@ impl Builder {
 		T: 'static + Send,
 	{
 		// SAFETY: `F` and `T` are `'static`.
-		unsafe { spawn::spawn(task, self.name, None) }
+		unsafe { spawn::spawn(task, self.name, self.stack_size, None) }
 	}
 
 	/// Implementation for
@@ -104,7 +109,7 @@ impl Builder {
 		T: 'static + Send,
 	{
 		// SAFETY: `F` and `T` are `'static`.
-		unsafe { spawn::message::spawn(task, self.name, None, message) }
+		unsafe { spawn::message::spawn(task, self.name, self.stack_size, None, message) }
 	}
 
 	/// Implementation of [`std::thread::Builder::spawn_scoped()`].
@@ -118,8 +123,14 @@ impl Builder {
 		T: 'scope + Send,
 	{
 		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
-		let result =
-			unsafe { spawn::spawn(|| async { task() }, self.name, Some(Arc::clone(&scope.0))) };
+		let result = unsafe {
+			spawn::spawn(
+				|| async { task() },
+				self.name,
+				self.stack_size,
+				Some(Arc::clone(&scope.0)),
+			)
+		};
 
 		result.map(|handle| ScopedJoinHandle::new(handle))
 	}
@@ -137,7 +148,8 @@ impl Builder {
 		T: 'scope + Send,
 	{
 		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
-		let result = unsafe { spawn::spawn(task, self.name, Some(Arc::clone(&scope.0))) };
+		let result =
+			unsafe { spawn::spawn(task, self.name, self.stack_size, Some(Arc::clone(&scope.0))) };
 
 		result.map(|handle| ScopedJoinHandle::new(handle))
 	}
@@ -158,10 +170,23 @@ impl Builder {
 		M: 'scope + MessageSend,
 	{
 		// SAFETY: `Scope` will prevent this thread to outlive its lifetime.
-		let result =
-			unsafe { spawn::message::spawn(task, self.name, Some(Arc::clone(&scope.0)), message) };
+		let result = unsafe {
+			spawn::message::spawn(
+				task,
+				self.name,
+				self.stack_size,
+				Some(Arc::clone(&scope.0)),
+				message,
+			)
+		};
 
 		result.map(|handle| ScopedJoinHandle::new(handle))
+	}
+
+	/// Implementation of [`std::thread::Builder::stack_size()`].
+	pub(super) const fn stack_size(mut self, size: usize) -> Self {
+		self.stack_size = Some(size);
+		self
 	}
 }
 

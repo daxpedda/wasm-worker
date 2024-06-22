@@ -96,9 +96,12 @@ pub trait BaseAudioContextExt {
 	/// use web_thread::web::audio_worklet::BaseAudioContextExt;
 	///
 	/// let context = AudioContext::new().unwrap();
-	/// context.clone().register_thread(|| {
-	/// 	// Do work.
-	/// }).await.unwrap();
+	/// context.clone().register_thread(
+	/// 	None,
+	/// 	|| {
+	/// 		// Do work.
+	/// 	},
+	/// ).await.unwrap();
 	/// # }
 	/// ```
 	///
@@ -111,7 +114,7 @@ pub trait BaseAudioContextExt {
 		)),
 		doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.68/web_sys/struct.BaseAudioContext.html"
 	)]
-	fn register_thread<F>(self, f: F) -> RegisterThreadFuture
+	fn register_thread<F>(self, stack_size: Option<usize>, f: F) -> RegisterThreadFuture
 	where
 		F: 'static + FnOnce() + Send;
 
@@ -147,6 +150,7 @@ pub trait BaseAudioContextExt {
 	/// context
 	/// 	.clone()
 	/// 	.register_thread_with_message(
+	/// 		None,
 	/// 		|message| {
 	/// 			let buffer: ArrayBuffer = message.0;
 	/// 			// Do work.
@@ -168,7 +172,12 @@ pub trait BaseAudioContextExt {
 		doc = "[`BaseAudioContext`]: https://docs.rs/web-sys/0.3.68/web_sys/struct.BaseAudioContext.html"
 	)]
 	#[cfg(any(feature = "message", docsrs))]
-	fn register_thread_with_message<F, M>(self, f: F, message: M) -> RegisterThreadFuture
+	fn register_thread_with_message<F, M>(
+		self,
+		stack_size: Option<usize>,
+		f: F,
+		message: M,
+	) -> RegisterThreadFuture
 	where
 		F: 'static + FnOnce(M) + Send,
 		M: 'static + MessageSend;
@@ -215,13 +224,16 @@ pub trait BaseAudioContextExt {
 	///
 	/// let context = AudioContext::new().unwrap();
 	/// let (sender, receiver) = async_channel::bounded(1);
-	/// context.clone().register_thread(move || {
-	/// 	let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
-	/// 	global
-	/// 		.register_processor_ext::<TestProcessor>("test")
-	/// 		.unwrap();
-	/// 	sender.try_send(()).unwrap();
-	/// }).await.unwrap();
+	/// context.clone().register_thread(
+	/// 	None,
+	/// 	move || {
+	/// 		let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+	/// 		global
+	/// 			.register_processor_ext::<TestProcessor>("test")
+	/// 			.unwrap();
+	/// 		sender.try_send(()).unwrap();
+	/// 	},
+	/// ).await.unwrap();
 	///
 	/// // Wait until processor is registered.
 	/// receiver.recv().await.unwrap();
@@ -253,16 +265,21 @@ where
 	BaseAudioContext: From<T>,
 	T: AsRef<BaseAudioContext>,
 {
-	fn register_thread<F>(self, #[allow(clippy::min_ident_chars)] f: F) -> RegisterThreadFuture
+	fn register_thread<F>(
+		self,
+		stack_size: Option<usize>,
+		#[allow(clippy::min_ident_chars)] f: F,
+	) -> RegisterThreadFuture
 	where
 		F: 'static + FnOnce() + Send,
 	{
-		RegisterThreadFuture(audio_worklet::register_thread(self.into(), f))
+		RegisterThreadFuture(audio_worklet::register_thread(self.into(), stack_size, f))
 	}
 
 	#[cfg(any(feature = "message", docsrs))]
 	fn register_thread_with_message<F, M>(
 		self,
+		stack_size: Option<usize>,
 		#[allow(clippy::min_ident_chars)] f: F,
 		message: M,
 	) -> RegisterThreadFuture
@@ -272,6 +289,7 @@ where
 	{
 		RegisterThreadFuture(audio_worklet::register_thread_with_message(
 			self.into(),
+			stack_size,
 			f,
 			message,
 		))
@@ -367,9 +385,12 @@ impl AudioWorkletHandle {
 	/// use web_thread::web::audio_worklet::BaseAudioContextExt;
 	///
 	/// let context = AudioContext::new().unwrap();
-	/// let handle = context.clone().register_thread(|| {
-	/// 	// Do work.
-	/// }).await.unwrap();
+	/// let handle = context.clone().register_thread(
+	/// 	None,
+	/// 	|| {
+	/// 		// Do work.
+	/// 	},
+	/// ).await.unwrap();
 	///
 	/// console::log_1(&format!("thread id: {:?}", handle.thread().id()).into());
 	/// # }
@@ -404,10 +425,13 @@ impl AudioWorkletHandle {
 	///
 	/// let context = AudioContext::new().unwrap();
 	/// let (sender, receiver) = async_channel::bounded(1);
-	/// let handle = context.clone().register_thread(move || {
-	/// 	// Do work.
-	/// 	sender.try_send(()).unwrap();
-	/// }).await.unwrap();
+	/// let handle = context.clone().register_thread(
+	/// 	None,
+	/// 	move || {
+	/// 		// Do work.
+	/// 		sender.try_send(()).unwrap();
+	/// 	},
+	/// ).await.unwrap();
 	///
 	/// // Wait until audio worklet is finished.
 	/// receiver.recv().await.unwrap();
@@ -498,13 +522,16 @@ pub trait AudioWorkletGlobalScopeExt {
 	/// #
 	/// let context = AudioContext::new().unwrap();
 	/// let (sender, receiver) = async_channel::bounded(1);
-	/// context.clone().register_thread(move || {
-	/// 	let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
-	/// 	global
-	/// 		.register_processor_ext::<TestProcessor>("test")
-	/// 		.unwrap();
-	/// 	sender.try_send(()).unwrap();
-	/// }).await.unwrap();
+	/// context.clone().register_thread(
+	/// 	None,
+	/// 	move || {
+	/// 		let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
+	/// 		global
+	/// 			.register_processor_ext::<TestProcessor>("test")
+	/// 			.unwrap();
+	/// 		sender.try_send(()).unwrap();
+	/// 	},
+	/// ).await.unwrap();
 	///
 	/// // Wait until processor is registered.
 	/// receiver.recv().await.unwrap();

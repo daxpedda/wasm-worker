@@ -2,9 +2,9 @@ import {initSync, __web_thread_worker_entry} from '@shim.js'
 
 onmessage = async event => {
 	onmessage = undefined
-	const [module, memory, task, message] = event.data
+	const [module, memory, stackSize, task, message] = event.data
 
-	initSync(module, memory)
+	initSync({module, memory, thread_stack_size: stackSize})
 	const terminateIndex = await __web_thread_worker_entry(task, message)
 	const memoryArray = new Int32Array(memory.buffer)
 	Atomics.store(memoryArray, terminateIndex, 1)

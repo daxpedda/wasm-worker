@@ -96,7 +96,7 @@ mod web {
 		let (sender, receiver) = async_channel::bounded(1);
 		context
 			.clone()
-			.register_thread(move || {
+			.register_thread(None, move || {
 				console::log_1(&"Hello from audio worklet!".into());
 
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();

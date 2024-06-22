@@ -82,6 +82,7 @@ pub(super) fn init_main_thread() {
 					Command::Spawn(SpawnData {
 						id,
 						name,
+						stack_size,
 						#[cfg(feature = "message")]
 						spawn_receiver,
 						task,
@@ -89,6 +90,7 @@ pub(super) fn init_main_thread() {
 						spawn::spawn_internal(
 							id,
 							name.as_deref(),
+							stack_size,
 							#[cfg(feature = "message")]
 							spawn_receiver,
 							Box::new(task),

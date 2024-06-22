@@ -13,6 +13,8 @@ use web_sys::{DedicatedWorkerGlobalScope, MessageEvent, Worker};
 use super::super::super::global::Global;
 #[cfg(feature = "audio-worklet")]
 use super::super::audio_worklet::register::THREAD_LOCK_INDEXES;
+#[cfg(feature = "audio-worklet")]
+use super::super::js::ArrayExt;
 use super::super::{channel, main, oneshot, JoinHandle, ScopeData, ThreadId};
 use super::{SpawnData, Task};
 use crate::thread::atomics::channel::Receiver;
@@ -30,6 +32,7 @@ thread_local! {
 pub(in super::super) unsafe fn spawn<F1, F2, T, M>(
 	task: F1,
 	name: Option<String>,
+	stack_size: Option<usize>,
 	scope: Option<Arc<ScopeData>>,
 	message: M,
 ) -> io::Result<JoinHandle<T>>
@@ -50,11 +53,18 @@ where
 	let task: Task<'_> = Box::new({
 		let thread = thread.clone();
 		move |message| {
-			super::thread_runner(thread, result_sender, spawn_sender, scope, move || {
-				let message = (!message.is_undefined()).then_some(message);
-				let message = M::receive(message, raw_message.send);
-				task(message)
-			})
+			super::thread_runner(
+				thread,
+				stack_size,
+				result_sender,
+				spawn_sender,
+				scope,
+				move || {
+					let message = (!message.is_undefined()).then_some(message);
+					let message = M::receive(message, raw_message.send);
+					task(message)
+				},
+			)
 		}
 	});
 
@@ -65,6 +75,7 @@ where
 			spawn_internal(
 				thread.id(),
 				thread.name(),
+				stack_size,
 				spawn_receiver,
 				&serialize,
 				transfer,
@@ -78,6 +89,7 @@ where
 			let data = SpawnData {
 				id: thread.id(),
 				name: thread.0.name.clone(),
+				stack_size,
 				spawn_receiver,
 				task,
 			};
@@ -111,6 +123,7 @@ where
 	} else {
 		Ok(super::spawn_without_message(
 			thread,
+			stack_size,
 			result_receiver,
 			spawn_receiver,
 			task,
@@ -145,6 +158,7 @@ fn send_message(
 fn spawn_internal(
 	id: ThreadId,
 	name: Option<&str>,
+	stack_size: Option<usize>,
 	spawn_receiver: Receiver<SpawnData>,
 	serialize: &JsValue,
 	transfer: Option<Array>,
@@ -159,11 +173,17 @@ fn spawn_internal(
 		|worker: &Worker, module, memory, task| {
 			if let Some(transfer) = transfer {
 				worker.post_message_with_transfer(
-					&Array::of4(module, memory, &task, serialize),
+					&Array::of5(module, memory, &stack_size.into(), &task, serialize),
 					&transfer,
 				)
 			} else {
-				worker.post_message(&Array::of4(module, memory, &task, serialize))
+				worker.post_message(&Array::of5(
+					module,
+					memory,
+					&stack_size.into(),
+					&task,
+					serialize,
+				))
 			}
 		},
 		#[cfg(feature = "audio-worklet")]
@@ -171,11 +191,25 @@ fn spawn_internal(
 			THREAD_LOCK_INDEXES.with(|indexes| {
 				if let Some(transfer) = transfer {
 					worker.post_message_with_transfer(
-						&Array::of5(module, memory, indexes, &task, serialize),
+						&ArrayExt::of6(
+							module,
+							memory,
+							&stack_size.into(),
+							indexes,
+							&task,
+							serialize,
+						),
 						&transfer,
 					)
 				} else {
-					worker.post_message(&Array::of5(module, memory, indexes, &task, serialize))
+					worker.post_message(&ArrayExt::of6(
+						module,
+						memory,
+						&stack_size.into(),
+						indexes,
+						&task,
+						serialize,
+					))
 				}
 			})
 		},
@@ -263,6 +297,7 @@ pub(in super::super) fn setup_message_handler(
 		spawn_internal(
 			data.id,
 			data.name.as_deref(),
+			data.stack_size,
 			data.spawn_receiver,
 			&serialize,
 			transfer,

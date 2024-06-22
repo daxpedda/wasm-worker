@@ -1,89 +1,56 @@
 #![cfg(test)]
 #![cfg(all(target_family = "wasm", feature = "audio-worklet"))]
 
-use wasm_bindgen_test::wasm_bindgen_test;
-use web_sys::{AudioContext, OfflineAudioContext};
+use web_sys::BaseAudioContext;
 use web_thread::web::audio_worklet::BaseAudioContextExt;
 
 #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
 use super::test_processor::TestProcessor;
+use crate::test_audio;
 
-#[wasm_bindgen_test]
 #[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
-#[should_panic = "operation not supported on this platform without the atomics target feature and \
-                  cross-origin isolation"]
-async fn register() {
-	AudioContext::new()
-		.unwrap()
-		.register_thread(|| ())
-		.await
-		.unwrap();
+async fn test_register(context: BaseAudioContext) {
+	context.register_thread(None, || ()).await.unwrap();
 }
 
-#[wasm_bindgen_test]
 #[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
-#[should_panic = "operation not supported on this platform without the atomics target feature and \
-                  cross-origin isolation"]
-async fn offline_register() {
-	OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
-		.unwrap()
-		.register_thread(|| ())
-		.await
-		.unwrap();
+test_audio!(
+	register,
+	should_panic = "operation not supported on this platform without the atomics target feature \
+	                and cross-origin isolation"
+);
+
+#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
+async fn test_register_twice(context: BaseAudioContext) {
+	context.clone().register_thread(None, || ()).await.unwrap();
+	context.register_thread(None, || ()).await.unwrap();
 }
 
-#[wasm_bindgen_test]
 #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
-#[should_panic = "`BaseAudioContext` already registered a thread"]
-async fn register_twice() {
-	let context = AudioContext::new().unwrap();
+test_audio!(
+	register_twice,
+	should_panic = "`BaseAudioContext` already registered a thread"
+);
 
-	context.clone().register_thread(|| ()).await.unwrap();
-	context.register_thread(|| ()).await.unwrap();
-}
-
-#[wasm_bindgen_test]
 #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
-#[should_panic = "`BaseAudioContext` already registered a thread"]
-async fn offline_register_twice() {
-	let context =
-		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
-			.unwrap();
-
-	context.clone().register_thread(|| ()).await.unwrap();
-	context.register_thread(|| ()).await.unwrap();
-}
-
-#[wasm_bindgen_test]
-#[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
-#[should_panic = "name"]
-async fn not_registered_node() {
-	let context = AudioContext::new().unwrap();
-	context.clone().register_thread(|| ()).await.unwrap();
+async fn test_not_registered_node(context: BaseAudioContext) {
+	context.clone().register_thread(None, || ()).await.unwrap();
 	context
 		.audio_worklet_node::<TestProcessor>("test", Box::new(|_| None), None)
 		.unwrap();
 }
 
-#[wasm_bindgen_test]
 #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
-#[should_panic = "name"]
-async fn offline_not_registered_node() {
-	let context =
-		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)
-			.unwrap();
-	context.clone().register_thread(|| ()).await.unwrap();
-	context
-		.audio_worklet_node::<TestProcessor>("test", Box::new(|_| None), None)
-		.unwrap();
-}
+test_audio!(not_registered_node, should_panic = "name");
 
-#[wasm_bindgen_test]
+#[wasm_bindgen_test::wasm_bindgen_test]
 #[cfg(any(not(target_feature = "atomics"), unsupported_spawn))]
 async fn check_failing_spawn() {
 	use js_sys::Array;
 	use wasm_bindgen_futures::JsFuture;
-	use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, Blob, BlobPropertyBag, Url};
+	use web_sys::{
+		AudioWorkletNode, AudioWorkletNodeOptions, Blob, BlobPropertyBag, OfflineAudioContext, Url,
+	};
 
 	let context =
 		OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(1, 1, 8000.)

@@ -37,6 +37,8 @@ pub(super) struct SpawnData {
 	pub(super) id: ThreadId,
 	/// Name of the thread.
 	pub(super) name: Option<String>,
+	/// Stack size of the thread.
+	pub(super) stack_size: Option<usize>,
 	/// [`Task`]s with messages to spawn.
 	#[cfg(feature = "message")]
 	pub(super) spawn_receiver: channel::Receiver<SpawnData>,
@@ -53,6 +55,7 @@ pub(super) struct SpawnData {
 pub(super) unsafe fn spawn<F1, F2, T>(
 	task: F1,
 	name: Option<String>,
+	stack_size: Option<usize>,
 	scope: Option<Arc<ScopeData>>,
 ) -> io::Result<JoinHandle<T>>
 where
@@ -70,6 +73,7 @@ where
 		move |_| {
 			thread_runner(
 				thread,
+				stack_size,
 				result_sender,
 				#[cfg(feature = "message")]
 				spawn_sender,
@@ -81,6 +85,7 @@ where
 
 	Ok(spawn_without_message(
 		thread,
+		stack_size,
 		result_receiver,
 		#[cfg(feature = "message")]
 		spawn_receiver,
@@ -91,6 +96,7 @@ where
 /// Spawn if no message requires transferring through JS.
 fn spawn_without_message<T>(
 	thread: Thread,
+	stack_size: Option<usize>,
 	result_receiver: oneshot::Receiver<T>,
 	#[cfg(feature = "message")] spawn_receiver: channel::Receiver<SpawnData>,
 	task: Task<'_>,
@@ -101,6 +107,7 @@ fn spawn_without_message<T>(
 		spawn_internal(
 			thread.id(),
 			thread.name(),
+			stack_size,
 			#[cfg(feature = "message")]
 			spawn_receiver,
 			Box::new(task),
@@ -113,6 +120,7 @@ fn spawn_without_message<T>(
 		Command::Spawn(SpawnData {
 			id: thread.id(),
 			name: thread.0.name.clone(),
+			stack_size,
 			#[cfg(feature = "message")]
 			spawn_receiver,
 			task,
@@ -142,6 +150,7 @@ fn thread_init(name: Option<String>, scope: Option<&ScopeData>) -> Thread {
 /// Common functionality between threads, regardless if a message is passed.
 fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Future<Output = T>>(
 	thread: Thread,
+	stack_size: Option<usize>,
 	result_sender: oneshot::Sender<T>,
 	#[cfg(feature = "message")] spawn_sender: channel::Sender<SpawnData>,
 	scope: Option<Arc<ScopeData>>,
@@ -176,7 +185,7 @@ fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Futu
 		Command::Terminate {
 			id: super::current_id(),
 			value,
-			memory: ThreadMemory::new(),
+			memory: ThreadMemory::new(stack_size),
 		}
 		.send();
 
@@ -188,6 +197,7 @@ fn thread_runner<'scope, T: 'scope + Send, F1: 'scope + FnOnce() -> F2, F2: Futu
 pub(super) fn spawn_internal(
 	id: ThreadId,
 	name: Option<&str>,
+	stack_size: Option<usize>,
 	#[cfg(feature = "message")] spawn_receiver: channel::Receiver<SpawnData>,
 	task: Task<'_>,
 ) {
@@ -199,9 +209,12 @@ pub(super) fn spawn_internal(
 		task,
 		|worker, module, memory, task| {
 			#[cfg(not(feature = "audio-worklet"))]
-			let message = Array::of3(module, memory, &task);
+			let message = Array::of4(module, memory, &stack_size.into(), &task);
 			#[cfg(feature = "audio-worklet")]
-			let message = { THREAD_LOCK_INDEXES.with(|indexes| Array::of4(module, memory, indexes, &task)) };
+			let message = {
+				THREAD_LOCK_INDEXES
+					.with(|indexes| Array::of5(module, memory, &stack_size.into(), indexes, &task))
+			};
 			worker.post_message(&message)
 		},
 	)

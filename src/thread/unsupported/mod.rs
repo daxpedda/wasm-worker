@@ -112,6 +112,11 @@ impl Builder {
 			"reached `spawn_scoped_with_message_internal()` without atomics target feature"
 		)
 	}
+
+	/// Implementation of [`std::thread::Builder::stack_size()`].
+	pub(super) const fn stack_size(self, _: usize) -> Self {
+		self
+	}
 }
 
 /// Implementation of [`std::thread::JoinHandle`].

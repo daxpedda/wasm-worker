@@ -158,7 +158,6 @@ async fn scope_builder() {
 async fn builder() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = Builder::new()
-		.stack_size(0)
 		.spawn(|| assert_eq!(web_thread::current().name(), None))
 		.unwrap();
 
@@ -177,9 +176,33 @@ async fn builder() {
 async fn builder_name() {
 	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
 	let mut handle = Builder::new()
-		.stack_size(0)
 		.name(String::from("test"))
 		.spawn(|| assert_eq!(web_thread::current().name(), Some("test")))
+		.unwrap();
+
+	#[cfg(not(target_family = "wasm"))]
+	handle.join().unwrap();
+	#[cfg(target_family = "wasm")]
+	if web::has_block_support() && cfg!(not(unsupported_spawn_then_block)) {
+		handle.join().unwrap();
+	} else {
+		handle.join_async().await.unwrap();
+	}
+}
+
+#[cfg_attr(not(target_family = "wasm"), pollster::test)]
+#[cfg_attr(target_family = "wasm", wasm_bindgen_test)]
+async fn builder_stack_size() {
+	#[allow(clippy::large_stack_frames, clippy::missing_const_for_fn)]
+	fn allocate_on_stack() {
+		#[allow(clippy::large_stack_arrays, clippy::no_effect_underscore_binding)]
+		let _test = [0_u8; 1024 * 1024 * 9];
+	}
+
+	#[cfg_attr(not(target_family = "wasm"), allow(unused_mut))]
+	let mut handle = Builder::new()
+		.stack_size(1024 * 1024 * 10)
+		.spawn(allocate_on_stack)
 		.unwrap();
 
 	#[cfg(not(target_family = "wasm"))]
@@ -241,7 +264,6 @@ async fn spawn_async() {
 #[wasm_bindgen_test]
 async fn builder_async() {
 	let mut handle = Builder::new()
-		.stack_size(0)
 		.spawn_async(|| async { assert_eq!(web_thread::current().name(), None) })
 		.unwrap();
 

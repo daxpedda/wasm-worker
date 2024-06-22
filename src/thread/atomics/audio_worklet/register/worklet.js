@@ -21,9 +21,9 @@ registerProcessor('__web_thread_worklet', class extends AudioWorkletProcessor {
     constructor(options) {
         super()
 
-        const [module, memory, workletLock, task] = options.processorOptions
+        const [module, memory, stackSize, workletLock, task] = options.processorOptions
 
-        initSync(module, memory)
+        initSync({module, memory, thread_stack_size: stackSize})
         const memoryArray = new Int32Array(memory.buffer)
         Atomics.store(memoryArray, workletLock, 0)
         Atomics.notify(memoryArray, workletLock)

@@ -23,6 +23,7 @@ async fn message() {
 	let flag = Flag::new();
 	context
 		.register_thread_with_message(
+			None,
 			{
 				let flag = flag.clone();
 				move |TransferableWrapper::<ArrayBuffer>(buffer)| {
@@ -50,7 +51,7 @@ async fn nested() {
 
 	let (sender, receiver) = async_channel::bounded(1);
 	context
-		.register_thread(move || {
+		.register_thread(None, move || {
 			let buffer = ArrayBuffer::new(1);
 			let array = Uint8Array::new(&buffer);
 			array.copy_from(&[42]);

@@ -90,6 +90,7 @@ ui_test = "0.23"
 async-channel = { version = "2", default-features = false }
 console_error_panic_hook = "0.1"
 itertools = { version = "0.13", default-features = false }
+paste = "1"
 wasm-bindgen-futures = "0.4"
 wasm-bindgen-test = "0.3"
 web-sys = { version = "0.3", features = [
@@ -115,7 +116,6 @@ web-time = "1"
 atomic-waker = "1"
 bytemuck = "1"
 futures-util = { version = "0.3", default-features = false }
-paste = "1"
 utf32-lit = "1"
 
 [patch.crates-io]
@@ -184,6 +184,11 @@ test = false
 [[test]]
 name = "supported_spawn_fail"
 path = "tests/supported_spawn_fail.rs"
+test = false
+
+[[test]]
+name = "supported_spawn_corrupt"
+path = "tests/supported_spawn_corrupt.rs"
 test = false
 
 [[test]]

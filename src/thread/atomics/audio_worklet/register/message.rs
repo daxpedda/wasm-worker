@@ -31,6 +31,7 @@ pub(super) struct MessageState {
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread_with_message()`].
 pub(in super::super::super::super) fn register_thread_with_message<F, M>(
 	context: BaseAudioContext,
+	stack_size: Option<usize>,
 	task: F,
 	message: M,
 ) -> RegisterThreadFuture
@@ -48,6 +49,7 @@ where
 
 	super::register_thread_internal(
 		context,
+		stack_size,
 		move |message| {
 			let message = (!message.is_undefined()).then_some(message);
 			let message = M::receive(message, raw_message.send);
@@ -81,6 +83,8 @@ impl HasMessagePortInterface for MessagePort {
 pub(super) struct Data {
 	/// [`Thread`].
 	pub(super) thread: Thread,
+	/// Stack size of the thread.
+	pub(super) stack_size: Option<usize>,
 	/// [`Sender`] to send back the associated [`ThreadMemory`].
 	pub(super) memory_sender: Sender<ThreadMemory>,
 }
@@ -99,5 +103,5 @@ pub unsafe fn __web_thread_worklet_register(data: NonNull<Data>) {
 	let data: Data = *unsafe { Box::from_raw(data.as_ptr()) };
 
 	Thread::register(data.thread);
-	data.memory_sender.send(ThreadMemory::new());
+	data.memory_sender.send(ThreadMemory::new(data.stack_size));
 }

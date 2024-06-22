@@ -64,6 +64,7 @@ thread_local! {
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
 pub(in super::super::super) fn register_thread<F>(
 	context: BaseAudioContext,
+	stack_size: Option<usize>,
 	task: F,
 ) -> RegisterThreadFuture
 where
@@ -71,6 +72,7 @@ where
 {
 	register_thread_internal(
 		context,
+		stack_size,
 		|_| task(),
 		#[cfg(feature = "message")]
 		None,
@@ -80,6 +82,7 @@ where
 /// Register thread regardless of message.
 fn register_thread_internal(
 	context: BaseAudioContext,
+	stack_size: Option<usize>,
 	task: impl 'static + FnOnce(JsValue) + Send,
 	#[cfg(feature = "message")] message: Option<MessageState>,
 ) -> RegisterThreadFuture {
@@ -131,7 +134,7 @@ fn register_thread_internal(
 						#[cfg(not(feature = "message"))]
 						{
 							Thread::register(thread);
-							memory_sender.send(ThreadMemory::new());
+							memory_sender.send(ThreadMemory::new(stack_size));
 						}
 						#[cfg(feature = "message")]
 						{
@@ -148,6 +151,7 @@ fn register_thread_internal(
 					promise,
 					thread,
 					task,
+					stack_size,
 					#[cfg(feature = "message")]
 					memory_sender,
 					memory_receiver,
@@ -178,6 +182,8 @@ enum State {
 		promise: JsFuture,
 		/// [`Thread`].
 		thread: Thread,
+		/// Stack size of the thread.
+		stack_size: Option<usize>,
 		/// Caller-supplied task.
 		task: Task,
 		/// [`Receiver`](oneshot::Sender) for [`ThreadMemory`].
@@ -200,6 +206,8 @@ enum State {
 		context: BaseAudioContext,
 		/// [`Thread`].
 		thread: Thread,
+		/// Stack size of the thread.
+		stack_size: Option<usize>,
 		/// Caller-supplied task.
 		task: Task,
 		/// [`Receiver`](oneshot::Sender) for [`ThreadMemory`].
@@ -222,6 +230,8 @@ enum State {
 		context: BaseAudioContext,
 		/// [`Thread`].
 		thread: Thread,
+		/// Stack size of the thread.
+		stack_size: Option<usize>,
 		/// Caller-supplied task.
 		task: Task,
 		/// [`Receiver`](oneshot::Sender) for [`ThreadMemory`].
@@ -268,6 +278,7 @@ impl Debug for State {
 				context,
 				promise,
 				thread,
+				stack_size,
 				task,
 				#[cfg(feature = "message")]
 				memory_sender,
@@ -282,6 +293,7 @@ impl Debug for State {
 					.field("context", context)
 					.field("promise", promise)
 					.field("thread", thread)
+					.field("stack_size", stack_size)
 					.field("task", &any::type_name_of_val(task));
 				#[cfg(feature = "message")]
 				debug_struct.field("memory_sender", memory_sender);
@@ -296,6 +308,7 @@ impl Debug for State {
 				future,
 				context,
 				thread,
+				stack_size,
 				task,
 				#[cfg(feature = "message")]
 				memory_sender,
@@ -309,6 +322,7 @@ impl Debug for State {
 				future,
 				context,
 				thread,
+				stack_size,
 				task,
 				#[cfg(feature = "message")]
 				memory_sender,
@@ -327,6 +341,7 @@ impl Debug for State {
 					.field("future", future)
 					.field("context", context)
 					.field("thread", thread)
+					.field("stack_size", stack_size)
 					.field("task", &any::type_name_of_val(task));
 				#[cfg(feature = "message")]
 				debug_struct.field("memory_sender", memory_sender);
@@ -404,6 +419,7 @@ impl Future for RegisterThreadFuture {
 						let State::Module {
 							context,
 							thread,
+							stack_size,
 							task,
 							#[cfg(feature = "message")]
 							memory_sender,
@@ -422,6 +438,7 @@ impl Future for RegisterThreadFuture {
 							future: None,
 							context,
 							thread,
+							stack_size,
 							task,
 							#[cfg(feature = "message")]
 							memory_sender,
@@ -460,6 +477,7 @@ impl Future for RegisterThreadFuture {
 					let State::WorkletLock {
 						context,
 						thread,
+						stack_size,
 						task,
 						#[cfg(feature = "message")]
 						memory_sender,
@@ -478,6 +496,7 @@ impl Future for RegisterThreadFuture {
 						future: None,
 						context,
 						thread,
+						stack_size,
 						task,
 						#[cfg(feature = "message")]
 						memory_sender,
@@ -507,6 +526,7 @@ impl Future for RegisterThreadFuture {
 					let State::WorkerLock {
 						context,
 						thread,
+						stack_size,
 						task,
 						#[cfg(feature = "message")]
 						memory_sender,
@@ -526,14 +546,16 @@ impl Future for RegisterThreadFuture {
 					#[cfg(feature = "message")]
 					let data: NonNull<Data> = NonNull::from(Box::leak(Box::new(Data {
 						thread: thread.clone(),
+						stack_size,
 						memory_sender,
 					})));
 
 					let options = AudioWorkletNodeOptions::new();
 					options.set_processor_options(Some(&MODULE.with(|module| {
 						MEMORY.with(|memory| {
-							WORKLET_LOCK_INDEX
-								.with(|index| Array::of4(module, memory, index, &data.into()))
+							WORKLET_LOCK_INDEX.with(|index| {
+								Array::of5(module, memory, &stack_size.into(), index, &data.into())
+							})
 						})
 					})));
 

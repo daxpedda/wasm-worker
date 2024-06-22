@@ -94,7 +94,30 @@ extern "C" {
 #[macro_export]
 macro_rules! js_string {
 	($string:literal) => {
-		js_sys::JsString::from_code_point(bytemuck::cast_slice(utf32_lit::utf32!($string)))
+		::js_sys::JsString::from_code_point(::bytemuck::cast_slice(::utf32_lit::utf32!($string)))
 			.expect("found invalid Unicode")
+	};
+}
+
+#[macro_export]
+macro_rules! test_audio {
+	($name:ident$(, should_panic = $should_panic:tt)?) => {
+		::paste::paste! {
+			#[::wasm_bindgen_test::wasm_bindgen_test]
+			$(#[should_panic = $should_panic])?
+			async fn $name() {
+				[<test_ $name>](::web_sys::AudioContext::new().unwrap().into()).await;
+			}
+
+			#[::wasm_bindgen_test::wasm_bindgen_test]
+			$(#[should_panic = $should_panic])?
+			async fn [<offline_ $name>]() {
+				let context = ::web_sys::OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
+					1, 1, 8000.,
+				)
+				.unwrap();
+				[<test_ $name>](context.into()).await;
+			}
+		}
 	};
 }

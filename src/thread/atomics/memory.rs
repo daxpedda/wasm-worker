@@ -18,11 +18,13 @@ pub(super) struct ThreadMemory {
 	tls_base: f64,
 	/// Stack memory.
 	stack_alloc: f64,
+	/// Stack size.
+	stack_size: Option<usize>,
 }
 
 impl ThreadMemory {
 	/// Create new [`ThreadMemory`] for the calling thread.
-	pub(super) fn new() -> Self {
+	pub(super) fn new(stack_size: Option<usize>) -> Self {
 		thread_local! {
 			static EXISTS: OnceCell<()> = const { OnceCell::new() };
 		}
@@ -39,6 +41,7 @@ impl ThreadMemory {
 			thread: super::current_id(),
 			tls_base,
 			stack_alloc,
+			stack_size,
 		}
 	}
 
@@ -78,7 +81,7 @@ impl ThreadMemory {
 		// being created and `ThreadMemory::release()` consumes itself. Other
 		// safety guarantees have to be uphold by the caller.
 		EXPORTS.with(|exports| unsafe {
-			exports.thread_destroy(&tls_base, &stack_alloc);
+			exports.thread_destroy(&tls_base, &stack_alloc, self.stack_size);
 		});
 
 		Ok(())

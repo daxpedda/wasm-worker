@@ -5,7 +5,6 @@ use std::cell::RefCell;
 use std::future::Future;
 
 use js_sys::{Array, Iterator, Object, Reflect};
-use paste::paste;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -20,52 +19,56 @@ use super::test_processor::{
 	AudioParameter, AudioWorkletNodeOptionsExt, TestProcessor, GLOBAL_DATA,
 };
 use super::util::Flag;
-use crate::js_string;
-
-macro_rules! test {
-	($name:ident) => {
-		paste! {
-			#[wasm_bindgen_test]
-			async fn $name() {
-				[<test_ $name>](AudioContext::new().unwrap().into()).await;
-			}
-
-			#[wasm_bindgen_test]
-			async fn [<offline_ $name>]() {
-				let context = OfflineAudioContext::new_with_number_of_channels_and_length_and_sample_rate(
-					1, 1, 8000.,
-				)
-				.unwrap();
-				[<test_ $name>](context.into()).await;
-			}
-		}
-	};
-}
+use crate::{js_string, test_audio};
 
 async fn test_nested(context: BaseAudioContext) {
 	let (sender, receiver) = async_channel::bounded(1);
 	context
 		.clone()
-		.register_thread(move || sender.try_send(web_thread::spawn(|| ())).unwrap())
+		.register_thread(None, move || {
+			sender.try_send(web_thread::spawn(|| ())).unwrap();
+		})
 		.await
 		.unwrap();
 
 	receiver.recv().await.unwrap().join_async().await.unwrap();
 }
 
-test!(nested);
+test_audio!(nested);
 
 async fn test_register(context: BaseAudioContext) {
-	context.register_thread(|| ()).await.unwrap();
+	context.register_thread(None, || ()).await.unwrap();
 }
 
-test!(register);
+test_audio!(register);
+
+async fn test_stack_size(context: BaseAudioContext) {
+	#[allow(clippy::large_stack_frames, clippy::missing_const_for_fn)]
+	fn allocate_on_stack() {
+		#[allow(clippy::large_stack_arrays, clippy::no_effect_underscore_binding)]
+		let _test = [0_u8; 1024 * 1024 * 9];
+	}
+
+	let flag = Flag::new();
+
+	context.register_thread(Some(1024 * 1024 * 10), {
+		let flag = flag.clone();
+		move || {
+			allocate_on_stack();
+			flag.signal();
+		}
+	});
+
+	flag.await;
+}
+
+test_audio!(stack_size);
 
 async fn test_register_release(context: BaseAudioContext) {
 	let flag = Flag::new();
 
 	let handle = context
-		.register_thread({
+		.register_thread(None, {
 			let flag = flag.clone();
 			move || flag.signal()
 		})
@@ -78,12 +81,12 @@ async fn test_register_release(context: BaseAudioContext) {
 	unsafe { handle.release() }.unwrap();
 }
 
-test!(register_release);
+test_audio!(register_release);
 
 async fn test_register_drop(context: BaseAudioContext) {
 	let flag = Flag::new();
 
-	context.register_thread({
+	context.register_thread(None, {
 		let flag = flag.clone();
 		move || flag.signal()
 	});
@@ -91,14 +94,14 @@ async fn test_register_drop(context: BaseAudioContext) {
 	flag.await;
 }
 
-test!(register_drop);
+test_audio!(register_drop);
 
 async fn test_node(context: BaseAudioContext) {
 	let start = Flag::new();
 	let end = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			let end = end.clone();
 			move || {
@@ -132,13 +135,13 @@ async fn test_node(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(node);
+test_audio!(node);
 
 async fn test_node_data(context: BaseAudioContext) {
 	let start = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			move || {
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
@@ -172,13 +175,13 @@ async fn test_node_data(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(node_data);
+test_audio!(node_data);
 
 async fn test_unpark(context: BaseAudioContext) {
 	let start = Flag::new();
 	let handle = context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			move || {
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
@@ -214,7 +217,7 @@ async fn test_unpark(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(unpark);
+test_audio!(unpark);
 
 async fn test_process<C, F>(context: C, post: impl FnOnce(C) -> F)
 where
@@ -225,7 +228,7 @@ where
 	let end = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			move || {
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
@@ -288,7 +291,7 @@ async fn test_no_options(context: BaseAudioContext) {
 	let end = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			let end = end.clone();
 			move || {
@@ -323,14 +326,14 @@ async fn test_no_options(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(no_options);
+test_audio!(no_options);
 
 async fn test_zero_options(context: BaseAudioContext) {
 	let start = Flag::new();
 	let end = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			let end = end.clone();
 			move || {
@@ -370,13 +373,13 @@ async fn test_zero_options(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(zero_options);
+test_audio!(zero_options);
 
 async fn test_data_no_options(context: BaseAudioContext) {
 	let start = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			move || {
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
@@ -411,13 +414,13 @@ async fn test_data_no_options(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(data_no_options);
+test_audio!(data_no_options);
 
 async fn test_data_empty_options(context: BaseAudioContext) {
 	let start = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			move || {
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
@@ -454,13 +457,13 @@ async fn test_data_empty_options(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(data_empty_options);
+test_audio!(data_empty_options);
 
 async fn test_data_zero_options(context: BaseAudioContext) {
 	let start = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			move || {
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
@@ -504,14 +507,14 @@ async fn test_data_zero_options(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(data_zero_options);
+test_audio!(data_zero_options);
 
 async fn test_options(context: BaseAudioContext) {
 	let start = Flag::new();
 	let end = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			let end = end.clone();
 			move || {
@@ -553,13 +556,13 @@ async fn test_options(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(options);
+test_audio!(options);
 
 async fn test_options_data(context: BaseAudioContext) {
 	let start = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			move || {
 				let global: AudioWorkletGlobalScope = js_sys::global().unchecked_into();
@@ -603,7 +606,7 @@ async fn test_options_data(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(options_data);
+test_audio!(options_data);
 
 struct TestParameters;
 
@@ -624,7 +627,7 @@ async fn test_parameters(context: BaseAudioContext) {
 	let end = Flag::new();
 	context
 		.clone()
-		.register_thread({
+		.register_thread(None, {
 			let start = start.clone();
 			let end = end.clone();
 			move || {
@@ -666,4 +669,4 @@ async fn test_parameters(context: BaseAudioContext) {
 	end.await;
 }
 
-test!(parameters);
+test_audio!(parameters);

@@ -18,12 +18,16 @@ use crate::web::message::MessageSend;
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
-pub(crate) fn register_thread<F>(context: BaseAudioContext, task: F) -> RegisterThreadFuture
+pub(crate) fn register_thread<F>(
+	context: BaseAudioContext,
+	stack_size: Option<usize>,
+	task: F,
+) -> RegisterThreadFuture
 where
 	F: 'static + FnOnce() + Send,
 {
 	RegisterThreadFuture(if super::has_spawn_support() {
-		audio_worklet::register_thread(context, task)
+		audio_worklet::register_thread(context, stack_size, task)
 	} else {
 		audio_worklet::RegisterThreadFuture::error(Error::new(
 			ErrorKind::Unsupported,
@@ -38,6 +42,7 @@ where
 #[cfg(feature = "message")]
 pub(crate) fn register_thread_with_message<F, M>(
 	context: BaseAudioContext,
+	stack_size: Option<usize>,
 	task: F,
 	message: M,
 ) -> RegisterThreadFuture
@@ -46,7 +51,7 @@ where
 	M: 'static + MessageSend,
 {
 	RegisterThreadFuture(if super::has_spawn_support() {
-		audio_worklet::register_thread_with_message(context, task, message)
+		audio_worklet::register_thread_with_message(context, stack_size, task, message)
 	} else {
 		audio_worklet::RegisterThreadFuture::error(Error::new(
 			ErrorKind::Unsupported,

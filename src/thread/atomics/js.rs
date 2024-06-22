@@ -1,5 +1,7 @@
 //! Bindings to the JS API.
 
+#[cfg(feature = "audio-worklet")]
+use js_sys::Array;
 use js_sys::WebAssembly::Global;
 use js_sys::{Object, Promise};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -56,7 +58,12 @@ extern "C" {
 	///   executed.
 	/// - Must not be called twice for the same thread.
 	#[wasm_bindgen(method, js_name = __wbindgen_thread_destroy)]
-	pub(super) unsafe fn thread_destroy(this: &Exports, tls_base: &Global, stack_alloc: &Global);
+	pub(super) unsafe fn thread_destroy(
+		this: &Exports,
+		tls_base: &Global,
+		stack_alloc: &Global,
+		stack_size: Option<usize>,
+	);
 
 	/// Base address of [`wasm-bindgen`](wasm_bindgen)s TLS memory.
 	#[wasm_bindgen(method, getter, js_name = __tls_base)]
@@ -73,4 +80,24 @@ extern "C" {
 	/// Setter for [`GlobalDescriptor.value`](https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Global/Global#descriptor) property.
 	#[wasm_bindgen(method, setter, js_name = value)]
 	pub(super) fn set_value(this: &GlobalDescriptor, value: &str);
+}
+
+#[cfg(feature = "audio-worklet")]
+#[wasm_bindgen]
+extern "C" {
+	/// Extension for [`Array`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array).
+	#[wasm_bindgen(js_name = Array)]
+	pub(super) type ArrayExt;
+
+	/// [`Array.of()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/of)
+	/// with six arguments.
+	#[wasm_bindgen(static_method_of = ArrayExt, js_class = Array, js_name = of)]
+	pub fn of6(
+		a: &JsValue,
+		b: &JsValue,
+		c: &JsValue,
+		d: &JsValue,
+		e: &JsValue,
+		f: &JsValue,
+	) -> Array;
 }

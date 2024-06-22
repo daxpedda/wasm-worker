@@ -13,7 +13,11 @@ use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcess
 
 /// Implementation for
 /// [`crate::web::audio_worklet::BaseAudioContextExt::register_thread()`].
-pub(in super::super) fn register_thread<F>(_: BaseAudioContext, _: F) -> RegisterThreadFuture {
+pub(in super::super) fn register_thread<F>(
+	_: BaseAudioContext,
+	_: Option<usize>,
+	_: F,
+) -> RegisterThreadFuture {
 	unreachable!("reached `register_thread()` without atomics target feature")
 }
 
@@ -22,6 +26,7 @@ pub(in super::super) fn register_thread<F>(_: BaseAudioContext, _: F) -> Registe
 #[cfg(feature = "message")]
 pub(in super::super) fn register_thread_with_message<F, M>(
 	_: BaseAudioContext,
+	_: Option<usize>,
 	_: F,
 	_: M,
 ) -> RegisterThreadFuture {

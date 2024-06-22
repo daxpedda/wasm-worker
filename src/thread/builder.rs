@@ -171,14 +171,8 @@ impl Builder {
 	}
 
 	/// See [`std::thread::Builder::stack_size()`].
-	///
-	/// # Notes
-	///
-	/// This call is no-op. The default stack size is 1MB. To modify the stack
-	/// size allocated per thread use the `WASM_BINDGEN_THREADS_STACK_SIZE`
-	/// environment variable when executing `wasm-bindgen-cli`.
 	#[allow(clippy::missing_const_for_fn)]
 	pub fn stack_size(self, #[allow(unused)] size: usize) -> Self {
-		self
+		Self(self.0.stack_size(size))
 	}
 }

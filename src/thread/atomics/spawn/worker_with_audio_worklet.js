@@ -5,6 +5,7 @@ onmessage = async event => {
 	const [
 		module,
 		memory,
+		stackSize,
 		[workletLock, workerLock],
 		task,
 		message,
@@ -23,7 +24,7 @@ onmessage = async event => {
 		Atomics.add(memoryArray, workerLock, 1)
 	}
 
-	initSync(module, memory)
+	initSync({module, memory, thread_stack_size: stackSize})
 
 	if (Atomics.sub(memoryArray, workerLock, 1) === 1)
 		Atomics.notify(memoryArray, workerLock)
