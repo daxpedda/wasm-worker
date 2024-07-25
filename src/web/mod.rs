@@ -66,7 +66,10 @@ use crate::{Builder, JoinHandle, Scope, ScopedJoinHandle};
 /// } else {
 /// 	handle.join_async().await.unwrap()
 /// };
+/// # let _ = result;
 /// # }
+/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+/// # let _ = test();
 /// ```
 #[must_use]
 pub fn has_block_support() -> bool {
@@ -136,6 +139,8 @@ pub trait JoinHandleExt<T> {
 	///
 	/// web_thread::spawn(|| ()).join_async().await.unwrap();
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	fn join_async(&mut self) -> JoinHandleFuture<'_, T>;
 }
@@ -198,6 +203,8 @@ impl<T> Future for JoinHandleFuture<'_, T> {
 ///
 /// assert_eq!(value.load(Ordering::Relaxed), 4);
 /// # }
+/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+/// # let _ = test();
 /// ```
 pub fn scope_async<'scope, 'env: 'scope, F1, F2, T>(
 	#[allow(clippy::min_ident_chars)] f: F1,
@@ -275,6 +282,8 @@ impl<'scope, 'env, F, T> ScopeFuture<'scope, 'env, F, T> {
 	///
 	/// assert_eq!(value.load(Ordering::Relaxed), 4);
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn), not(unsupported_spawn_then_block))))]
+	/// # let _ = test();
 	/// ```
 	pub const fn into_wait(self) -> ScopeIntoJoinFuture<'scope, 'env, F, T> {
 		ScopeIntoJoinFuture(self)
@@ -305,6 +314,8 @@ pub trait ScopedJoinHandleExt<'scope, T> {
 	/// 	scope.spawn(|| ()).join_async().await.unwrap();
 	/// }).await;
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	fn join_async<'handle>(&'handle mut self) -> ScopedJoinHandleFuture<'handle, 'scope, T>;
 }
@@ -460,6 +471,8 @@ impl<T> ScopeJoinFuture<'_, '_, T> {
 	///
 	/// assert_eq!(value.load(Ordering::Relaxed), 4);
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn), not(unsupported_spawn_then_block))))]
+	/// # let _ = test();
 	/// ```
 	pub fn join_all(self) -> T {
 		self.0 .0.join_all()
@@ -622,14 +635,13 @@ pub trait ScopeExt<'scope> {
 	/// ```
 	/// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
 	/// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
-	/// # #[cfg(target_feature = "atomics")]
-	/// # #[cfg_attr(not(unsupported_spawn), wasm_bindgen_test::wasm_bindgen_test)]
+	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
 	/// # async fn test() {
 	/// use web_thread::web::{self, ScopeExt};
 	///
 	/// let (sender, receiver) = async_channel::unbounded::<usize>();
 	///
-	/// # let mut handle =
+	/// # let handle =
 	/// web::scope_async(move |scope| async move {
 	/// 	scope.spawn_async(move || async move {
 	/// 		while let Ok(message) = receiver.recv().await {
@@ -645,6 +657,8 @@ pub trait ScopeExt<'scope> {
 	/// # drop(sender);
 	/// # handle.await;
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	fn spawn_async<F1, F2, T>(&'scope self, f: F1) -> ScopedJoinHandle<'scope, T>
 	where
@@ -726,8 +740,7 @@ impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
 /// ```
 /// # #[cfg(all(target_feature = "atomics", not(unsupported_spawn)))]
 /// # wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
-/// # #[cfg(target_feature = "atomics")]
-/// # #[cfg_attr(not(unsupported_spawn), wasm_bindgen_test::wasm_bindgen_test)]
+/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
 /// # async fn test() {
 /// # use web_thread::web::JoinHandleExt;
 /// #
@@ -747,6 +760,8 @@ impl<'scope> ScopeExt<'scope> for Scope<'scope, '_> {
 /// # drop(sender);
 /// # handle.join_async().await.unwrap();
 /// # }
+/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+/// # let _ = test();
 /// ```
 pub fn spawn_async<F1, F2, T>(#[allow(clippy::min_ident_chars)] f: F1) -> JoinHandle<T>
 where
@@ -788,6 +803,7 @@ where
 /// 	|message| async move {
 /// 		let canvas: OffscreenCanvas = message.0;
 /// 		// Do work.
+/// #       let _ = canvas;
 /// 	},
 /// 	message,
 /// )
@@ -795,6 +811,8 @@ where
 /// .await
 /// .unwrap();
 /// # }
+/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+/// # let _ = test();
 /// ```
 #[cfg(any(feature = "message", docsrs))]
 pub fn spawn_with_message<F1, F2, T, M>(

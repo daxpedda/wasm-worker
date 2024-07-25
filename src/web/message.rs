@@ -127,6 +127,7 @@ macro_rules! impl_for_tuples {
 /// web::spawn_with_message(
 /// 	|message| async move {
 /// 		// Do work.
+/// #       let _ = message;
 /// 	},
 /// 	message,
 /// )
@@ -134,6 +135,8 @@ macro_rules! impl_for_tuples {
 /// .await
 /// .unwrap();
 /// # }
+/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+/// # let _ = test();
 /// ```
 ///
 /// [`Serializable`]: https://developer.mozilla.org/en-US/docs/Glossary/Serializable_object
@@ -441,6 +444,7 @@ impl Serializable for VideoFrame {}
 /// web::spawn_with_message(
 /// 	|message| async move {
 /// 		// Do work.
+/// #   	let _ = message;
 /// 	},
 /// 	message,
 /// )
@@ -448,6 +452,8 @@ impl Serializable for VideoFrame {}
 /// .await
 /// .unwrap();
 /// # }
+/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+/// # let _ = test();
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SerializableWrapper<T>(pub T)
@@ -578,15 +584,21 @@ impl<T: Into<JsValue> + JsCast + Transferable> MessageSend for TransferableWrapp
 /// let mut handle = web::spawn_with_message(
 /// 	|message| async move {
 /// 		// Do work.
+/// #       drop(message);
 /// 	},
 /// 	message,
 /// );
 ///
 /// // Do work.
+/// # /*
 /// data;
+/// # */
+/// # let _ =data;
 ///
 /// handle.join_async().await.unwrap();
 /// # }
+/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+/// # let _ = test();
 /// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SendWrapper<T>(pub T)

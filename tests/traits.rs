@@ -77,6 +77,7 @@ const fn web() {
 			RegisterThreadFuture, ReleaseError,
 		};
 
+		#[allow(dead_code)]
 		struct TestProcessor;
 
 		impl ExtendAudioWorkletProcessor for TestProcessor {

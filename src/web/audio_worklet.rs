@@ -103,6 +103,8 @@ pub trait BaseAudioContextExt {
 	/// 	},
 	/// ).await.unwrap();
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	///
 	/// [`closed`]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#closed
@@ -154,12 +156,15 @@ pub trait BaseAudioContextExt {
 	/// 		|message| {
 	/// 			let buffer: ArrayBuffer = message.0;
 	/// 			// Do work.
+	/// #           let _ = buffer;
 	/// 		},
 	/// 		buffer,
 	/// 	)
 	/// 	.await
 	/// 	.unwrap();
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	///
 	/// [`closed`]: https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/state#closed
@@ -240,7 +245,10 @@ pub trait BaseAudioContextExt {
 	/// web::yield_now_async(YieldTime::UserBlocking).await;
 	///
 	/// let node = context.audio_worklet_node::<TestProcessor>("test", String::from("test"), None).unwrap();
+	/// # let _ = node;
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	///
 	/// [`new AudioWorkletNode`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode
@@ -394,6 +402,8 @@ impl AudioWorkletHandle {
 	///
 	/// console::log_1(&format!("thread id: {:?}", handle.thread().id()).into());
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	#[must_use]
 	pub const fn thread(&self) -> &Thread {
@@ -420,7 +430,7 @@ impl AudioWorkletHandle {
 	/// # #[cfg_attr(all(target_feature = "atomics", not(unsupported_spawn)), wasm_bindgen_test::wasm_bindgen_test)]
 	/// # async fn test() {
 	/// use wasm_bindgen_futures::JsFuture;
-	/// use web_sys::{AudioContext, console};
+	/// use web_sys::AudioContext;
 	/// use web_thread::web::audio_worklet::BaseAudioContextExt;
 	///
 	/// let context = AudioContext::new().unwrap();
@@ -440,6 +450,8 @@ impl AudioWorkletHandle {
 	/// // events or promises that could call into the Wasm module later.
 	/// unsafe { handle.release() }.unwrap();
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	pub unsafe fn release(self) -> Result<(), ReleaseError> {
 		// SAFETY: See `ThreadMemory::release()`. Other safety guarantees have to be
@@ -538,7 +550,10 @@ pub trait AudioWorkletGlobalScopeExt {
 	/// web::yield_now_async(YieldTime::UserBlocking).await;
 	///
 	/// let node = AudioWorkletNode::new(&context, "test").unwrap();
+	/// # let _ = node;
 	/// # }
+	/// # #[cfg(not(all(target_feature = "atomics", not(unsupported_spawn))))]
+	/// # let _ = test();
 	/// ```
 	///
 	/// [`AudioWorkletGlobalScope.registerProcessor()`]: https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletGlobalScope/registerProcessor
