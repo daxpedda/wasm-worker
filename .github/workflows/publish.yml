@@ -1,25 +1,25 @@
 name: Publish
 
 on:
-  push:
-    branches: ["main"]
-  pull_request:
+    push:
+        branches: ['main']
+    pull_request:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref_name }}
+    cancel-in-progress: true
 
 env:
-  CARGO_TERM_COLOR: always
+    CARGO_TERM_COLOR: always
 
 jobs:
-  publish:
-    name: Publish
+    publish:
+        name: Publish
 
-    runs-on: ubuntu-latest
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Test Publish
-        run: cargo publish --dry-run
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+            - name: Test Publish
+              run: cargo publish --dry-run
