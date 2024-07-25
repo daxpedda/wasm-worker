@@ -90,9 +90,9 @@ fn register_thread_internal(
 		/// Object URL to the worklet script.
 		static URL: ScriptUrl = {
 			#[cfg(not(feature = "message"))]
-			let template = include_str!("worklet.min.js");
+			let template = include_str!("../../script/worklet.min.js");
 			#[cfg(feature = "message")]
-			let template = include_str!("worklet_with_message.min.js");
+			let template = include_str!("../../script/worklet_with_message.min.js");
 
 			ScriptUrl::new(&template.replacen("@shim.js", &META.url(), 1))
 		};

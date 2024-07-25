@@ -5,6 +5,9 @@
 	"isModule": true,
 	"minify": true,
 	"jsc": {
+		"parser": {
+			"syntax": "typescript"
+		},
 		"target": "es2022",
 		"minify": {
 			"compress": {

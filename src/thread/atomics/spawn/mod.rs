@@ -233,9 +233,9 @@ fn spawn_common(
 		/// Object URL to the worker script.
 		static URL: ScriptUrl = {
 			#[cfg(not(feature = "audio-worklet"))]
-			let template = include_str!("worker.min.js");
+			let template = include_str!("../script/worker.min.js");
 			#[cfg(feature = "audio-worklet")]
-			let template = include_str!("worker_with_audio_worklet.min.js");
+			let template = include_str!("../script/worker_with_audio_worklet.min.js");
 
 			ScriptUrl::new(&template.replacen("@shim.js", &META.url(), 1))
 		};

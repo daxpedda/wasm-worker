@@ -116,13 +116,14 @@ jobs:
     name: ESLint
 
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./src/thread/atomics/script
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install ESLint
-        run: sudo npm i -g eslint
       - name: Setup NPM
         run: npm install
       - name: Run ESLint
-        run: eslint
+        run: npx eslint

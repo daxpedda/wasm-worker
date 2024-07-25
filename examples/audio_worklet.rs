@@ -86,7 +86,7 @@ mod web {
 			context
 				.audio_worklet()
 				.unwrap()
-				.add_module(&url(include_str!("polyfill.js")))
+				.add_module(&url(include_str!("polyfill.min.js")))
 				.unwrap(),
 		)
 		.await
