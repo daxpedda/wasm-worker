@@ -1,6 +1,6 @@
 import { initSync, __web_thread_worker_entry, Message } from '@shim.js'
 
-onmessage = async (event) => {
+onmessage = async event => {
 	onmessage = null
 	const [module, memory, stackSize, task, message] = event.data as [
 		WebAssembly.Module,

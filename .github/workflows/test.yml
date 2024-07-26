@@ -1,335 +1,329 @@
 name: Test
 
 on:
-    push:
-        branches: ['main']
-    pull_request:
+  push:
+    branches: ["main"]
+  pull_request:
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref_name }}
-    cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref_name }}
+  cancel-in-progress: true
 
 env:
-    CARGO_TERM_COLOR: always
+  CARGO_TERM_COLOR: always
 
 jobs:
-    build-test:
-        name: ${{ matrix.target.description }} ${{ matrix.rust.description }} ${{ matrix.features.description }}
+  build-test:
+    name:
+      ${{ matrix.target.description }} ${{ matrix.rust.description }} ${{
+      matrix.features.description }}
 
-        runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-        timeout-minutes: 10
+    timeout-minutes: 10
 
-        strategy:
-            fail-fast: false
-            matrix:
-                target:
-                    - { target: wasm32-unknown-unknown, description: Build Web, web: true }
-                rust:
-                    - { version: stable }
-                    - {
-                          version: nightly,
-                          description: with Atomics,
-                          component: --component rust-src,
-                          flags: '-Ctarget-feature=+atomics,+bulk-memory',
-                          args: '-Zbuild-std=panic_abort,std',
-                      }
-                features:
-                    - { features: '' }
-                    - { features: --features audio-worklet, description: (`audio-worklet`) }
-                    - { features: --features message, description: (`message`) }
-                    - {
-                          features: --features message,
-                          description: (`message` + `web_sys_unstable_apis`),
-                          flags: --cfg=web_sys_unstable_apis,
-                      }
-                    - { features: --all-features, description: (all features) }
-                    - {
-                          features: --all-features,
-                          description: (all features + `web_sys_unstable_apis`),
-                          flags: --cfg=web_sys_unstable_apis,
-                      }
-                include:
-                    - target:
-                          {
-                              target: x86_64-unknown-linux-gnu,
-                              description: Build & Test Native,
-                              web: false,
-                          }
-                      rust: { version: stable }
-                      features: { features: '' }
-                    - target:
-                          {
-                              target: x86_64-unknown-linux-gnu,
-                              description: Build & Test Native,
-                              web: false,
-                          }
-                      rust: { version: stable }
-                      features: { features: --all-features, description: (all features) }
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { target: wasm32-unknown-unknown, description: Build Web, web: true }
+        rust:
+          - { version: stable }
+          - {
+              version: nightly,
+              description: with Atomics,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+        features:
+          - { features: "" }
+          - { features: --features audio-worklet, description: (`audio-worklet`) }
+          - { features: --features message, description: (`message`) }
+          - {
+              features: --features message,
+              description: (`message` + `web_sys_unstable_apis`),
+              flags: --cfg=web_sys_unstable_apis,
+            }
+          - { features: --all-features, description: (all features) }
+          - {
+              features: --all-features,
+              description: (all features + `web_sys_unstable_apis`),
+              flags: --cfg=web_sys_unstable_apis,
+            }
+        include:
+          - target:
+              { target: x86_64-unknown-linux-gnu, description: Build & Test Native, web: false }
+            rust: { version: stable }
+            features: { features: "" }
+          - target:
+              { target: x86_64-unknown-linux-gnu, description: Build & Test Native, web: false }
+            rust: { version: stable }
+            features: { features: --all-features, description: (all features) }
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-            - name: Install Rust
-              run: |
-                  rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
-                  rustup default ${{ matrix.rust.version }}
-            - name: Build
-              env:
-                  RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
-              run: |
-                  cargo build ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
-            - name: Documentation
-              env:
-                  RUSTDOCFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
-                  RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
-              run: |
-                  cargo doc --no-deps ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
-            - name: Test
-              if: matrix.target.web == false && matrix.target.features == ''
-              run: cargo test --all-targets --no-fail-fast
-            - name: Documentation tests
-              if: matrix.target.web == false && matrix.target.features == ''
-              run: cargo test --doc --no-fail-fast
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
+          rustup default ${{ matrix.rust.version }}
+      - name: Build
+        env:
+          RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
+        run: |
+          cargo build ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+      - name: Documentation
+        env:
+          RUSTDOCFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
+          RUSTFLAGS: ${{ matrix.rust.flags }} ${{ matrix.features.flags }}
+        run: |
+          cargo doc --no-deps ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+      - name: Test
+        if: matrix.target.web == false && matrix.target.features == ''
+        run: cargo test --all-targets --no-fail-fast
+      - name: Documentation tests
+        if: matrix.target.web == false && matrix.target.features == ''
+        run: cargo test --doc --no-fail-fast
 
-    test-browsers:
-        name: ${{ matrix.rust.pre_description }} ${{ matrix.driver.description }} ${{ matrix.rust.post_description }} ${{ matrix.cross-origin-isolation.description }} ${{ matrix.features.description }}
+  test-browsers:
+    name:
+      ${{ matrix.rust.pre_description }} ${{ matrix.driver.description }} ${{
+      matrix.rust.post_description }} ${{ matrix.cross-origin-isolation.description }} ${{
+      matrix.features.description }}
 
-        runs-on: ${{ matrix.driver.os }}
+    runs-on: ${{ matrix.driver.os }}
 
-        timeout-minutes: 10
+    timeout-minutes: 10
 
-        strategy:
-            fail-fast: false
-            matrix:
-                rust:
-                    - { version: stable, pre_description: Test }
-                    - { version: nightly, pre_description: Doctest }
-                    - {
-                          version: nightly,
-                          pre_description: Test & Doctest,
-                          post_description: with Atomics,
-                          atomics: true,
-                          component: --component rust-src,
-                          flags: '-Ctarget-feature=+atomics,+bulk-memory',
-                          args: '-Zbuild-std=panic_abort,std',
-                      }
-                features:
-                    - { features: '' }
-                    - { features: --features audio-worklet, description: (`audio-worklet`) }
-                    - { features: --features message, description: (`message`) }
-                    - { features: --all-features, description: (all features) }
-                cross-origin-isolation:
-                    - { state: true }
-                    - { state: false, description: (no COOP+COEP), flags: --cfg=unsupported_spawn }
-                driver:
-                    - {
-                          os: ubuntu-latest,
-                          description: Chrome,
-                          name: CHROMEDRIVER,
-                          value: chromedriver,
-                          flags: --cfg=unsupported_spawn_then_block,
-                      }
-                    - {
-                          os: ubuntu-latest,
-                          description: Firefox,
-                          name: GECKODRIVER,
-                          value: geckodriver,
-                          flags: --cfg=unsupported_service --cfg=unsupported_shared_block --cfg=unsupported_wait_async --cfg=unsupported_headless_audiocontext,
-                      }
-                    - {
-                          os: macos-latest,
-                          description: Safari,
-                          name: SAFARIDRIVER,
-                          value: safaridriver,
-                          flags: --cfg=unsupported_spawn_then_block --cfg=unsupported_shared_block,
-                      }
-                exclude:
-                    - rust: { version: stable, pre_description: Test }
-                      features: { features: '' }
-                    - rust: { version: stable, pre_description: Test }
-                      features:
-                          { features: --features audio-worklet, description: (`audio-worklet`) }
-                    - rust: { version: stable, pre_description: Test }
-                      features: { features: --features message, description: (`message`) }
-                    - rust: { version: nightly, pre_description: Doctest }
-                      features: { features: '' }
-                    - rust: { version: nightly, pre_description: Doctest }
-                      features:
-                          { features: --features audio-worklet, description: (`audio-worklet`) }
-                    - rust: { version: nightly, pre_description: Doctest }
-                      features: { features: --features message, description: (`message`) }
-                    - rust:
-                          {
-                              version: nightly,
-                              pre_description: Test & Doctest,
-                              post_description: with Atomics,
-                              atomics: true,
-                              component: --component rust-src,
-                              flags: '-Ctarget-feature=+atomics,+bulk-memory',
-                              args: '-Zbuild-std=panic_abort,std',
-                          }
-                      features: { features: '' }
-                      cross-origin-isolation:
-                          {
-                              state: false,
-                              description: (no COOP+COEP),
-                              flags: --cfg=unsupported_spawn,
-                          }
-                    - rust:
-                          {
-                              version: nightly,
-                              pre_description: Test & Doctest,
-                              post_description: with Atomics,
-                              atomics: true,
-                              component: --component rust-src,
-                              flags: '-Ctarget-feature=+atomics,+bulk-memory',
-                              args: '-Zbuild-std=panic_abort,std',
-                          }
-                      features:
-                          { features: --features audio-worklet, description: (`audio-worklet`) }
-                      cross-origin-isolation:
-                          {
-                              state: false,
-                              description: (no COOP+COEP),
-                              flags: --cfg=unsupported_spawn,
-                          }
-                    - rust:
-                          {
-                              version: nightly,
-                              pre_description: Test & Doctest,
-                              post_description: with Atomics,
-                              atomics: true,
-                              component: --component rust-src,
-                              flags: '-Ctarget-feature=+atomics,+bulk-memory',
-                              args: '-Zbuild-std=panic_abort,std',
-                          }
-                      features: { features: --features message, description: (`message`) }
-                      cross-origin-isolation:
-                          {
-                              state: false,
-                              description: (no COOP+COEP),
-                              flags: --cfg=unsupported_spawn,
-                          }
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - { version: stable, pre_description: Test }
+          - { version: nightly, pre_description: Doctest }
+          - {
+              version: nightly,
+              pre_description: Test & Doctest,
+              post_description: with Atomics,
+              atomics: true,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+        features:
+          - { features: "" }
+          - { features: --features audio-worklet, description: (`audio-worklet`) }
+          - { features: --features message, description: (`message`) }
+          - { features: --all-features, description: (all features) }
+        cross-origin-isolation:
+          - { state: true }
+          - { state: false, description: (no COOP+COEP), flags: --cfg=unsupported_spawn }
+        driver:
+          - {
+              os: ubuntu-latest,
+              description: Chrome,
+              name: CHROMEDRIVER,
+              value: chromedriver,
+              flags: --cfg=unsupported_spawn_then_block,
+            }
+          - {
+              os: ubuntu-latest,
+              description: Firefox,
+              name: GECKODRIVER,
+              value: geckodriver,
+              flags:
+                --cfg=unsupported_service --cfg=unsupported_shared_block
+                --cfg=unsupported_wait_async --cfg=unsupported_headless_audiocontext,
+            }
+          - {
+              os: macos-latest,
+              description: Safari,
+              name: SAFARIDRIVER,
+              value: safaridriver,
+              flags: --cfg=unsupported_spawn_then_block --cfg=unsupported_shared_block,
+            }
+        exclude:
+          - rust: { version: stable, pre_description: Test }
+            features: { features: "" }
+          - rust: { version: stable, pre_description: Test }
+            features: { features: --features audio-worklet, description: (`audio-worklet`) }
+          - rust: { version: stable, pre_description: Test }
+            features: { features: --features message, description: (`message`) }
+          - rust: { version: nightly, pre_description: Doctest }
+            features: { features: "" }
+          - rust: { version: nightly, pre_description: Doctest }
+            features: { features: --features audio-worklet, description: (`audio-worklet`) }
+          - rust: { version: nightly, pre_description: Doctest }
+            features: { features: --features message, description: (`message`) }
+          - rust:
+              {
+                version: nightly,
+                pre_description: Test & Doctest,
+                post_description: with Atomics,
+                atomics: true,
+                component: --component rust-src,
+                flags: "-Ctarget-feature=+atomics,+bulk-memory",
+                args: "-Zbuild-std=panic_abort,std",
+              }
+            features: { features: "" }
+            cross-origin-isolation:
+              { state: false, description: (no COOP+COEP), flags: --cfg=unsupported_spawn }
+          - rust:
+              {
+                version: nightly,
+                pre_description: Test & Doctest,
+                post_description: with Atomics,
+                atomics: true,
+                component: --component rust-src,
+                flags: "-Ctarget-feature=+atomics,+bulk-memory",
+                args: "-Zbuild-std=panic_abort,std",
+              }
+            features: { features: --features audio-worklet, description: (`audio-worklet`) }
+            cross-origin-isolation:
+              { state: false, description: (no COOP+COEP), flags: --cfg=unsupported_spawn }
+          - rust:
+              {
+                version: nightly,
+                pre_description: Test & Doctest,
+                post_description: with Atomics,
+                atomics: true,
+                component: --component rust-src,
+                flags: "-Ctarget-feature=+atomics,+bulk-memory",
+                args: "-Zbuild-std=panic_abort,std",
+              }
+            features: { features: --features message, description: (`message`) }
+            cross-origin-isolation:
+              { state: false, description: (no COOP+COEP), flags: --cfg=unsupported_spawn }
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-            - uses: taiki-e/cache-cargo-install-action@v2
-              with:
-                  tool: wasm-bindgen-cli
-                  git: https://github.com/daxpedda/wasm-bindgen
-                  rev: eeaf02e8ef039bb1962a66863ee4f0d6e983d636
-            - name: Install Rust
-              run: |
-                  rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
-                  rustup default ${{ matrix.rust.version }}
-            - name: Set Driver
-              run: echo "${{ matrix.driver.name }}=${{ matrix.driver.value }}" >> $GITHUB_ENV
-            - name: Disable Cross-Origin-Isolation
-              if: matrix.cross-origin-isolation.state == false
-              run: echo "WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1" >> $GITHUB_ENV
-            - name: Test
-              if: matrix.rust.version != 'nightly' || matrix.rust.atomics
-              env:
-                  RUSTFLAGS: --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
-              run: |
-                  cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }}
-            - name: Documentation tests
-              if: matrix.rust.version == 'nightly'
-              env:
-                  RUSTFLAGS: --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
-                  RUSTDOCFLAGS: --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{ matrix.cross-origin-isolation.flags }}
-              run: |
-                  cargo +nightly test --doc --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile -- --test-threads 1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: wasm-bindgen-cli
+          git: https://github.com/daxpedda/wasm-bindgen
+          rev: eeaf02e8ef039bb1962a66863ee4f0d6e983d636
+      - name: Install Rust
+        run: |
+          rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
+          rustup default ${{ matrix.rust.version }}
+      - name: Set Driver
+        run: echo "${{ matrix.driver.name }}=${{ matrix.driver.value }}" >> $GITHUB_ENV
+      - name: Disable Cross-Origin-Isolation
+        if: matrix.cross-origin-isolation.state == false
+        run: echo "WASM_BINDGEN_TEST_NO_ORIGIN_ISOLATION=1" >> $GITHUB_ENV
+      - name: Test
+        if: matrix.rust.version != 'nightly' || matrix.rust.atomics
+        env:
+          RUSTFLAGS:
+            --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{
+            matrix.cross-origin-isolation.flags }}
+        run: |
+          cargo test --all-targets --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }}
+      - name: Documentation tests
+        if: matrix.rust.version == 'nightly'
+        env:
+          RUSTFLAGS:
+            --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{
+            matrix.cross-origin-isolation.flags }}
+          RUSTDOCFLAGS:
+            --cfg=web_sys_unstable_apis ${{ matrix.rust.flags }} ${{ matrix.driver.flags }} ${{
+            matrix.cross-origin-isolation.flags }}
+        run: |
+          cargo +nightly test --doc --no-fail-fast ${{ matrix.features.features }} --target wasm32-unknown-unknown ${{ matrix.rust.args }} -Zdoctest-xcompile -- --test-threads 1
 
-    compile-test-web:
-        name: Compile Tests on Web ${{ matrix.rust.description }}
+  compile-test-web:
+    name: Compile Tests on Web ${{ matrix.rust.description }}
 
-        runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-        timeout-minutes: 10
+    timeout-minutes: 10
 
-        strategy:
-            fail-fast: false
-            matrix:
-                rust:
-                    - { version: stable, build_std: 0 }
-                    - {
-                          version: nightly,
-                          description: with Atomics,
-                          component: --component rust-src,
-                          flags: '-Ctarget-feature=+atomics,+bulk-memory',
-                          args: --features message,
-                          build_std: 1,
-                      }
+    strategy:
+      fail-fast: false
+      matrix:
+        rust:
+          - { version: stable, build_std: 0 }
+          - {
+              version: nightly,
+              description: with Atomics,
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: --features message,
+              build_std: 1,
+            }
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-            - name: Install Rust
-              run: |
-                  rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
-                  rustup default ${{ matrix.rust.version }}
-            - name: Test
-              env:
-                  UI_TEST_TARGET: wasm32-unknown-unknown
-                  UI_TEST_RUSTFLAGS: ${{ matrix.rust.flags }}
-                  UI_TEST_ARGS: ${{ matrix.rust.args }}
-                  UI_TEST_BUILD_STD: ${{ matrix.rust.build_std }}
-              run: cargo test --test compile_test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target wasm32-unknown-unknown
+          rustup default ${{ matrix.rust.version }}
+      - name: Test
+        env:
+          UI_TEST_TARGET: wasm32-unknown-unknown
+          UI_TEST_RUSTFLAGS: ${{ matrix.rust.flags }}
+          UI_TEST_ARGS: ${{ matrix.rust.args }}
+          UI_TEST_BUILD_STD: ${{ matrix.rust.build_std }}
+        run: cargo test --test compile_test
 
-    minimal-versions:
-        name: Minimal Versions on ${{ matrix.target.description }} (${{ matrix.rust.description }}) ${{ matrix.features.description }}
+  minimal-versions:
+    name:
+      Minimal Versions on ${{ matrix.target.description }} (${{ matrix.rust.description }}) ${{
+      matrix.features.description }}
 
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: minimal-versions
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: minimal-versions
 
-        strategy:
-            fail-fast: false
-            matrix:
-                target:
-                    - { target: wasm32-unknown-unknown, description: Web }
-                rust:
-                    - { version: '1.70', description: MSRV }
-                    - { version: stable, description: Stable }
-                    - {
-                          version: nightly,
-                          description: Nightly (Atomics),
-                          component: --component rust-src,
-                          flags: '-Ctarget-feature=+atomics,+bulk-memory',
-                          args: '-Zbuild-std=panic_abort,std',
-                      }
-                features:
-                    - { features: '' }
-                    - { features: --features audio-worklet, description: (`audio-worklet`) }
-                    - { features: --features message, description: (`message`) }
-                    - { features: --all-features, description: (all features) }
-                include:
-                    - target: { target: x86_64-unknown-linux-gnu, description: Native }
-                      rust: { version: '1.70', description: MSRV }
-                      features: { features: --all-features, description: (all features) }
-                    - target: { target: x86_64-unknown-linux-gnu, description: Native }
-                      rust: { version: stable, description: Stable }
-                      features: { features: --all-features, description: (all features) }
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { target: wasm32-unknown-unknown, description: Web }
+        rust:
+          - { version: "1.70", description: MSRV }
+          - { version: stable, description: Stable }
+          - {
+              version: nightly,
+              description: Nightly (Atomics),
+              component: --component rust-src,
+              flags: "-Ctarget-feature=+atomics,+bulk-memory",
+              args: "-Zbuild-std=panic_abort,std",
+            }
+        features:
+          - { features: "" }
+          - { features: --features audio-worklet, description: (`audio-worklet`) }
+          - { features: --features message, description: (`message`) }
+          - { features: --all-features, description: (all features) }
+        include:
+          - target: { target: x86_64-unknown-linux-gnu, description: Native }
+            rust: { version: "1.70", description: MSRV }
+            features: { features: --all-features, description: (all features) }
+          - target: { target: x86_64-unknown-linux-gnu, description: Native }
+            rust: { version: stable, description: Stable }
+            features: { features: --all-features, description: (all features) }
 
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v4
-            - name: Install Rust
-              run: |
-                  rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
-                  rustup default ${{ matrix.rust.version }}
-            - name: Install Rust nightly
-              run: rustup toolchain install nightly --profile minimal
-            - name: Update to minimal versions
-              run: cargo +nightly update -Zminimal-versions
-            - name: Fix nightly
-              if: matrix.rust.version == 'nightly'
-              run: cargo update -p proc-macro2 --precise 1.0.60
-            - name: Build
-              env:
-                  RUSTFLAGS: ${{ matrix.rust.flags }}
-              run: cargo build ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{ matrix.rust.args }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        run: |
+          rustup toolchain install ${{ matrix.rust.version }} --profile minimal ${{ matrix.rust.component }} --target ${{ matrix.target.target }}
+          rustup default ${{ matrix.rust.version }}
+      - name: Install Rust nightly
+        run: rustup toolchain install nightly --profile minimal
+      - name: Update to minimal versions
+        run: cargo +nightly update -Zminimal-versions
+      - name: Fix nightly
+        if: matrix.rust.version == 'nightly'
+        run: cargo update -p proc-macro2 --precise 1.0.60
+      - name: Build
+        env:
+          RUSTFLAGS: ${{ matrix.rust.flags }}
+        run:
+          cargo build ${{ matrix.features.features }} --target ${{ matrix.target.target }} ${{
+          matrix.rust.args }}

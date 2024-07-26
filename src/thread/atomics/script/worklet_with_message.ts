@@ -61,7 +61,7 @@ registerProcessor(
 			__web_thread_worklet_register(data)
 
 			this_.continueProcessing = true
-			this_.port.onmessage = (event) => {
+			this_.port.onmessage = event => {
 				this_.continueProcessing = false
 				this_.port.onmessage = null
 				const [task, message] = event.data as [number | undefined, Message]
