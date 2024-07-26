@@ -9,7 +9,7 @@ useTabs = true
 
 # Markdown: https://github.com/prettier/prettier/issues/5019
 [[overrides]]
-files = ["*.yml", "*.md"]
+files = ["*.yaml", "*.md"]
 options = { singleQuote = false, tabWidth = 2 }
 
 [[overrides]]
