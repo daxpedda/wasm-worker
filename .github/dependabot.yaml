@@ -15,8 +15,8 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: github-actions
-    directory: /
+  - package-ecosystem: npm
+    directory: src/thread/atomics/script
     schedule:
       interval: daily
     groups:
