@@ -17,16 +17,19 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[cfg(feature = "audio-worklet")]
 async fn test_stack_size(context: BaseAudioContext) {
+	use std::hint;
+
 	use futures_util::future;
 	use futures_util::future::Either;
 	use web_thread::web::audio_worklet::BaseAudioContextExt;
 
 	use self::util::{Flag, SIGNAL_DURATION};
 
+	#[inline(never)]
 	#[allow(clippy::large_stack_frames, clippy::missing_const_for_fn)]
 	fn allocate_on_stack() {
 		#[allow(clippy::large_stack_arrays, clippy::no_effect_underscore_binding)]
-		let _test = [0_u8; 1024 * 1024 * 2];
+		let _test = hint::black_box([0_u8; 1024 * 1024 * 2]);
 	}
 
 	let flag = Flag::new();

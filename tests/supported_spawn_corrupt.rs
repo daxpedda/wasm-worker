@@ -1,6 +1,8 @@
 #![cfg(test)]
 #![cfg(all(target_family = "wasm", target_feature = "atomics"))]
 
+use std::hint;
+
 use futures_util::future;
 use futures_util::future::Either;
 use web_thread::Builder;
@@ -10,10 +12,11 @@ use crate::util::{Flag, SIGNAL_DURATION};
 
 #[wasm_bindgen_test::wasm_bindgen_test]
 async fn builder_stack_size() {
+	#[inline(never)]
 	#[allow(clippy::large_stack_frames, clippy::missing_const_for_fn)]
 	fn allocate_on_stack() {
 		#[allow(clippy::large_stack_arrays, clippy::no_effect_underscore_binding)]
-		let _test = [0_u8; 1024 * 1024 * 2];
+		let _test = hint::black_box([0_u8; 1024 * 1024 * 2]);
 	}
 
 	let flag = Flag::new();

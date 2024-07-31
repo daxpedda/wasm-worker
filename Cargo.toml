@@ -10,6 +10,9 @@ repository = "https://github.com/daxpedda/web-thread"
 rust-version = "1.70"
 version = "0.0.0"
 
+[profile.test]
+opt-level = 1
+
 [features]
 audio-worklet = [
 	"web-sys/AudioContextState",
