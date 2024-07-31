@@ -1,4 +1,4 @@
-import { initSync, __web_thread_worklet_entry } from '@shim.js'
+import { initSync, __web_thread_worklet_entry, Pointer, type Task } from '@shim.js'
 import {
 	__WebThreadProcessorConstructor,
 	__WebThreadProcessor,
@@ -49,7 +49,7 @@ registerProcessor(
 				WebAssembly.Memory,
 				number | undefined,
 				number,
-				number,
+				Pointer<typeof Task>,
 			]
 
 			initSync({ module: module, memory: memory, thread_stack_size: stackSize })

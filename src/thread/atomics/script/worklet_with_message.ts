@@ -2,7 +2,10 @@ import {
 	initSync,
 	__web_thread_worklet_register,
 	__web_thread_worklet_entry,
-	Message,
+	Pointer,
+	type Data,
+	type Message,
+	type Task,
 } from '@shim.js'
 import { __WebThreadProcessor, AudioParamDescriptor } from 'web_thread_worklet'
 
@@ -50,7 +53,7 @@ registerProcessor(
 				WebAssembly.Memory,
 				number | undefined,
 				number,
-				number,
+				Pointer<typeof Data>,
 			]
 
 			initSync({ module, memory, thread_stack_size: stackSize })
@@ -64,7 +67,10 @@ registerProcessor(
 			this_.port.onmessage = event => {
 				this_.continueProcessing = false
 				this_.port.onmessage = null
-				const [task, message] = event.data as [number | undefined, Message]
+				const [task, message] = event.data as [
+					Pointer<typeof Task> | undefined,
+					Pointer<typeof Message>,
+				]
 
 				if (task === undefined) return
 

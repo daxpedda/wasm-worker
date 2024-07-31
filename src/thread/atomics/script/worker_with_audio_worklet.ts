@@ -1,4 +1,4 @@
-import { initSync, __web_thread_worker_entry, Message } from '@shim.js'
+import { initSync, __web_thread_worker_entry, Pointer, type Task, type Message } from '@shim.js'
 
 onmessage = async event => {
 	onmessage = null
@@ -7,8 +7,8 @@ onmessage = async event => {
 		WebAssembly.Memory,
 		number | undefined,
 		[number, number],
-		number,
-		Message,
+		Pointer<typeof Task>,
+		Pointer<typeof Message>,
 	]
 
 	const memoryArray = new Int32Array(memory.buffer)
