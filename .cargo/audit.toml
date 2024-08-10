@@ -1,6 +1,0 @@
-[advisories]
-ignore = [
-	# Only an unmaintained `dev-dependency`.
-	# Will be fixed by <https://github.com/romankoblov/prettydiff/pull/19>.
-	"RUSTSEC-2021-0139",
-]
