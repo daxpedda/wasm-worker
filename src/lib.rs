@@ -1,7 +1,10 @@
 //! TODO:
+//! - Refactor builder implementation
+//! - Use static string imports.
+//! - Use linked modules.
 //! - Remove `TextDecoder` detection in audio worklets.
 //! - Add `MessageSend` macro.
-//! - Add `WorkletBuilder`.
+//! - Add `WorkletBuilder` (or use `Builder`).
 //! - Wrap `MessageChannel` into something safe.
 //! - Consider passing message into `Builder`.
 //! - Add README.
@@ -9,9 +12,9 @@
 //!
 //! Things to note:
 //! - Will fail on import when used with the `no-modules` target.
-//! - Blocking is not recommended.
-//! - Audio worklets are very limited.
-//! - Spawning happens on the "main" thread, e.g. if blocked nothing will spawn.
+//! - Blocking is not recommended, e.g. blocks events.
+//! - Audio worklets are very limited, e.g. should not do any allocation.
+//! - Spawning happens on the "main" thread, e.g. if blocked nothing will spawn (affets some browsers only).
 //!
 //! Browser bugs:
 //! - Browsers don't support `TextEncoder`/`TextDecoder` in audio worklets:
