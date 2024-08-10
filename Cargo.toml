@@ -87,7 +87,7 @@ static_assertions = "1"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pollster = { version = "0.3", features = ["macro"] }
-ui_test = "0.23"
+ui_test = "0.25"
 
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
 async-channel = { version = "2", default-features = false }
@@ -123,7 +123,6 @@ utf32-lit = "1"
 
 [patch.crates-io]
 js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-ui_test = { git = "https://github.com/daxpedda/ui_test", branch = "web-thread" }
 utf32-lit = { git = "https://github.com/daxpedda/utf32-lit", branch = "web-thread" }
 wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
 wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
