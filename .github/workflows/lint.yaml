@@ -110,13 +110,6 @@ jobs:
               description: (all features + `web_sys_unstable_apis`),
               flags: --cfg=web_sys_unstable_apis,
             }
-        include:
-          - target: { target: x86_64-unknown-linux-gnu, description: Native }
-            rust: { version: nightly }
-            features: { features: "" }
-          - target: { target: x86_64-unknown-linux-gnu, description: Native }
-            rust: { version: nightly }
-            features: { features: --all-features }
 
     steps:
       - name: Checkout
