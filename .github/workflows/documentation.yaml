@@ -3,6 +3,7 @@ name: Documentation
 on:
   push:
     branches: ["main"]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -13,19 +14,88 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  document-deploy:
-    name: Document & Deploy
+  coverage:
+    name: Test Coverage
 
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}web_thread
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install `wasm-bindgen-cli`
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: wasm-bindgen-cli
+          git: https://github.com/rustwasm/wasm-bindgen
+          rev: d3872f17d3e6fbed19eef71a8056b904b5c0fb63
+      - name: Install LLVM v18
+        run: sudo apt-get install llvm-18
+      - name: Install Rust nightly
+        run: |
+          rustup toolchain install nightly --profile minimal --target wasm32-unknown-unknown --component rust-src,llvm-tools-preview
+          rustup default nightly
+      - name: Test
+        env:
+          CHROMEDRIVER: chromedriver
+          CFLAGS_wasm32_unknown_unknown: -matomics -mbulk-memory
+          CARGO_HOST_RUSTFLAGS: --cfg=wasm_bindgen_unstable_test_coverage
+          RUSTFLAGS:
+            -Cinstrument-coverage -Zno-profiler-runtime --emit=llvm-ir
+            --cfg=wasm_bindgen_unstable_test_coverage --cfg=web_sys_unstable_apis
+            --cfg=unsupported_spawn_then_block -Ctarget-feature=+atomics,+bulk-memory
+          WASM_BINDGEN_UNSTABLE_TEST_PROFRAW_OUT: coverage-input
+        run: |
+          mkdir coverage-input
+          cargo test --all-features --target wasm32-unknown-unknown -Ztarget-applies-to-host -Zhost-config -Zbuild-std=panic_abort,std --tests -- --skip corrupt
+      - name: Prepare Object Files
+        env:
+          CFLAGS_wasm32_unknown_unknown: -matomics -mbulk-memory
+          CARGO_HOST_RUSTFLAGS: --cfg=wasm_bindgen_unstable_test_coverage
+          RUSTFLAGS:
+            -Cinstrument-coverage -Zno-profiler-runtime --emit=llvm-ir
+            --cfg=wasm_bindgen_unstable_test_coverage --cfg=web_sys_unstable_apis
+            --cfg=unsupported_spawn_then_block -Ctarget-feature=+atomics,+bulk-memory
+        run: |
+          mkdir coverage-output
+          crate_name=web_thread
+          IFS=$'\n'
+          for file in $(
+            cargo test --all-features --target wasm32-unknown-unknown -Ztarget-applies-to-host -Zhost-config -Zbuild-std=panic_abort,std --tests --no-run --message-format=json | \
+            jq -r "select(.reason == \"compiler-artifact\") | (select(.target.kind == [\"test\"]) // select(.target.name == \"$crate_name\")) | .filenames[0]"
+          )
+          do
+            if [[ ${file##*.} == "rlib" ]]; then
+                base=$(basename $file .rlib)
+                file=$(dirname $file)/${base#"lib"}.ll
+            else
+                file=$(dirname $file)/$(basename $file .wasm).ll
+            fi
+
+            input=coverage-input/$(basename $file)
+
+            cp $file $input
+            perl -i -p0e 's/(^define.*?$).*?^}/$1\nstart:\n  unreachable\n}/gms' $input
+            perl -i -p0e 's/(^define( [^ ]+)*) range\(.*?\)/$1/gm' $input
+
+            clang-18 $input -Wno-override-module -c -o coverage-output/$(basename $input .ll).o
+          done
+      - name: Merge Profile Data
+        run:
+          llvm-profdata-18 merge -sparse coverage-input/*.profraw -o
+          coverage-output/coverage.profdata
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage-0
+          path: coverage-output
+          if-no-files-found: error
+
+  document:
+    name: Document
 
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
@@ -47,10 +117,67 @@ jobs:
           chmod -c -R +rX "target/wasm32-unknown-unknown/doc" | while read line; do
             echo "::warning title=Invalid file permissions automatically fixed::$line"
           done
-      - name: Upload artifact
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation
+          path: target/wasm32-unknown-unknown/doc
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy
+
+    needs: [coverage, document]
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}doc/web_thread
+
+    runs-on: ubuntu-24.04
+
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install LLVM v18
+        run: sudo apt-get install llvm-18
+      - name: Install `rustfilt`
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: rustfilt
+      - name: Download Test Coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-coverage-*
+          path: coverage
+      - name: Merge Profile Data
+        run:
+          llvm-profdata-18 merge -sparse coverage/**/coverage.profdata -o coverage/coverage.profdata
+      - name: Export Code Coverage Report
+        run: |
+          objects=()
+          for file in $(ls coverage/**/*.o)
+          do
+              objects+=(-object $file)
+          done
+          llvm-cov-18 show -show-instantiations=false -Xdemangler=rustfilt -output-dir page/coverage -format=html -instr-profile=coverage/coverage.profdata ${objects[@]} -sources src
+          llvm-cov-18 export -format=text -summary-only -instr-profile=coverage/coverage.profdata ${objects[@]} -sources src | \
+          printf '{ "coverage": "%.2f%%" }' $(jq '.data[0].totals.functions.percent') > page/coverage/coverage.json
+      - name: Download Documentation
+        uses: actions/download-artifact@v4
+        with:
+          name: documentation
+          path: page/doc
+      - name: Upload Page Artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: target/wasm32-unknown-unknown/doc
+          path: page
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

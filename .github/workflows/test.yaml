@@ -199,7 +199,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: taiki-e/cache-cargo-install-action@v2
+      - name: Install `wasm-bindgen-cli`
+        uses: taiki-e/cache-cargo-install-action@v2
         with:
           tool: wasm-bindgen-cli
           git: https://github.com/rustwasm/wasm-bindgen
