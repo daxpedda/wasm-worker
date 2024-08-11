@@ -1,5 +1,4 @@
 30
-1MB
 APIs
 Async
 atomics
@@ -27,5 +26,6 @@ unparks
 unparked
 unparking
 Wasm
+WebAssembly
 worklet
 worklets

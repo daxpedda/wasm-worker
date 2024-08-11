@@ -12,7 +12,7 @@ message = ["web-thread/message"]
 web-thread = { path = ".." }
 
 [patch.crates-io]
-js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+js-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
+wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
+wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
+web-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
