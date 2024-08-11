@@ -114,7 +114,8 @@ impl Builder {
 	}
 
 	/// Implementation of [`std::thread::Builder::stack_size()`].
-	pub(super) const fn stack_size(self, _: usize) -> Self {
+	#[allow(clippy::missing_const_for_fn)]
+	pub(super) fn stack_size(self, _: usize) -> Self {
 		self
 	}
 }

@@ -171,8 +171,12 @@ impl Builder {
 	}
 
 	/// See [`std::thread::Builder::stack_size()`].
-	#[allow(clippy::missing_const_for_fn)]
-	pub fn stack_size(self, #[allow(unused)] size: usize) -> Self {
+	///
+	/// # Notes
+	///
+	/// Stack size will be round up to the nearest multiple of the WebAssembly
+	/// page size, which is 64 Ki.
+	pub fn stack_size(self, size: usize) -> Self {
 		Self(self.0.stack_size(size))
 	}
 }

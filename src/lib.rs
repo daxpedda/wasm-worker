@@ -1,5 +1,5 @@
 //! TODO:
-//! - Refactor builder implementation
+//! - Re-factor builder implementation
 //! - Use static string imports.
 //! - Use linked modules.
 //! - Add `MessageSend` macro.
@@ -13,7 +13,8 @@
 //! - Will fail on import when used with the `no-modules` target.
 //! - Blocking is not recommended, e.g. blocks events.
 //! - Audio worklets are very limited, e.g. should not do any allocation.
-//! - Spawning happens on the "main" thread, e.g. if blocked nothing will spawn (affets some browsers only).
+//! - Spawning happens on the "main" thread, e.g. if blocked nothing will spawn
+//!   (affects some browsers only).
 //!
 //! Browser bugs:
 //! - Browsers don't support `TextEncoder`/`TextDecoder` in audio worklets:

@@ -184,7 +184,13 @@ impl Builder {
 	}
 
 	/// Implementation of [`std::thread::Builder::stack_size()`].
-	pub(super) const fn stack_size(mut self, size: usize) -> Self {
+	pub(super) fn stack_size(mut self, mut size: usize) -> Self {
+		/// Wasm page size according to the specification is 64 Ki.
+		/// See <https://webassembly.github.io/spec/core/exec/runtime.html#page-size>.
+		const PAGE_SIZE: usize = 1024 * 64;
+
+		size = size.checked_add(PAGE_SIZE - 1).unwrap_or(usize::MAX) / PAGE_SIZE * PAGE_SIZE;
+
 		self.stack_size = Some(size);
 		self
 	}
