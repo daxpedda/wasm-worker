@@ -776,7 +776,7 @@ mod web {
 	fn url(script: &str) -> String {
 		let sequence = Array::of1(&script.into());
 		let property = BlobPropertyBag::new();
-		property.set_type_("text/javascript");
+		property.set_type("text/javascript");
 		let blob = Blob::new_with_str_sequence_and_options(&sequence, &property)
 			.expect("`new Blob()` should never throw");
 

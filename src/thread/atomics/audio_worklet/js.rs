@@ -4,17 +4,11 @@ use std::ptr::NonNull;
 
 use js_sys::Object;
 use wasm_bindgen::prelude::wasm_bindgen;
-use wasm_bindgen::JsValue;
 
-use super::super::super::js::GlobalExt;
 use super::Data;
 
 #[wasm_bindgen]
 extern "C" {
-	/// Returns the constructor of [`TextDecoder`](https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder).
-	#[wasm_bindgen(method, getter, js_name = TextDecoder)]
-	pub(super) fn text_decoder(this: &GlobalExt) -> JsValue;
-
 	/// Extension for [`BaseAudioContext`](web_sys::BaseAudioContext).
 	pub(super) type BaseAudioContextExt;
 

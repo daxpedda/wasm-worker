@@ -119,14 +119,13 @@ web-time = "1"
 atomic-waker = "1"
 bytemuck = "1"
 futures-util = { version = "0.3", default-features = false }
-utf32-lit = "1"
 
 [patch.crates-io]
-js-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-utf32-lit = { git = "https://github.com/daxpedda/utf32-lit", branch = "web-thread" }
-wasm-bindgen = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-wasm-bindgen-futures = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
-web-sys = { git = "https://github.com/daxpedda/wasm-bindgen", branch = "web-thread" }
+js-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
+wasm-bindgen = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
+wasm-bindgen-futures = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
+wasm-bindgen-test = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
+web-sys = { git = "https://github.com/rustwasm/wasm-bindgen", rev = "d3872f17d3e6fbed19eef71a8056b904b5c0fb63" }
 
 [[example]]
 doc-scrape-examples = true

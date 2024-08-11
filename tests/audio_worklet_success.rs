@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 use std::future::Future;
 
-use js_sys::{Array, Iterator, Object, Reflect};
+use js_sys::{Array, Iterator, JsString, Object, Reflect};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -19,7 +19,7 @@ use super::test_processor::{
 	AudioParameter, AudioWorkletNodeOptionsExt, TestProcessor, GLOBAL_DATA,
 };
 use super::util::Flag;
-use crate::{js_string, test_audio};
+use crate::test_audio;
 
 async fn test_nested(context: BaseAudioContext) {
 	let (sender, receiver) = async_channel::bounded(1);
@@ -615,7 +615,7 @@ impl AudioParameter for TestParameters {
 		let parameters = Array::new();
 
 		let parameter = Object::new();
-		Reflect::set(&parameter, &js_string!("name"), &js_string!("test")).unwrap();
+		Reflect::set(&parameter, &js_string("name"), &js_string("test")).unwrap();
 
 		parameters.push(&parameter);
 		parameters.values()
@@ -636,7 +636,7 @@ async fn test_parameters(context: BaseAudioContext) {
 					if data
 						.set(RefCell::new(Some(Box::new(move |options| {
 							let parameters = options.get_parameter_data().unwrap();
-							let value = Reflect::get(&parameters, &js_string!("test")).unwrap();
+							let value = Reflect::get(&parameters, &js_string("test")).unwrap();
 							assert_eq!(value, 42.);
 							end.signal();
 							None
@@ -670,3 +670,8 @@ async fn test_parameters(context: BaseAudioContext) {
 }
 
 test_audio!(parameters);
+
+fn js_string(string: &str) -> JsString {
+	JsString::from_code_point(string.chars().map(u32::from).collect::<Vec<_>>().as_slice())
+		.expect("found invalid Unicode")
+}

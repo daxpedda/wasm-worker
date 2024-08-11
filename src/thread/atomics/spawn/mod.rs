@@ -20,7 +20,7 @@ use {self::message::SPAWN_SENDER, super::channel};
 
 #[cfg(feature = "audio-worklet")]
 use super::audio_worklet::register::THREAD_LOCK_INDEXES;
-use super::js::META;
+use super::js::{Meta, META};
 use super::main::{self, Command};
 use super::memory::ThreadMemory;
 use super::url::ScriptUrl;
@@ -237,12 +237,12 @@ fn spawn_common(
 			#[cfg(feature = "audio-worklet")]
 			let template = include_str!("../script/worker_with_audio_worklet.min.js");
 
-			ScriptUrl::new(&template.replacen("@shim.js", &META.url(), 1))
+			ScriptUrl::new(&template.replacen("@shim.js", &META.with(Meta::url), 1))
 		};
 	}
 
 	let options = WorkerOptions::new();
-	options.set_type_(WorkerType::Module);
+	options.set_type(WorkerType::Module);
 
 	if let Some(name) = name {
 		options.set_name(name);

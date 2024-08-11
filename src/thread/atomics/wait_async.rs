@@ -81,7 +81,7 @@ impl WaitAsync {
 	/// Mimics the interface we need from [`Atomics::wait_async`].
 	pub(super) fn wait(value: &AtomicI32, check: i32) -> Self {
 		thread_local! {
-			static HAS_WAIT_ASYNC: bool = !js::HAS_WAIT_ASYNC.is_undefined();
+			static HAS_WAIT_ASYNC: bool = !js::HAS_WAIT_ASYNC.with(JsValue::is_undefined);
 		}
 
 		// Short-circuit before having to go through FFI.

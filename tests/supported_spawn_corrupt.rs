@@ -15,8 +15,8 @@ async fn builder_stack_size() {
 	#[inline(never)]
 	#[allow(clippy::large_stack_frames, clippy::missing_const_for_fn)]
 	fn allocate_on_stack() {
-		#[allow(clippy::large_stack_arrays, clippy::no_effect_underscore_binding)]
-		let _test = hint::black_box([0_u8; 1024 * 1024 * 2]);
+		#[allow(clippy::large_stack_arrays)]
+		hint::black_box([0_u8; 1024 * 1024 * 2]);
 	}
 
 	let flag = Flag::new();

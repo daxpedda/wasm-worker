@@ -12,7 +12,7 @@ use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNodeOptions, DomException};
 
 use super::js::ProcessorOptions;
-use super::{Data, DATA_PROPERTY_NAME, HAS_TEXT_DECODER, PROCESSOR_OPTIONS_PROPERTY_NAME};
+use super::{Data, DATA_PROPERTY_NAME, PROCESSOR_OPTIONS_PROPERTY_NAME};
 use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 
 /// Implementation for
@@ -20,12 +20,9 @@ use crate::web::audio_worklet::ExtendAudioWorkletProcessor;
 pub(in super::super::super) fn register_processor<P: 'static + ExtendAudioWorkletProcessor>(
 	name: &str,
 ) -> Result<(), Error> {
-	let name = if HAS_TEXT_DECODER.with(bool::clone) {
-		JsString::from(name)
-	} else {
+	let name =
 		JsString::from_code_point(name.chars().map(u32::from).collect::<Vec<_>>().as_slice())
-			.expect("found invalid Unicode")
-	};
+			.expect("found invalid Unicode");
 
 	__web_thread_register_processor(
 		name,

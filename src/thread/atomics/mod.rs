@@ -346,7 +346,7 @@ pub(super) fn has_spawn_support() -> bool {
 	static HAS_SPAWN_SUPPORT: OnceLock<bool> = OnceLock::new();
 
 	*HAS_SPAWN_SUPPORT.get_or_init(|| {
-		*CROSS_ORIGIN_ISOLATED && {
+		CROSS_ORIGIN_ISOLATED.with(bool::clone) && {
 			let global: GlobalExt = js_sys::global().unchecked_into();
 			!global.worker().is_undefined()
 		}

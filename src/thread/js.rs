@@ -64,7 +64,7 @@ extern "C" {
 	pub(super) fn scheduler(this: &WindowOrWorkerExt) -> Scheduler;
 
 	/// Returns [`crossOriginIsolated`](https://developer.mozilla.org/en-US/docs/Web/API/crossOriginIsolated) global property.
-	#[wasm_bindgen(js_name = crossOriginIsolated)]
+	#[wasm_bindgen(thread_local, js_name = crossOriginIsolated)]
 	pub(super) static CROSS_ORIGIN_ISOLATED: bool;
 }
 

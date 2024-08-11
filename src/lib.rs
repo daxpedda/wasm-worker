@@ -2,7 +2,6 @@
 //! - Refactor builder implementation
 //! - Use static string imports.
 //! - Use linked modules.
-//! - Remove `TextDecoder` detection in audio worklets.
 //! - Add `MessageSend` macro.
 //! - Add `WorkletBuilder` (or use `Builder`).
 //! - Wrap `MessageChannel` into something safe.

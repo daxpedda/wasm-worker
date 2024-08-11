@@ -8,9 +8,9 @@ pub(super) mod register;
 
 use std::any::{Any, TypeId};
 use std::ptr::NonNull;
-use std::sync::OnceLock;
 
 use js_sys::{JsString, Object, Reflect};
+use wasm_bindgen::prelude::wasm_bindgen;
 use wasm_bindgen::JsCast;
 use web_sys::{AudioWorkletNode, AudioWorkletNodeOptions, BaseAudioContext};
 
@@ -21,56 +21,21 @@ pub(in super::super) use self::register::message::register_thread_with_message;
 pub(in super::super) use self::register::{
 	register_thread, AudioWorkletHandle, RegisterThreadFuture,
 };
-use super::super::js::GlobalExt;
 pub(in super::super) use super::is_main_thread;
 use crate::web::audio_worklet::{AudioWorkletNodeError, ExtendAudioWorkletProcessor};
 
-/// Macro to cache conversions from [`String`]s to [`JsString`]s to avoid
-/// `TextDecoder` when not available and the overhead of creating [`JsString`].
-macro_rules! js_string {
-	($($(#[$doc:meta])* static $name:ident = $value:literal;)*) => {
-		thread_local! {
-			$(
-				$(#[$doc])*
-				static $name: JsString = if HAS_TEXT_DECODER.with(bool::clone) {
-					JsString::from($value)
-				} else {
-					/// There is currently no nice way in Rust to convert
-					/// [`String`]s into `Vec<u32>`s without allocation, so we
-					/// cache it.
-					static NAME: OnceLock<Vec<u32>> = OnceLock::new();
-
-					JsString::from_code_point(
-						NAME.get_or_init(|| $value.chars().map(u32::from).collect())
-							.as_slice(),
-					)
-					.expect("found invalid Unicode")
-				};
-			)*
-		}
-	};
-}
-
-thread_local! {
-	/// Caches if this audio worklet supports [`TextDecoder`]. It is possible
-	/// that users will add a polyfill, so we don't want to assume that all
-	/// audio worklets have the same support.
-	///
-	/// [`TextDecoder`]: https://developer.mozilla.org/en-US/docs/Web/API/TextDecoder
-	static HAS_TEXT_DECODER: bool = !js_sys::global()
-		.unchecked_into::<GlobalExt>()
-		.text_decoder()
-		.is_undefined();
-}
-
-js_string! {
+#[wasm_bindgen]
+#[rustfmt::skip]
+extern "C" {
 	/// Name of our custom property on [`AudioWorkletNodeOptions`].
-	static DATA_PROPERTY_NAME = "__web_thread_data";
+	#[wasm_bindgen(thread_local, static_string)]
+	static DATA_PROPERTY_NAME: JsString = "__web_thread_data";
 
 	/// Name of the
 	/// [`AudioWorkletNodeOptions.processorOptions`](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode/AudioWorkletNode#processoroptions)
 	/// property.
-	static PROCESSOR_OPTIONS_PROPERTY_NAME = "processorOptions";
+	#[wasm_bindgen(thread_local, static_string)]
+	static PROCESSOR_OPTIONS_PROPERTY_NAME: JsString = "processorOptions";
 }
 
 /// Returns [`true`] if this context has a registered thread.

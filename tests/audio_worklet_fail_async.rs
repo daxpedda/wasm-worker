@@ -62,7 +62,7 @@ async fn check_failing_spawn() {
 			.into(),
 	);
 	let property = BlobPropertyBag::new();
-	property.set_type_("text/javascript");
+	property.set_type("text/javascript");
 	let blob = Blob::new_with_str_sequence_and_options(&sequence, &property).unwrap();
 	let url = Url::create_object_url_with_blob(&blob).unwrap();
 

@@ -1,5 +1,6 @@
 #![cfg(all(target_family = "wasm", feature = "audio-worklet"))]
 #![allow(
+	clippy::missing_panics_doc,
 	missing_copy_implementations,
 	missing_debug_implementations,
 	unreachable_pub
@@ -89,14 +90,6 @@ extern "C" {
 
 	#[wasm_bindgen(setter, method, js_name = parameterData)]
 	pub fn set_parameter_data(this: &AudioWorkletNodeOptionsExt, value: Option<&Array>);
-}
-
-#[macro_export]
-macro_rules! js_string {
-	($string:literal) => {
-		::js_sys::JsString::from_code_point(::bytemuck::cast_slice(::utf32_lit::utf32!($string)))
-			.expect("found invalid Unicode")
-	};
 }
 
 #[macro_export]

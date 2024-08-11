@@ -30,7 +30,7 @@ use {
 	web_sys::MessageChannel,
 };
 
-use super::super::js::META;
+use super::super::js::{Meta, META};
 use super::super::memory::ThreadMemory;
 use super::super::url::ScriptUrl;
 use super::super::wait_async::WaitAsync;
@@ -94,7 +94,7 @@ fn register_thread_internal(
 			#[cfg(feature = "message")]
 			let template = include_str!("../../script/worklet_with_message.min.js");
 
-			ScriptUrl::new(&template.replacen("@shim.js", &META.url(), 1))
+			ScriptUrl::new(&template.replacen("@shim.js", &META.with(Meta::url), 1))
 		};
 	}
 

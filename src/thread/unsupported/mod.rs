@@ -212,7 +212,7 @@ pub(super) fn has_spawn_support() -> bool {
 
 thread_local! {
 	static ZERO_ARRAY: Int32Array = {
-		if *CROSS_ORIGIN_ISOLATED {
+		if CROSS_ORIGIN_ISOLATED.with(bool::clone) {
 			Int32Array::new(&SharedArrayBuffer::new(4))
 		} else {
 			// Without cross-origin isolation `SharedArrayBuffer` is unsupported, but we

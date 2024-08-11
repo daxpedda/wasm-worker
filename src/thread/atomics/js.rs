@@ -19,7 +19,7 @@ extern "C" {
 	pub(super) type Meta;
 
 	/// Returns [`import.meta`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import.meta).
-	#[wasm_bindgen(js_namespace = import, js_name = meta)]
+	#[wasm_bindgen(thread_local, js_namespace = import, js_name = meta)]
 	pub(super) static META: Meta;
 
 	/// See [`import.meta.url`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/import.meta#url).
@@ -27,7 +27,7 @@ extern "C" {
 	pub(super) fn url(this: &Meta) -> String;
 
 	/// Returns [`Atomics.waitAsync`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/waitAsync).
-	#[wasm_bindgen(js_namespace = Atomics, js_name = waitAsync)]
+	#[wasm_bindgen(thread_local, js_namespace = Atomics, js_name = waitAsync)]
 	pub(super) static HAS_WAIT_ASYNC: JsValue;
 
 	/// Type for [`Atomics.waitAsync`s return value](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Atomics/waitAsync#return_value).
