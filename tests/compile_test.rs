@@ -5,7 +5,8 @@ use std::ffi::OsString;
 
 use ui_test::custom_flags::rustfix::RustfixMode;
 use ui_test::dependencies::DependencyBuilder;
-use ui_test::{Config, OutputConflictHandling};
+use ui_test::status_emitter::Text;
+use ui_test::{Args, Config, Format, OutputConflictHandling};
 
 #[test]
 fn test() {
@@ -40,7 +41,28 @@ fn test() {
 
 	revisioned.set_custom("dependencies", dependency_builder);
 
-	ui_test::run_tests(config).unwrap();
+	let args = Args::test().unwrap();
+	#[allow(clippy::print_stdout)]
+	if let Format::Pretty = args.format {
+		println!(
+			"Compiler: {}",
+			config.program.display().to_string().replace('\\', "/")
+		);
+	}
+
+	let text = match args.format {
+		Format::Terse => Text::quiet(),
+		Format::Pretty => Text::verbose(),
+	};
+	config.with_args(&args);
+
+	ui_test::run_tests_generic(
+		vec![config],
+		ui_test::default_file_filter,
+		ui_test::default_per_file_config,
+		text,
+	)
+	.unwrap();
 }
 
 fn add_flags(envs: &mut Vec<(OsString, Option<OsString>)>, flags: OsString) {
