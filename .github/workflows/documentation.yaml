@@ -128,11 +128,16 @@ jobs:
           llvm-cov-18 export -format=lcov -skip-functions -instr-profile=coverage-input/coverage.profdata ${objects[@]} -sources src > coverage-output/coverage.lcov
           llvm-cov-18 export -format=text -summary-only -instr-profile=coverage-input/coverage.profdata ${objects[@]} -sources src | \
           printf '{ "coverage": "%.2f%%" }' $(jq '.data[0].totals.functions.percent') > coverage-output/coverage.json
+      - name: Download Previous Coverage Report
+        run: wget https://daxpedda.github.io/wasm-worker/coverage/coverage.lcov
       - name: Report Coverage in Job Summary
         # See <https://github.com/romeovs/lcov-reporter-action/pull/68>
         uses: 06393993/lcov-reporter-action@45b31bf53fa5ac82d0f49039198080afdb535288
         with:
           lcov-file: coverage-output/coverage.lcov
+          lcov-base: coverage.lcov
+          filter-changed-files: true
+          title: Test Coverage
           post-to: job-summary
       - name: Upload Test Coverage Artifact
         uses: actions/upload-artifact@v4
