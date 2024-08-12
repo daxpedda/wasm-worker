@@ -14,7 +14,6 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::Worker;
 
 use super::js::{self, WaitAsyncResult};
-use super::url::ScriptUrl;
 use super::{MEMORY, MEMORY_ARRAY};
 
 /// Arbitrary limited amount of workers to cache.
@@ -111,7 +110,7 @@ impl WaitAsync {
 	fn wait_polyfill(index: u32, check: i32) -> Self {
 		thread_local! {
 			/// Object URL to the worker script.
-			static URL: ScriptUrl = ScriptUrl::new(include_str!("script/wait_async.min.js"));
+			static URL: String = wasm_bindgen::link_to!(module = "/src/thread/atomics/script/wait_async.min.js");
 			/// Holds cached workers.
 			static WORKERS: RefCell<Vec<Worker>> = const { RefCell::new(Vec::new()) };
 		}
@@ -121,7 +120,7 @@ impl WaitAsync {
 				return worker;
 			}
 
-			URL.with(|url| Worker::new(url.as_raw()))
+			URL.with(|url| Worker::new(url))
 				.expect("`new Worker()` is not expected to fail with a local script")
 		});
 

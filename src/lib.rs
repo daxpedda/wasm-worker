@@ -1,7 +1,5 @@
 //! TODO:
-//! - Re-factor builder implementation
-//! - Use static string imports.
-//! - Use linked modules.
+//! - Re-factor builder implementation.
 //! - Add `MessageSend` macro.
 //! - Add `WorkletBuilder` (or use `Builder`).
 //! - Wrap `MessageChannel` into something safe.

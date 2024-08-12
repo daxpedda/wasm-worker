@@ -86,7 +86,9 @@ mod web {
 			context
 				.audio_worklet()
 				.unwrap()
-				.add_module(&url(include_str!("polyfill.min.js")))
+				.add_module(&url(&wasm_bindgen::link_to!(
+					module = "/examples/polyfill.min.js"
+				)))
 				.unwrap(),
 		)
 		.await
