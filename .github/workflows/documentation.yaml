@@ -83,11 +83,63 @@ jobs:
         run:
           llvm-profdata-18 merge -sparse coverage-input/*.profraw -o
           coverage-output/coverage.profdata
-      - name: Upload
+      - name: Upload Test Coverage Artifact
         uses: actions/upload-artifact@v4
         with:
           name: test-coverage-0
           path: coverage-output
+          retention-days: 1
+          if-no-files-found: error
+
+  collect-coverage:
+    name: Collect Test Coverage
+
+    needs: coverage
+
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install LLVM v18
+        run: sudo apt-get install llvm-18
+      - name: Install `rustfilt`
+        uses: taiki-e/cache-cargo-install-action@v2
+        with:
+          tool: rustfilt
+      - name: Download Test Coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: test-coverage-*
+          path: coverage-input
+      - name: Merge Profile Data
+        run:
+          llvm-profdata-18 merge -sparse coverage-input/**/coverage.profdata -o
+          coverage-input/coverage.profdata
+      - name: Export Code Coverage Report
+        run: |
+          mkdir coverage-output
+          objects=()
+          for file in $(ls coverage-input/**/*.o)
+          do
+              objects+=(-object $file)
+          done
+          llvm-cov-18 show -show-instantiations=false -Xdemangler=rustfilt -output-dir coverage-output -format=html -instr-profile=coverage-input/coverage.profdata ${objects[@]} -sources src
+          llvm-cov-18 export -format=lcov -skip-functions -instr-profile=coverage-input/coverage.profdata ${objects[@]} -sources src > coverage-output/coverage.lcov
+          llvm-cov-18 export -format=text -summary-only -instr-profile=coverage-input/coverage.profdata ${objects[@]} -sources src | \
+          printf '{ "coverage": "%.2f%%" }' $(jq '.data[0].totals.functions.percent') > coverage-output/coverage.json
+      - name: Report Coverage in Job Summary
+        # See <https://github.com/romeovs/lcov-reporter-action/pull/68>
+        uses: 06393993/lcov-reporter-action@45b31bf53fa5ac82d0f49039198080afdb535288
+        with:
+          lcov-file: coverage-output/coverage.lcov
+          post-to: job-summary
+      - name: Upload Test Coverage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-coverage
+          path: coverage-output
+          retention-days: 1
           if-no-files-found: error
 
   document:
@@ -122,18 +174,19 @@ jobs:
         with:
           name: documentation
           path: target/wasm32-unknown-unknown/doc
+          retention-days: 1
           if-no-files-found: error
 
   deploy:
     name: Deploy
 
-    needs: [coverage, document]
+    needs: [collect-coverage, document]
 
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}doc/web_thread
 
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
@@ -145,30 +198,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Install LLVM v18
-        run: sudo apt-get install llvm-18
-      - name: Install `rustfilt`
-        uses: taiki-e/cache-cargo-install-action@v2
-        with:
-          tool: rustfilt
       - name: Download Test Coverage
         uses: actions/download-artifact@v4
         with:
-          pattern: test-coverage-*
-          path: coverage
-      - name: Merge Profile Data
-        run:
-          llvm-profdata-18 merge -sparse coverage/**/coverage.profdata -o coverage/coverage.profdata
-      - name: Export Code Coverage Report
-        run: |
-          objects=()
-          for file in $(ls coverage/**/*.o)
-          do
-              objects+=(-object $file)
-          done
-          llvm-cov-18 show -show-instantiations=false -Xdemangler=rustfilt -output-dir page/coverage -format=html -instr-profile=coverage/coverage.profdata ${objects[@]} -sources src
-          llvm-cov-18 export -format=text -summary-only -instr-profile=coverage/coverage.profdata ${objects[@]} -sources src | \
-          printf '{ "coverage": "%.2f%%" }' $(jq '.data[0].totals.functions.percent') > page/coverage/coverage.json
+          name: test-coverage
+          path: page/coverage
       - name: Download Documentation
         uses: actions/download-artifact@v4
         with:
