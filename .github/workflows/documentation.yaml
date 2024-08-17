@@ -130,7 +130,7 @@ jobs:
         run: wget https://daxpedda.github.io/wasm-worker/coverage/coverage.lcov
       - name: Report Coverage in Job Summary
         # See <https://github.com/romeovs/lcov-reporter-action/pull/68>
-        uses: 06393993/lcov-reporter-action@45b31bf53fa5ac82d0f49039198080afdb535288
+        uses: 06393993/lcov-reporter-action@24d48ff28930b87e67d0df34283153b04a76f166
         with:
           lcov-file: coverage-output/coverage.lcov
           lcov-base: coverage.lcov
