@@ -13,6 +13,8 @@
 //! - Audio worklets are very limited, e.g. should not do any allocation.
 //! - Spawning happens on the "main" thread, e.g. if blocked nothing will spawn
 //!   (affects some browsers only).
+//! - Calling any functions from a thread not spawned by `web-thread` will cause
+//!   issues.
 //!
 //! Browser bugs:
 //! - Browsers don't support `TextEncoder`/`TextDecoder` in audio worklets:

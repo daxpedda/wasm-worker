@@ -20,7 +20,7 @@ use std::future::Future;
 use std::panic::RefUnwindSafe;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, LazyLock};
 use std::task::{Context, Poll};
 use std::time::Duration;
 use std::{io, ptr, thread};
@@ -349,14 +349,18 @@ pub(super) fn test_block_support() -> bool {
 pub(super) fn has_spawn_support() -> bool {
 	/// We spawn only from the main thread, so we cache the result to be able to
 	/// call it from other threads but get the result of the main thread.
-	static HAS_SPAWN_SUPPORT: OnceLock<bool> = OnceLock::new();
-
-	*HAS_SPAWN_SUPPORT.get_or_init(|| {
+	#[allow(
+		clippy::disallowed_methods,
+		reason = "this will be called at least once from the main thread before being cached"
+	)]
+	static HAS_SPAWN_SUPPORT: LazyLock<bool> = LazyLock::new(|| {
 		CROSS_ORIGIN_ISOLATED.with(bool::clone) && {
 			let global: GlobalExt = js_sys::global().unchecked_into();
 			!global.worker().is_undefined()
 		}
-	})
+	});
+
+	*HAS_SPAWN_SUPPORT
 }
 
 /// Returns the [`ThreadId`] of the current thread without cloning the
@@ -365,13 +369,17 @@ fn current_id() -> ThreadId {
 	THREAD.with(|cell| cell.get_or_init(Thread::new).id())
 }
 
-/// Determined if the current thread is the main thread.
+/// Determined if the current thread is the main thread. Make sure to
+/// call at least once on the main thread!
 pub(super) fn is_main_thread() -> bool {
-	/// Saves the [`ThreadId`] of the main thread. Make sure this gets
-	/// initialized before spawning any threads.
-	static MAIN_THREAD: OnceLock<ThreadId> = OnceLock::new();
+	/// Saves the [`ThreadId`] of the main thread.
+	#[allow(
+		clippy::disallowed_methods,
+		reason = "this will be called at least once from the main thread before being cached"
+	)]
+	static MAIN_THREAD: LazyLock<ThreadId> = LazyLock::new(current_id);
 
-	*MAIN_THREAD.get_or_init(current_id) == current_id()
+	*MAIN_THREAD == current_id()
 }
 
 /// Converts a reference to a pointer to [`i32`] to an index into the internal

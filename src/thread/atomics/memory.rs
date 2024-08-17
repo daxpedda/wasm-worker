@@ -1,7 +1,5 @@
 //! TLS destruction handling.
 
-use std::cell::OnceCell;
-
 use js_sys::WebAssembly::Global;
 use js_sys::{Number, Object};
 use wasm_bindgen::JsCast;
@@ -25,13 +23,18 @@ pub(super) struct ThreadMemory {
 impl ThreadMemory {
 	/// Create new [`ThreadMemory`] for the calling thread.
 	pub(super) fn new(stack_size: Option<usize>) -> Self {
-		thread_local! {
-			static EXISTS: OnceCell<()> = const { OnceCell::new() };
-		}
+		#[cfg(debug_assertions)]
+		{
+			use std::cell::OnceCell;
 
-		EXISTS
-			.with(|exists| exists.set(()))
-			.expect("created `ThreadMemory` twice for this thread");
+			thread_local! {
+				static EXISTS: OnceCell<()> = const { OnceCell::new() };
+			}
+
+			EXISTS
+				.with(|exists| exists.set(()))
+				.expect("created `ThreadMemory` twice for this thread");
+		}
 
 		let exports: Exports = wasm_bindgen::exports().unchecked_into();
 		let tls_base = Number::unchecked_from_js(exports.tls_base().value()).value_of();

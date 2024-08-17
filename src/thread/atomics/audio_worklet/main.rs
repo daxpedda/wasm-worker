@@ -11,6 +11,11 @@ use super::super::super::ThreadId;
 use super::super::channel::{self, Sender};
 
 /// [`ThreadId`] to destroy [`Sender`] to the main thread.
+#[allow(
+	clippy::disallowed_methods,
+	reason = "this is guaranteed to be initialized from the main thread before any other thread \
+	          will try to access it"
+)]
 pub(super) static DESTROY_SENDER: OnceLock<Sender<ThreadId>> = OnceLock::new();
 
 thread_local! {

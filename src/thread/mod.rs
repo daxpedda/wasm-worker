@@ -271,6 +271,10 @@ pub(crate) fn has_block_support() -> bool {
 				// See <https://bugzilla.mozilla.org/show_bug.cgi?id=1359745>.
 				Global::Shared(_) => {
 					/// Cache if blocking on shared workers is supported.
+					/// REASON: A Wasm module can never be shared between
+					/// multiple shared workers, so this can never be
+					/// initialized from multiple threads at the same time.
+					#[allow(clippy::disallowed_methods)]
 					static HAS_SHARED_WORKER_BLOCK_SUPPORT: OnceLock<bool> = OnceLock::new();
 
 					*HAS_SHARED_WORKER_BLOCK_SUPPORT.get_or_init(r#impl::test_block_support)

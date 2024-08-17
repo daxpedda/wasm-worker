@@ -17,6 +17,11 @@ use super::spawn::{self, SpawnData};
 use super::wait_async::WaitAsync;
 
 /// [`Command`] [`Sender`] to the main thread.
+#[allow(
+	clippy::disallowed_methods,
+	reason = "this is guaranteed to be initialized from the main thread before any other thread \
+	          will try to access it"
+)]
 static COMMAND_SENDER: OnceLock<Sender<Command>> = OnceLock::new();
 
 thread_local! {
