@@ -1,4 +1,4 @@
-name: Documentation
+name: Coverage & Documentation
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: "pages"
+  group: ${{ github.workflow }}-${{ github.ref_name }}
   cancel-in-progress: true
 
 env:
@@ -194,7 +194,9 @@ jobs:
 
     runs-on: ubuntu-latest
 
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    if:
+      github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref_name ==
+      'main')
 
     permissions:
       contents: read
