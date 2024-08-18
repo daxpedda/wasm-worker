@@ -200,7 +200,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install `wasm-bindgen-cli`
-        uses: taiki-e/cache-cargo-install-action@v2
+        uses: taiki-e/install-action@v2
         with:
           tool: wasm-bindgen-cli
       - name: Install Rust
