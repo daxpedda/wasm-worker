@@ -87,7 +87,7 @@ static_assertions = "1"
 
 [target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
 pollster = { version = "0.3", features = ["macro"] }
-ui_test = "0.25"
+ui_test = "0.27"
 
 [target.'cfg(target_family = "wasm")'.dev-dependencies]
 async-channel = { version = "2", default-features = false }
