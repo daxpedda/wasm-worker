@@ -40,6 +40,10 @@ extern "C" {
 	#[wasm_bindgen(method, getter, js_name = WorkletGlobalScope)]
 	pub(super) fn worklet_global_scope(this: &GlobalExt) -> JsValue;
 
+	/// Returns the constructor of [`SharedArrayBuffer`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/SharedArrayBuffer).
+	#[wasm_bindgen(method, getter, js_name = SharedArrayBuffer)]
+	pub(super) fn shared_array_buffer(this: &GlobalExt) -> JsValue;
+
 	/// Extension for [`Window`](https://developer.mozilla.org/en-US/docs/Web/API/Window).
 	#[wasm_bindgen(extends = Window)]
 	pub(super) type WindowExt;
@@ -65,7 +69,7 @@ extern "C" {
 
 	/// Returns [`crossOriginIsolated`](https://developer.mozilla.org/en-US/docs/Web/API/crossOriginIsolated) global property.
 	#[wasm_bindgen(thread_local, js_name = crossOriginIsolated)]
-	pub(super) static CROSS_ORIGIN_ISOLATED: bool;
+	pub(super) static CROSS_ORIGIN_ISOLATED: Option<bool>;
 }
 
 #[cfg(not(web_sys_unstable_apis))]

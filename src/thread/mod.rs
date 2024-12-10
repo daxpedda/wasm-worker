@@ -21,7 +21,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 
+use js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
 use r#impl::Parker;
+use wasm_bindgen::JsCast;
 
 #[cfg(target_feature = "atomics")]
 use self::atomics as r#impl;
@@ -291,4 +293,19 @@ pub(crate) fn has_block_support() -> bool {
 /// Implementation for [`crate::web::has_spawn_support()`].
 pub(crate) fn has_spawn_support() -> bool {
 	r#impl::has_spawn_support()
+}
+
+/// Returns if [`SharedArrayBuffer`][js_sys::SharedArrayBuffer] is supported.
+fn has_shared_array_buffer_support() -> bool {
+	thread_local! {
+		static HAS_SHARED_ARRAY_BUFFER_SUPPORT: bool = {
+			let global: GlobalExt = js_sys::global().unchecked_into();
+
+			CROSS_ORIGIN_ISOLATED
+				.with(Option::clone)
+				.unwrap_or_else(|| !global.shared_array_buffer().is_undefined())
+		};
+	}
+
+	HAS_SHARED_ARRAY_BUFFER_SUPPORT.with(bool::clone)
 }

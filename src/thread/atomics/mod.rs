@@ -34,7 +34,7 @@ use {std::io::Error, wasm_bindgen::JsValue, web_sys::DomException};
 
 use self::oneshot::Receiver;
 pub(super) use self::parker::Parker;
-use super::js::{GlobalExt, CROSS_ORIGIN_ISOLATED};
+use super::js::GlobalExt;
 use super::{ScopedJoinHandle, Thread, ThreadId, THREAD};
 #[cfg(feature = "message")]
 use crate::web::message::MessageSend;
@@ -354,7 +354,7 @@ pub(super) fn has_spawn_support() -> bool {
 		reason = "this will be called at least once from the main thread before being cached"
 	)]
 	static HAS_SPAWN_SUPPORT: LazyLock<bool> = LazyLock::new(|| {
-		CROSS_ORIGIN_ISOLATED.with(bool::clone) && {
+		super::has_shared_array_buffer_support() && {
 			let global: GlobalExt = js_sys::global().unchecked_into();
 			!global.worker().is_undefined()
 		}
